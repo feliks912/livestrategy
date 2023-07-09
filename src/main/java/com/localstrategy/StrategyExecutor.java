@@ -129,6 +129,10 @@ public class StrategyExecutor {
 
     public void priceUpdate(double currentDeviationMean, SingleTransaction currentTransaction, Candle previousCandle){
 
+        if(positions.size() > maxPositionCounter){
+            maxPositionCounter = positions.size();
+        }
+
         if(startTime == 0){
             startTime = currentTransaction.getTimestamp();
         }
@@ -142,8 +146,6 @@ public class StrategyExecutor {
 
         //It seems actual price is +-0.01 all the time.
         double currentPrice = currentTransaction.getPrice() + 0.01 * (random.nextGaussian() < 0 ? -1 : 1);
-
-        int positionCounter = 0;
 
         //TODO: Fixed percentage railing take profit, activated after breakeven, at 2% distance from the current price
         /* for(Position position : positions){
@@ -178,9 +180,32 @@ public class StrategyExecutor {
             }
         } */
 
+        for(Position position : positions){
+            if( !position.isClosed() && 
+                !position.isStoplossActive()){
+                    if( !position.isClosedBeforeStoploss() &&
+                        currentTransaction.getTimestamp() - position.getOpenTimestamp() > position.getExchangeLatency()){
+
+                        position.setStoplossActive();
+                    }
+                    else if(position.isClosedBeforeStoploss() &&
+                            currentTransaction.getTimestamp() - position.getClosedBeforeStoplossTimestamp() > position.getExchangeLatency()){
+
+                        double closePrice = riskManager.getSlippagePrice(currentPrice, position.getSize(), position.getDirection() == 1 ? OrderSide.SELL : OrderSide.BUY);
+
+                        double profit = position.closePosition(previousCandle.getIndex() + 1, currentTransaction.getTimestamp(), closePrice);
+
+                        portfolio += profit;
+                        usedMargin -= position.getMargin();
+
+                        removePositions.add(position);
+                    }
+            }
+        }
+
         if(longTpRRInProgress && !longPositionsToTpRR.isEmpty() && currentTransaction.getTimestamp() - marketShortRequestTimestamp > newShortMarketTradeNextRequestLatency){
             for(Position position : longPositionsToTpRR){
-                if(!position.isClosed() && position.isFilled()){
+                if(!position.isClosed()){
                     
                     double closePrice = riskManager.getSlippagePrice(currentPrice, position.getSize(), OrderSide.SELL);
 
@@ -197,7 +222,7 @@ public class StrategyExecutor {
 
         if(shortTpRRInProgress && !shortPositionsToTpRR.isEmpty() && currentTransaction.getTimestamp() - marketLongRequestTimestamp > newLongMarketTradeNextRequestLatency){
             for(Position position : shortPositionsToTpRR){
-                if(!position.isClosed() && position.isFilled()){
+                if(!position.isClosed()){
                     
                     double closePrice = riskManager.getSlippagePrice(currentPrice, position.getSize(), OrderSide.BUY);
 
@@ -216,7 +241,7 @@ public class StrategyExecutor {
         if(newCandle && currentTransaction.getTimestamp() - previousCandle.getTimestamp() > newCandleNextRequestLatency){
             if(!positionsToTpFixedRR.isEmpty()){
                 for(Position position : positionsToTpFixedRR){
-                    if(!position.isClosed() && position.isFilled()){
+                    if(!position.isClosed()){
 
                         double closePrice = riskManager.getSlippagePrice(currentPrice, position.getSize(), position.getDirection() == 1 ? OrderSide.SELL : OrderSide.BUY);
 
@@ -232,7 +257,7 @@ public class StrategyExecutor {
             
             if(!positionsToBreakeven.isEmpty()){
                 for(Position position : positionsToBreakeven){
-                    if(!position.isClosed() && position.isFilled()){ //Could be closed in the meantime //FIXME: test if this works.
+                    if(!position.isClosed()){ //Could be closed in the meantime //FIXME: test if this works.
                         position.setStopLossPrice(
                             position.getInitialStopLossPrice() + 
                             BEPercentage * (position.getEntryPrice() - position.getInitialStopLossPrice()));
@@ -244,7 +269,7 @@ public class StrategyExecutor {
 
             if(positionsToTrailingProfit.isEmpty()){
                 for(Position position : positionsToTrailingProfit){
-                    if(!position.isClosed() && position.isFilled()){
+                    if(!position.isClosed()){
                         if(position.getDirection() == 1 && previousCandle.getLow() > position.getStopLossPrice()){
                             position.setStopLossPrice(previousCandle.getLow());
                         } 
@@ -263,20 +288,26 @@ public class StrategyExecutor {
         for(Position position : positions){
             //Check position stoploss
             if(!position.isClosed()){
-                positionCounter++;
 
                 if((position.getDirection() == 1 && currentPrice <= position.getStopLossPrice()) ||
                     position.getDirection() == -1 && currentPrice >= position.getStopLossPrice()){
+
+                        if(position.isStoplossActive()){
+                            double stopPrice = riskManager.getSlippagePrice(currentPrice, position.getSize(), position.getDirection() == 1 ? OrderSide.SELL : OrderSide.BUY);
+
+                            double profit = position.closePosition(previousCandle.getIndex() + 1, currentTransaction.getTimestamp(), stopPrice);
+                            temporaryProfit += profit;
+                            portfolio += profit;
+                            usedMargin -= position.getMargin();
+
+                            removePositions.add(position);
+                        } else {
+                            System.out.println("got you.");
+                            position.setClosedBeforeStoploss(currentTransaction.getTimestamp());
+                        }
                         
                     //TODO: Introduce slippage into a stoploss
-                    double stopPrice = riskManager.getSlippagePrice(currentPrice, position.getSize(), position.getDirection() == 1 ? OrderSide.SELL : OrderSide.BUY);
-
-                    double profit = position.closePosition(previousCandle.getIndex() + 1, currentTransaction.getTimestamp(), stopPrice);
-                    temporaryProfit += profit;
-                    portfolio += profit;
-                    usedMargin -= position.getMargin();
-
-                    removePositions.add(position);
+                    
                 }
             }
 
@@ -324,11 +355,6 @@ public class StrategyExecutor {
                     }    
                 }
             } */
-        }
-        
-
-        if(positionCounter > maxPositionCounter){
-            maxPositionCounter = positionCounter;
         }
 
         //FIXME: Edit this so positions are saved during investigation otherwise this lowers the memory requirements drastically
@@ -400,24 +426,24 @@ public class StrategyExecutor {
 
         //TODO: In theory market orders are made at the price of the next transaction, we cannot execute them at the currentPrice because currentPrice is the price of the current transaction which in the meantime moved the price further.
         // A 300 millisecond time off between requesting an order and executing it on the then current market price
-        if(marketShort && currentTransaction.getTimestamp() - marketShortRequestTimestamp > newShortMarketTradeNextRequestLatency){
+        /* if(marketShort && currentTransaction.getTimestamp() - marketShortRequestTimestamp > newShortMarketTradeNextRequestLatency){
             marketShort = false;
 
-            /* double slippagePrice = calculateSlippagePrice(currentPrice);
+            double slippagePrice = calculateSlippagePrice(currentPrice);
 
             if(slippagePrice < stopLossPriceShort){
                 makeOrder(slippagePrice, stopLossPriceShort, "market", previousCandle.getIndex() + 1, currentTransaction.getTimestamp());
-            } */
-        }
+            }
+        } */
 
-        if(marketLong && currentTransaction.getTimestamp() - marketLongRequestTimestamp > newLongMarketTradeNextRequestLatency){
+        /* if(marketLong && currentTransaction.getTimestamp() - marketLongRequestTimestamp > newLongMarketTradeNextRequestLatency){
             marketLong = false;
             
-            /* double slippagePrice = calculateSlippagePrice(currentPrice);
+            double slippagePrice = calculateSlippagePrice(currentPrice);
 
             if(slippagePrice > stopLossPriceLong){
                 makeOrder(slippagePrice, stopLossPriceLong, "market", previousCandle.getIndex() + 1, currentTransaction.getTimestamp());
-            } */
+            }
         }
 
         /* if(limitShort && currentTransaction.getTimestamp() - limitShortRequestTimestamp > newShortLimitTradeNextRequestLatency){
@@ -624,20 +650,20 @@ public class StrategyExecutor {
 
         updateZigZagValue(candles);
 
-        if(lastLow != 0){
+        /* if(lastLow != 0){
             orderEntryPriceShort = lastLow;
         }
         if(lastHigh != 0){
             orderEntryPriceLong = lastHigh;
-        }
+        } */
 
 
-        /* if(topHighIndex != 0 && rangeLow != 0 && lastLow != 0){
+        if(topHighIndex != 0 && rangeLow != 0 && lastLow != 0){
             orderEntryPriceShort = rangeLow > lastLow ? rangeLow : lastLow;
         }
         if(bottomLowIndex != 0 && rangeHigh != 0 && lastHigh != 0){
             orderEntryPriceLong = rangeHigh < lastHigh ? rangeHigh : lastHigh; // Set the appropriate order limit
-        }*/
+        }
 
         
     }
@@ -712,6 +738,7 @@ public class StrategyExecutor {
             riskPercentage,
             usedMargin,
             entryTimestamp,
+            calculateTradeEventLatency() + calculateTradeRequestLatency(),
             riskManager
         );
 
@@ -727,37 +754,6 @@ public class StrategyExecutor {
                 dailyPositionCount++;
             }
         }
-
-        //We close opposite positions AFTER opening a new order
-        /* if(!longPositionsToTpRR.isEmpty()){
-            for(Position position : longPositionsToTpRR){
-                if(!position.isClosed() && position.isFilled()){
-                    
-                    portfolio += position.closePosition(entryIndex, entryTimestamp, entryPrice);
-                    usedMargin -= position.getMargin();
-
-                    removePositions.add(position);
-                }
-            }
-            longPositionsToTpRR.clear();
-        }
-
-        if(!longPositionsToDiscard.isEmpty()){
-            for(Position position : longPositionsToDiscard){
-                if(!position.isClosed() && !position.isFilled()){
-                    position.closePosition(entryIndex, entryTimestamp, position.getEntryPrice());
-
-                    removePositions.add(position);
-                }
-            }
-            longPositionsToDiscard.clear();
-        }
-
-        if(!removePositions.isEmpty()){
-            closedPositions.addAll(removePositions);
-            positions.removeAll(removePositions);
-            removePositions.clear();
-        } */
     }
 
     public void updateZigZagValue(ArrayList<Candle> candles){

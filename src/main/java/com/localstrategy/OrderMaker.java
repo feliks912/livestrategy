@@ -16,6 +16,7 @@ public class OrderMaker {
             double risk,
             double marginUsed,
             long openTimestamp,
+            double exchangeLatency,
             RiskManager riskManager
     ) {
         if (Math.abs(entryPrice - stoplossPrice) > 5) { //$5 difference between entry and stop required.
@@ -80,6 +81,7 @@ public class OrderMaker {
                             requiredMargin,
                             timeIndex,
                             openTimestamp,
+                            exchangeLatency,
                             borrowAmount
                         )
                 );

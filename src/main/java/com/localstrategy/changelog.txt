@@ -1,4 +1,4 @@
-6:30PM 9.7.2023
+9.7.2023 18:30
     Added trailing stoploss on previous candle high / low
     Changed entry strategy - last low / high no longer have to match the lowest low / highest recent high (but new orders can still only be made on a lower low / higher high using usedHigh / usedLow flags)
     The entry price is always ZigZag low / high, no more range.
@@ -11,3 +11,20 @@
         Introduce reversing a trade on stop
             Fixed profit to recouperate loss (depends on stoploss percentage)
         Convert to multi-threaded
+
+9.7.2023 20:00
+    Added latency between order activation and setting a stoploss
+
+    Observation:
+        We lost a lot on that one
+
+    Todo: FIXME:
+        Currently we place a stop-limit order entry request when when a new stoploss level is recognized, but I forgot to cancel the previous one on new candle formation. That takes 2*trade request latency because we must cancel, then create an order (binance, of course, doesn't support closing and creating a new order in the same request ofc ofc). I must implement the latency those two requests take.
+
+        Also, it takes LONGER for us to get a response from the server because I've been analyzing how long it takes for the exchange to execute and order compared to when the request was sent, not how long it takes for us to receive that response. I've got to test that aswell, then implement it here.
+
+9.7.2023 20:33
+    Reintroduced ranges to entry triggers
+
+    Observations:
+        

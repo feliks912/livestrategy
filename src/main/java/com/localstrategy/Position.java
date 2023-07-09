@@ -22,7 +22,14 @@ public class Position {
     private double hourlyInterestRate;
     private double borrowedAmount;
 
+    private double exchangeLatency;
+
+    private boolean activeStoploss = false;
+
     private double trailingPct = 0;
+
+    private boolean closedBeforeStoploss = false;
+    private long closedBeforeStoplossTimestamp;
 
     private int initialStopLossIndex;
     private int entryPriceIndex;
@@ -31,7 +38,7 @@ public class Position {
 
     private long closeRequestTimestamp;
 
-    public Position(int PositionId, String orderType, double entryPrice, double initialStopLossPrice, double size, double margin, int openIndex, long openTimestamp, double borrowedAmount) {
+    public Position(int PositionId, String orderType, double entryPrice, double initialStopLossPrice, double size, double margin, int openIndex, long openTimestamp, double exchangeLatency, double borrowedAmount) {
         this.id = PositionId;
         this.orderType = orderType;
         this.entryPrice = entryPrice;
@@ -53,6 +60,9 @@ public class Position {
         this.closedIndex = 0;
         this.profit = 0;
         this.partiallyClosed = false;
+
+        this.exchangeLatency = exchangeLatency;
+
         this.hourlyInterestRate = direction == 1 ? RiskManager.HOURLY_USDT_INTEREST_RATE / 100 : RiskManager.HOURLY_BTC_INTEREST_RATE / 100;
         this.totalUnpaidInterest = borrowedAmount * hourlyInterestRate * (direction == 1 ? 1 : entryPrice);
     }
@@ -283,5 +293,30 @@ public class Position {
     //FIXME: borrowedAmount doesn't account for partial closes
     public void increaseUnpaidInterest(double currentPrice){
         this.totalUnpaidInterest += borrowedAmount * hourlyInterestRate * (direction == 1 ? 1 : currentPrice);
+    }
+
+    public void setStoplossActive(){
+        this.activeStoploss = true;
+    }
+
+    public boolean isStoplossActive(){
+        return this.activeStoploss;
+    }
+
+    public double getExchangeLatency(){
+        return this.exchangeLatency;
+    }
+
+    public void setClosedBeforeStoploss(long closedBeforeStoplossTimestamp){
+        this.closedBeforeStoploss = true;
+        this.closedBeforeStoplossTimestamp = closedBeforeStoplossTimestamp;
+    }
+
+    public long getClosedBeforeStoplossTimestamp(){
+        return this.closedBeforeStoplossTimestamp;
+    }
+
+    public boolean isClosedBeforeStoploss(){
+        return this.closedBeforeStoploss;
     }
 }
