@@ -33,7 +33,9 @@ public class OrderMaker {
 
             //FIXME: Commented to simulate ideal environment.
             positionSize = Math.max(10 / entryPrice, positionSize);
-            positionSize = Math.max(0.00001, Math.min(positionSize, 152));
+            positionSize = Math.max(positionSize, 0.00001);
+            
+            //positionSize = Math.max(0.00001, Math.min(positionSize, 152));
 
             positionSize = Math.min(positionSize, riskManager.getMaximumOrderSize(entryPrice, Math.abs(entryPrice - stoplossPrice), 10, (entryPrice > stoplossPrice ? OrderSide.BUY : OrderSide.SELL)));
 

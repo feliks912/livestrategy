@@ -242,11 +242,11 @@ public class Position {
         return this.breakEven;
     }
 
-    public boolean getBreakEven() {
+    public boolean isBreakevenSet() {
         return this.breakEven;
     }
 
-    public void setBreakEven(boolean breakEven) {
+    public void setBreakevenFlag(boolean breakEven) {
         this.breakEven = breakEven;
     }
 

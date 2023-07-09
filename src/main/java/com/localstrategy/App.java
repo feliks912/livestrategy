@@ -4,19 +4,19 @@ public class App {
 
     public static void main( String[] args ) {
 
-        /* StrategyExecutor zigZagStrategy = new StrategyExecutor(3, 2, 0, 0.1, 1.6, 0.3, 1000, 0.1, 0);
+        /* StrategyExecutor zigZagStrategy = new StrategyExecutor(10, 2, 0, 100, 100, 0, 10000, 0.1, 0);
 
-        TradingGUI gui = new TradingGUI(zigZagStrategy); */
+        TradingGUI gui = new TradingGUI(1000000, zigZagStrategy); */
 
         StrategyStarter strategy = new StrategyStarter(
             "C:/--- BTCUSDT",
-            500000,
-            100,
-            3,
+            1000000,
+            10,
             2,
-            0.1,
+            0,
+            100,
             1000,
-            1,
+            0,
             10000,
             0.1,
             0

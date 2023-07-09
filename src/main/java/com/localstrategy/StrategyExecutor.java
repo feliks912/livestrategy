@@ -127,6 +127,26 @@ public class StrategyExecutor {
 
     }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     public void priceUpdate(double currentDeviationMean, SingleTransaction currentTransaction, Candle previousCandle){
 
         if(positions.size() > maxPositionCounter){
@@ -251,8 +271,8 @@ public class StrategyExecutor {
 
                         removePositions.add(position);
                     }
-                    positionsToTpFixedRR.clear();
                 }
+                positionsToTpFixedRR.clear();
             }
             
             if(!positionsToBreakeven.isEmpty()){
@@ -261,21 +281,37 @@ public class StrategyExecutor {
                         position.setStopLossPrice(
                             position.getInitialStopLossPrice() + 
                             BEPercentage * (position.getEntryPrice() - position.getInitialStopLossPrice()));
-                        position.setBreakEven(true);
+                        position.setBreakevenFlag(true);
                     }
                 }
                 positionsToBreakeven.clear();
             }
 
-            if(positionsToTrailingProfit.isEmpty()){
+            if(!positionsToTrailingProfit.isEmpty()){
                 for(Position position : positionsToTrailingProfit){
                     if(!position.isClosed()){
-                        if(position.getDirection() == 1 && previousCandle.getLow() > position.getStopLossPrice()){
+                        /* if(position.getDirection() == 1 && previousCandle.getLow() > position.getStopLossPrice()){
                             position.setStopLossPrice(previousCandle.getLow());
                         } 
                         else if(position.getDirection() == -1 && previousCandle.getHigh() < position.getStopLossPrice()){
                             position.setStopLossPrice(previousCandle.getHigh());
+                        } */
+
+                        double trailingPrice = position.getStopLossPrice() + ((previousCandle.getClose() - position.getStopLossPrice()) * 0.6);
+
+                        if(position.getDirection() == 1 && trailingPrice > position.getStopLossPrice()){
+                            position.setStopLossPrice(trailingPrice);
+                        } 
+                        else if(position.getDirection() == -1 && trailingPrice < position.getStopLossPrice()) {
+                            position.setStopLossPrice(trailingPrice);
                         }
+
+                        /* if(position.getDirection() == 1 && lastLow > position.getStopLossPrice()){
+                            position.setStopLossPrice(lastLow);
+                        }
+                        else if(position.getDirection() == -1 && lastHigh < position.getStopLossPrice()){
+                            position.setStopLossPrice(lastHigh);
+                        } */
                     }
                 }
                 positionsToTrailingProfit.clear();
@@ -292,22 +328,18 @@ public class StrategyExecutor {
                 if((position.getDirection() == 1 && currentPrice <= position.getStopLossPrice()) ||
                     position.getDirection() == -1 && currentPrice >= position.getStopLossPrice()){
 
-                        if(position.isStoplossActive()){
-                            double stopPrice = riskManager.getSlippagePrice(currentPrice, position.getSize(), position.getDirection() == 1 ? OrderSide.SELL : OrderSide.BUY);
+                    if(position.isStoplossActive()){
+                        double stopPrice = riskManager.getSlippagePrice(currentPrice, position.getSize(), position.getDirection() == 1 ? OrderSide.SELL : OrderSide.BUY);
 
-                            double profit = position.closePosition(previousCandle.getIndex() + 1, currentTransaction.getTimestamp(), stopPrice);
-                            temporaryProfit += profit;
-                            portfolio += profit;
-                            usedMargin -= position.getMargin();
+                        double profit = position.closePosition(previousCandle.getIndex() + 1, currentTransaction.getTimestamp(), stopPrice);
+                        temporaryProfit += profit;
+                        portfolio += profit;
+                        usedMargin -= position.getMargin();
 
-                            removePositions.add(position);
-                        } else {
-                            System.out.println("got you.");
-                            position.setClosedBeforeStoploss(currentTransaction.getTimestamp());
-                        }
-                        
-                    //TODO: Introduce slippage into a stoploss
-                    
+                        removePositions.add(position);
+                    } else {
+                        position.setClosedBeforeStoploss(currentTransaction.getTimestamp());
+                    }
                 }
             }
 
@@ -487,7 +519,7 @@ public class StrategyExecutor {
 
                             makeOrder(orderEntryPriceShort, stopLossPriceShort, "market", previousCandle.getIndex() + 1, currentTransaction.getTimestamp());
                         }
-                    } /* else if(previousCandle.getClose() < orderEntryPriceShort && currentPrice < orderEntryPriceShort){
+                    } else if(previousCandle.getClose() < orderEntryPriceShort && currentPrice < orderEntryPriceShort){
                         usedLow = true;
 
                         if(sayLimit){
@@ -496,7 +528,7 @@ public class StrategyExecutor {
                         }
 
                         //makeOrder(orderEntryPriceShort, stopLossPriceShort, "limit", previousCandle.getIndex() + 1, currentTransaction.getTimestamp());
-                    } */
+                    }
                 }
             }
         }
@@ -522,7 +554,7 @@ public class StrategyExecutor {
 
                             makeOrder(orderEntryPriceLong, stopLossPriceLong, "market", previousCandle.getIndex() + 1, currentTransaction.getTimestamp());
                         }
-                    } /* else if(previousCandle.getClose() > orderEntryPriceLong && currentPrice > orderEntryPriceLong){
+                    } else if(previousCandle.getClose() > orderEntryPriceLong && currentPrice > orderEntryPriceLong){
                         usedHigh = true;
 
                         if(sayLimit){
@@ -531,11 +563,39 @@ public class StrategyExecutor {
                         }
 
                         //makeOrder(orderEntryPriceLong, stopLossPriceLong, "limit", previousCandle.getIndex() + 1, currentTransaction.getTimestamp());
-                    } */
+                    }
                 }
             }
         }
     }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     public void newCandle(SingleTransaction lastTransaction, ArrayList<Candle> candles){
 
@@ -575,14 +635,14 @@ public class StrategyExecutor {
             }
 
             if(!position.isClosed() && position.isFilled()){
-                if(!position.getBreakEven()){
+                if(!position.isBreakevenSet()){
                     if((position.getDirection() == 1 && candle.getClose() > position.getEntryPrice()) ||
                         position.getDirection() == -1 && candle.getClose() < position.getEntryPrice()) {
 
                         positionsToBreakeven.add(position);
                     }
                 } 
-                else if(position.getBreakEven()){
+                else {
                     positionsToTrailingProfit.add(position);
                 }   
             }
@@ -647,23 +707,22 @@ public class StrategyExecutor {
                 usedLow = false; //Entry switch on
             }
         }
-
         updateZigZagValue(candles);
 
-        /* if(lastLow != 0){
+        if(lastLow != 0){
             orderEntryPriceShort = lastLow;
         }
         if(lastHigh != 0){
             orderEntryPriceLong = lastHigh;
-        } */
+        }
 
 
-        if(topHighIndex != 0 && rangeLow != 0 && lastLow != 0){
+        /* if(topHighIndex != 0 && rangeLow != 0 && lastLow != 0){
             orderEntryPriceShort = rangeLow > lastLow ? rangeLow : lastLow;
         }
         if(bottomLowIndex != 0 && rangeHigh != 0 && lastHigh != 0){
             orderEntryPriceLong = rangeHigh < lastHigh ? rangeHigh : lastHigh; // Set the appropriate order limit
-        }
+        } */
 
         
     }
@@ -755,6 +814,26 @@ public class StrategyExecutor {
             }
         }
     }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     public void updateZigZagValue(ArrayList<Candle> candles){
 

@@ -15,13 +15,14 @@ public class TradingGUI extends JFrame {
     private double oldPortfolio = 0;
     private double currentPortfolio = 0;
 
-    public TradingGUI(StrategyExecutor zigzagstrat) {
+
+    public TradingGUI(double candleVolume, StrategyExecutor zigzagstrat) {
         // Set the layout manager for the frame
         setLayout(new BorderLayout());
 
         // Create a candlestick chart
         positionsTable = new PositionsTable(false);
-        candlestickChart = new CandlestickChart(positionsTable, zigzagstrat, false);
+        candlestickChart = new CandlestickChart(candleVolume, positionsTable, zigzagstrat, false);
         
 
         // Get initial portfolio values

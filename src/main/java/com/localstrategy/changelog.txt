@@ -27,4 +27,25 @@
     Reintroduced ranges to entry triggers
 
     Observations:
-        
+        Higher profits
+
+    Todo:
+        Introduce BE on a percentage move from the entry price, this way we'll avoid losses where price moves away from entry but hits the stoploss in the same candle. Especially true in volatile markets. Prioritize minimizing losses.
+
+9.7.2023 21:50
+    Added trailing stoploss at a percentage between previous candle close and entry.
+
+    Observations:
+        Some days are catastrophically profitable, but on others the losses recouperate
+
+    Todo:
+        500000 volume candles just don't seem to cut it on days ~450 to ~700. Try with 2mil.
+        TODO: Priority - cut losses
+            Loss prevention methods:
+                Opposite reordering ?
+                Higher distance values
+                Higher ZigZag parameter values
+                Rollback to matching ZigZag values with highest / lowest values
+                Lower risk
+                New detection method (but refactor first)
+                    Note previous potential limit levels (but don't take them) and only open positions when price crosses that level. Hopefully those are potential reversal levels so them, and onwards would be a good place to start checking for levels

@@ -22,6 +22,8 @@ public class CandleConstructor {
     private Candle candle;
     private int candleIndex = 0;
 
+    private static final int MAXIMUM_CANDLES_SIZE = 500;
+
     public CandleConstructor(double volumePerCandle){
         this.volumePerCandle = volumePerCandle;
     }
@@ -58,7 +60,7 @@ public class CandleConstructor {
 
                 calculateDistance(candle);
 
-                if(candles.size() >= 2000){
+                if(candles.size() >= MAXIMUM_CANDLES_SIZE){
                     candles.remove(0);
                 }
 
@@ -100,7 +102,7 @@ public class CandleConstructor {
             if(candleToBeClosed == false){ //If normal candle formed not a single transaction candle
                 calculateDistance(candle);
 
-                if(candles.size() >= 2000){
+                if(candles.size() >= MAXIMUM_CANDLES_SIZE){
                     candles.remove(0);
                 }
 

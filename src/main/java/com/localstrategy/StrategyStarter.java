@@ -48,7 +48,7 @@ public class StrategyStarter {
 
         StrategyExecutor zigZagStrategy = new StrategyExecutor(distance, ZZDepth, ZZBackstep, tpRR, fixedRR, BEPercentage, initialPortfolio, riskPercentage, brokerCommissionRate);
 
-        TransactionLoader transactionLoader = new TransactionLoader(inputDataFolderPath, null, null);
+        TransactionLoader transactionLoader = new TransactionLoader(inputDataFolderPath, "2022-11-13", null);
 
         int fileCount = transactionLoader.getTotalCsvFiles();
         

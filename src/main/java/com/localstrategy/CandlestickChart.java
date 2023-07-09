@@ -45,13 +45,15 @@ public class CandlestickChart extends JFrame {
     private StrategyExecutor zigZagStrat;
     private PositionsTable positionsTable;
     boolean isButtonPressed = false;
-    CandleConstructor candleConstructor = new CandleConstructor(500000);
+    CandleConstructor candleConstructor;
 
-    public CandlestickChart(PositionsTable positionsTable, StrategyExecutor zigZagStrat, boolean visible) {
+    public CandlestickChart(double candleVolume, PositionsTable positionsTable, StrategyExecutor zigZagStrat, boolean visible) {
         super("Candlestick Chart Demo");
         this.positionsTable = positionsTable;
         this.zigZagStrat = zigZagStrat;
         this.oldPortfolio = zigZagStrat.getPortfolio();
+
+        this.candleConstructor = new CandleConstructor(candleVolume);
 
         calendar.set(1970, Calendar.JANUARY, 1, 0, 0, 0);
 
@@ -171,7 +173,7 @@ public class CandlestickChart extends JFrame {
     public void executor(){
         ArrayList<SingleTransaction> transactionList = new ArrayList<SingleTransaction>();
 
-        TransactionLoader transactionLoader = new TransactionLoader("C:/--- BTCUSDT/", "2022-12-10", null);
+        TransactionLoader transactionLoader = new TransactionLoader("C:/--- BTCUSDT/", "2022-11-13", null);
 
         int fileCount = transactionLoader.getTotalCsvFiles();
 
@@ -210,7 +212,7 @@ public class CandlestickChart extends JFrame {
                         }
                     } else {
                         try{
-                            Thread.sleep(50);
+                            Thread.sleep(150);
                         } catch(Exception e){
                             System.out.println(e);
                         }
