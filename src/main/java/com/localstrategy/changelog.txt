@@ -1,0 +1,13 @@
+6:30PM 9.7.2023
+    Added trailing stoploss on previous candle high / low
+    Changed entry strategy - last low / high no longer have to match the lowest low / highest recent high (but new orders can still only be made on a lower low / higher high using usedHigh / usedLow flags)
+    The entry price is always ZigZag low / high, no more range.
+
+    Observations:
+        More positions - crazy profits, crazy losses.
+    
+    Todo:
+        Increase distance and ZigZag values
+        Introduce reversing a trade on stop
+            Fixed profit to recouperate loss (depends on stoploss percentage)
+        Convert to multi-threaded
