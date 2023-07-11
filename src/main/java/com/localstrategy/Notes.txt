@@ -56,3 +56,6 @@ FIXME:
     TODO:
         tpRR lags by the tradeRequestLatency behind opening our order programmatically and getting a usedUpdate frame. My assumption is it is approximatelly the same time it takes the trade to be executed? Because now we're getting confirmations over a stream
             We can probably locally detect the change in price and when our order would trigger, therefore the time it takes to close tpRR trades is the time it takes the exchange to process the trade request.
+
+
+

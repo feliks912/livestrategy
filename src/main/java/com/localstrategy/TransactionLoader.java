@@ -54,7 +54,7 @@ public class TransactionLoader {
         ArrayList<SingleTransaction> transactions = new ArrayList<>();
         if(!filesQueue.isEmpty()){
             Path filePath = filesQueue.poll();
-            try(CSVReader reader = new CSVReader(new FileReader(filePath.toString()))){
+            try(CSVReader reader = new CSVReader(new FileReader(filePath.toString()))){ //We read the whole file here
                 String[] nextLine;
                 /* while ((nextLine = reader.readNext()) != null) {
                     SingleTransaction transaction = new SingleTransaction();

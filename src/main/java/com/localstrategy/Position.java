@@ -34,11 +34,25 @@ public class Position {
     private int initialStopLossIndex;
     private int entryPriceIndex;
 
+    private int tick;
+
     private double totalUnpaidInterest;
 
     private long closeRequestTimestamp;
 
-    public Position(int PositionId, String orderType, double entryPrice, double initialStopLossPrice, double size, double margin, int openIndex, long openTimestamp, double exchangeLatency, double borrowedAmount) {
+    public Position(
+            int PositionId,
+            String orderType,
+            double entryPrice,
+            double initialStopLossPrice,
+            double size,
+            double margin,
+            int openIndex,
+            long openTimestamp,
+            int tick,
+            double exchangeLatency,
+            double borrowedAmount) {
+
         this.id = PositionId;
         this.orderType = orderType;
         this.entryPrice = entryPrice;
@@ -62,6 +76,8 @@ public class Position {
         this.partiallyClosed = false;
 
         this.exchangeLatency = exchangeLatency;
+
+        this.tick = tick;
 
         this.hourlyInterestRate = direction == 1 ? RiskManager.HOURLY_USDT_INTEREST_RATE / 100 : RiskManager.HOURLY_BTC_INTEREST_RATE / 100;
         this.totalUnpaidInterest = borrowedAmount * hourlyInterestRate * (direction == 1 ? 1 : entryPrice);
@@ -318,5 +334,9 @@ public class Position {
 
     public boolean isClosedBeforeStoploss(){
         return this.closedBeforeStoploss;
+    }
+
+    public int getTick(){
+        return this.tick;
     }
 }

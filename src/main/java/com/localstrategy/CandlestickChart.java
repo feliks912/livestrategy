@@ -173,7 +173,7 @@ public class CandlestickChart extends JFrame {
     public void executor(){
         ArrayList<SingleTransaction> transactionList = new ArrayList<SingleTransaction>();
 
-        TransactionLoader transactionLoader = new TransactionLoader("C:/--- BTCUSDT/", "2022-11-13", null);
+        TransactionLoader transactionLoader = new TransactionLoader("C:/--- BTCUSDT/", "2022-11-22", null);
 
         int fileCount = transactionLoader.getTotalCsvFiles();
 

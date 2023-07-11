@@ -16,6 +16,7 @@ public class OrderMaker {
             double risk,
             double marginUsed,
             long openTimestamp,
+            int tick,
             double exchangeLatency,
             RiskManager riskManager
     ) {
@@ -83,6 +84,7 @@ public class OrderMaker {
                             requiredMargin,
                             timeIndex,
                             openTimestamp,
+                            tick,
                             exchangeLatency,
                             borrowAmount
                         )

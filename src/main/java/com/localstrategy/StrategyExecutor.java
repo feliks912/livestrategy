@@ -101,6 +101,9 @@ public class StrategyExecutor {
     private boolean longTpRRInProgress = false;
     private boolean fixedRRInProgress = false;
 
+    private int bottomLowTick;
+    private int topHighTick;
+
     private boolean sayLimit = true;
 
     private boolean newCandle = false;
@@ -126,19 +129,6 @@ public class StrategyExecutor {
 
 
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -297,7 +287,7 @@ public class StrategyExecutor {
                             position.setStopLossPrice(previousCandle.getHigh());
                         } */
 
-                        double trailingPrice = position.getStopLossPrice() + ((previousCandle.getClose() - position.getStopLossPrice()) * 0.6);
+                        double trailingPrice = position.getStopLossPrice() + ((previousCandle.getClose() - position.getStopLossPrice()) * 0.5);
 
                         if(position.getDirection() == 1 && trailingPrice > position.getStopLossPrice()){
                             position.setStopLossPrice(trailingPrice);
@@ -513,11 +503,11 @@ public class StrategyExecutor {
 
                             marketShortRequestTimestamp = currentTransaction.getTimestamp();
 
-                            checktpRR(currentPrice, OrderSide.SELL);
+                            checktpRR(currentPrice, OrderSide.SELL, topHighTick);
 
                             newShortMarketTradeNextRequestLatency = calculateTradeRequestLatency() + calculateTradeEventLatency();
 
-                            makeOrder(orderEntryPriceShort, stopLossPriceShort, "market", previousCandle.getIndex() + 1, currentTransaction.getTimestamp());
+                            makeOrder(orderEntryPriceShort, stopLossPriceShort, "market", topHighTick, previousCandle.getIndex() + 1, currentTransaction.getTimestamp());
                         }
                     } else if(previousCandle.getClose() < orderEntryPriceShort && currentPrice < orderEntryPriceShort){
                         usedLow = true;
@@ -548,11 +538,11 @@ public class StrategyExecutor {
 
                             marketLongRequestTimestamp = currentTransaction.getTimestamp();
 
-                            checktpRR(currentPrice, OrderSide.BUY);
+                            checktpRR(currentPrice, OrderSide.BUY, bottomLowTick);
 
                             newLongMarketTradeNextRequestLatency = calculateTradeRequestLatency() + calculateTradeEventLatency();
 
-                            makeOrder(orderEntryPriceLong, stopLossPriceLong, "market", previousCandle.getIndex() + 1, currentTransaction.getTimestamp());
+                            makeOrder(orderEntryPriceLong, stopLossPriceLong, "market", bottomLowTick, previousCandle.getIndex() + 1, currentTransaction.getTimestamp());
                         }
                     } else if(previousCandle.getClose() > orderEntryPriceLong && currentPrice > orderEntryPriceLong){
                         usedHigh = true;
@@ -639,11 +629,13 @@ public class StrategyExecutor {
                     if((position.getDirection() == 1 && candle.getClose() > position.getEntryPrice()) ||
                         position.getDirection() == -1 && candle.getClose() < position.getEntryPrice()) {
 
-                        positionsToBreakeven.add(position);
+                        if(position.calculateRR(candle.getClose()) > 2.5){
+                            positionsToBreakeven.add(position);
+                        }
                     }
                 } 
                 else {
-                    positionsToTrailingProfit.add(position);
+                    //positionsToTrailingProfit.add(position);
                 }   
             }
 
@@ -664,9 +656,12 @@ public class StrategyExecutor {
             firstHighLowFound = true;
         }
 
+        updateZigZagValue(candles);
+
         if(firstHighLowFound){
             if(candle.getTick() < -distance){
                 bottomLowIndex = candle.getIndex(); //Save the candle index
+                bottomLowTick = candle.getTick();
 
                 stopLossPriceLong = candle.getLow();
 
@@ -688,6 +683,7 @@ public class StrategyExecutor {
             
             if (candle.getTick() > distance){ //'new' high
                 topHighIndex = candle.getIndex(); //Save the candle index
+                topHighTick = candle.getTick();
 
                 stopLossPriceShort = candle.getHigh();
 
@@ -707,14 +703,21 @@ public class StrategyExecutor {
                 usedLow = false; //Entry switch on
             }
         }
-        updateZigZagValue(candles);
 
-        if(lastLow != 0){
+        if(lastLowIndex < topHighIndex && candle.getClose() > lastLow){
+            orderEntryPriceShort = lastLow;
+        }
+        if(lastHighIndex < bottomLowIndex && candle.getClose() < lastHigh){
+            orderEntryPriceLong = lastHigh;
+        }
+        
+
+        /* if(lastLow != 0){
             orderEntryPriceShort = lastLow;
         }
         if(lastHigh != 0){
             orderEntryPriceLong = lastHigh;
-        }
+        } */
 
 
         /* if(topHighIndex != 0 && rangeLow != 0 && lastLow != 0){
@@ -753,26 +756,58 @@ public class StrategyExecutor {
         return portfolioList;
     }
 
-    private void checktpRR(double currentPrice, OrderSide orderSide){
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private void checktpRR(double currentPrice, OrderSide orderSide, int currentTick){
         for(Position position : positions){
             if(!position.isClosed() &&
                 ((position.getDirection() == -1 && orderSide.equals(OrderSide.BUY)) ||  //  Against short position
                 (position.getDirection() == 1 && orderSide.equals(OrderSide.SELL)))){ //   Against long position
 
-                if(position.isFilled() && position.calculateRR(currentPrice) > tpRR) {
-                    if(orderSide.equals(OrderSide.BUY)){
-                        shortPositionsToTpRR.add(position);
-                        shortTpRRInProgress = true;
-                    } else {
-                        longPositionsToTpRR.add(position);
-                        longTpRRInProgress = true;
-                    }
-                } 
-                else if(!position.isFilled()) { //Discard unfilled limit orders
-                    if(orderSide.equals(OrderSide.BUY)){
-                        shortPositionsToDiscard.add(position);
-                    } else {
-                        longPositionsToDiscard.add(position);
+                if((Math.abs(currentTick - position.getTick()) / Math.abs(position.getTick())) * 100 < 20 ||
+                    Math.abs(currentTick) > Math.abs(position.getTick())){ //Only -20% difference in tick values or higher tick values are considered to close the position
+                    if(position.isFilled() && position.calculateRR(currentPrice) > tpRR) {
+                        if(orderSide.equals(OrderSide.BUY)){
+                            shortPositionsToTpRR.add(position);
+                            shortTpRRInProgress = true;
+                        } else {
+                            longPositionsToTpRR.add(position);
+                            longTpRRInProgress = true;
+                        }
+                    } 
+                    else if(!position.isFilled()) { //Discard unfilled limit orders
+                        if(orderSide.equals(OrderSide.BUY)){
+                            shortPositionsToDiscard.add(position);
+                        } else {
+                            longPositionsToDiscard.add(position);
+                        }
                     }
                 }
             }
@@ -780,8 +815,11 @@ public class StrategyExecutor {
     }
 
 
+
+
+
     //makeOrder already executed with slippage
-    private void makeOrder(double entryPrice, double stopLossPrice, String orderType, int entryIndex, long entryTimestamp){
+    private void makeOrder(double entryPrice, double stopLossPrice, String orderType, int tick, int entryIndex, long entryTimestamp){
 
         int positionsSize = positions.size();
 
@@ -797,6 +835,7 @@ public class StrategyExecutor {
             riskPercentage,
             usedMargin,
             entryTimestamp,
+            tick,
             calculateTradeEventLatency() + calculateTradeRequestLatency(),
             riskManager
         );
@@ -814,22 +853,6 @@ public class StrategyExecutor {
             }
         }
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
