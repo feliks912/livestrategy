@@ -7,7 +7,7 @@ public class Position {
     private double initialStopLossPrice;
     private double size;
     private double closingPrice;
-    private int direction;
+    private OrderSide direction;
     private int openIndex;
     private boolean breakEven;
     private double margin;
@@ -17,53 +17,46 @@ public class Position {
     private int closedIndex;
     private double profit;
     private boolean partiallyClosed;
-    private String orderType;
+    private OrderType orderType;
     private long openTimestamp;
     private double hourlyInterestRate;
     private double borrowedAmount;
     private double fillPrice;
-
+    private long fillTimestamp;
+    private long closeTimestamp;
     private double exchangeLatency;
-
-    private boolean activeStoploss = false;
-
-    private double trailingPct = 0;
-
-    private boolean closedBeforeStoploss = false;
-    private long closedBeforeStoplossTimestamp;
-
+    private boolean activeStopLoss;
+    private double trailingPct;
+    private boolean closedBeforeStopLoss;
+    private long closedBeforeStopLossTimestamp;
     private int initialStopLossIndex;
     private int entryPriceIndex;
-
     private int tick;
-
     private double totalUnpaidInterest;
-
     private long closeRequestTimestamp;
-
-    private boolean reversed = false;
+    private boolean reversed;
 
     public Position(
             double openPrice,
             double initialStopLossPrice,
             double size,
-            String orderType,
+            OrderType orderType,
             double margin,
             double borrowedAmount,
-            int PositionId) {
+            int positionId) {
 
-        this.id = PositionId;
+        this.id = positionId;
         this.orderType = orderType;
         this.stopLossPrice = initialStopLossPrice;
         this.entryPriceIndex = openIndex;
         this.initialStopLossPrice = openIndex;
         this.initialStopLossPrice = initialStopLossPrice;
 
-        //TODO: Convert position to use fill price instead of open price during calculation
+        // TODO: Convert position to use fill price instead of open price during calculation
         this.openPrice = openPrice;
         this.size = size;
         this.closingPrice = 0;
-        this.direction = openPrice > stopLossPrice ? 1 : -1;
+        this.direction = openPrice > stopLossPrice ? OrderSide.BUY : OrderSide.SELL;
         this.borrowedAmount = borrowedAmount;
         this.breakEven = false;
         this.margin = margin;
@@ -74,8 +67,8 @@ public class Position {
         this.profit = 0;
         this.partiallyClosed = false;
 
-        this.hourlyInterestRate = direction == 1 ? AssetHandler.HOURLY_USDT_INTEREST_RATE / 100 : AssetHandler.HOURLY_BTC_INTEREST_RATE / 100;
-        this.totalUnpaidInterest = borrowedAmount * hourlyInterestRate * (direction == 1 ? 1 : openPrice);
+        this.hourlyInterestRate = direction.equals(OrderSide.BUY) ? AssetHandler.HOURLY_USDT_INTEREST_RATE / 100 : AssetHandler.HOURLY_BTC_INTEREST_RATE / 100;
+        this.totalUnpaidInterest = borrowedAmount * hourlyInterestRate * (direction.equals(OrderSide.BUY) ? 1 : openPrice);
     }
     
 
@@ -84,7 +77,7 @@ public class Position {
             return 0;
         }
 
-        if ((direction == 1 && candle.getLow() <= stopLossPrice) || (direction == -1 && candle.getHigh() >= stopLossPrice)) {
+        if ((direction.equals(OrderSide.BUY) && candle.getLow() <= stopLossPrice) || (direction.equals(OrderSide.SELL) && candle.getHigh() >= stopLossPrice)) {
             return closePosition(stopLossPrice, closeTimestamp);
         }
 
@@ -92,23 +85,24 @@ public class Position {
     }
 
     public double calculateProfit(double closePrice) {
-        return (closePrice - openPrice) * direction * size;
+        return (closePrice - fillPrice) * size * (direction.equals(OrderSide.BUY) ? 1 : -1);
     }
 
-    public double fillPosition(int fillTime) {
+    public double fillPosition(double fillPrice, long fillTime) {
         if (!closed && !filled) {
             filled = true;
-            filledIndex = fillTime;
+            this.fillPrice = fillPrice;
+            fillTimestamp = fillTime;
             return margin;
         }
         return 0;
     }
 
-    public double payCommission(){
+    public double payCommission() {
         return size * StrategyExecutor.brokerCommissionRate / 100;
     }
 
-    //FIXME: Check calculations
+    // FIXME: Check calculations
     public double partialClose(int closeIndex, long closeTimestamp, double closePrice, double positionPercentage) {
         if (closed || positionPercentage <= 0 || positionPercentage > 1) {
             return 0;
@@ -117,7 +111,7 @@ public class Position {
         double tempCommission = payCommission();
         
         // Calculate the profit per unit size
-        double profitPerUnitSize = (closePrice - openPrice) * direction;
+        double profitPerUnitSize = (closePrice - fillPrice) * (direction.equals(OrderSide.BUY) ? 1 : -1);
         
         double partialSize = positionPercentage * size;
         
@@ -140,7 +134,7 @@ public class Position {
         partiallyClosed = true;
         
         return partialProfit - tempCommission;
-}
+    }
 
     public double closePosition(double closePrice, long closeTimestamp) {
         if (closed) {
@@ -148,10 +142,10 @@ public class Position {
         }
 
         closed = true;
-        closeTimestamp = closeTimestamp;
+        this.closeTimestamp = closeTimestamp;
         closingPrice = closePrice;
 
-        if(!filled){
+        if (!filled) {
             return 0;
         }
 
@@ -160,26 +154,25 @@ public class Position {
         return profit - totalUnpaidInterest;
     }
 
-    public double cancelPosition(long closeTimestamp){
-        if(filled){
+    public double cancelPosition(long closeTimestamp) {
+        if (filled) {
             return 0;
         }
 
         return closePosition(openPrice, closeTimestamp);
     }
 
-    public void setTrailingPct(double price){
+    public void setTrailingPct(double price) {
         this.trailingPct = Math.abs(openPrice - stopLossPrice) / price;
     }
 
-    public double getTrailingPct(){
+    public double getTrailingPct() {
         return this.trailingPct;
     }
 
-    public double calculateRR(double closePrice){
-        return (closePrice - openPrice) / (openPrice - initialStopLossPrice);
+    public double calculateRR(double closePrice) {
+        return (closePrice - fillPrice) / (fillPrice - initialStopLossPrice);
     }
-
 
     public int getInitialStopLossIndex() {
         return this.initialStopLossIndex;
@@ -193,7 +186,7 @@ public class Position {
         return this.entryPriceIndex;
     }
 
-    public void setSize(double size){
+    public void setSize(double size) {
         this.size = size;
     }
 
@@ -201,23 +194,23 @@ public class Position {
         this.entryPriceIndex = entryPriceIndex;
     }
 
-    public long getOpenTimestamp(){
+    public long getOpenTimestamp() {
         return this.openTimestamp;
     }
 
-    public void setMargin(double margin){
+    public void setMargin(double margin) {
         this.margin = margin;
     }
 
-    public double getBorrowedAmount(){
+    public double getBorrowedAmount() {
         return this.borrowedAmount;
     }
 
-    public void setBorrowedAmount(double amount){
+    public void setBorrowedAmount(double amount) {
         this.borrowedAmount = amount;
     }
 
-    public String getOrderType() {
+    public OrderType getOrderType() {
         return this.orderType;
     }
 
@@ -249,7 +242,7 @@ public class Position {
         return this.closingPrice;
     }
 
-    public int getDirection() {
+    public OrderSide getDirection() {
         return this.direction;
     }
 
@@ -293,69 +286,69 @@ public class Position {
         return this.profit;
     }
 
-    public boolean getPartiallyClosed(){
+    public boolean getPartiallyClosed() {
         return this.partiallyClosed;
     }
     
-    public void setCloseRequestTimestamp(long timestamp){
+    public void setCloseRequestTimestamp(long timestamp) {
         this.closeRequestTimestamp = timestamp;
     }
     
-    public long getCloseRequestTimestamp(){
+    public long getCloseRequestTimestamp() {
         return this.closeRequestTimestamp;
     }
 
-    public double getTotalUnpaidInterest(){
+    public double getTotalUnpaidInterest() {
         return this.totalUnpaidInterest;
     }
 
-    //FIXME: borrowedAmount doesn't account for partial closes
-    public void increaseUnpaidInterest(double currentPrice){
-        this.totalUnpaidInterest += borrowedAmount * hourlyInterestRate * (direction == 1 ? 1 : currentPrice);
+    // FIXME: borrowedAmount doesn't account for partial closes
+    public void increaseUnpaidInterest(double currentPrice) {
+        this.totalUnpaidInterest += borrowedAmount * hourlyInterestRate * (direction.equals(OrderSide.BUY) ? 1 : currentPrice);
     }
 
-    public void setStoplossActive(){
-        this.activeStoploss = true;
+    public void setStoplossActive() {
+        this.activeStopLoss = true;
     }
 
-    public boolean isStoplossActive(){
-        return this.activeStoploss;
+    public boolean isStoplossActive() {
+        return this.activeStopLoss;
     }
 
-    public double getExchangeLatency(){
+    public double getExchangeLatency() {
         return this.exchangeLatency;
     }
 
-    public void setClosedBeforeStoploss(long closedBeforeStoplossTimestamp){
-        this.closedBeforeStoploss = true;
-        this.closedBeforeStoplossTimestamp = closedBeforeStoplossTimestamp;
+    public void setClosedBeforeStoploss(long closedBeforeStoplossTimestamp) {
+        this.closedBeforeStopLoss = true;
+        this.closedBeforeStopLossTimestamp = closedBeforeStoplossTimestamp;
     }
 
-    public long getClosedBeforeStoplossTimestamp(){
-        return this.closedBeforeStoplossTimestamp;
+    public long getClosedBeforeStoplossTimestamp() {
+        return this.closedBeforeStopLossTimestamp;
     }
 
-    public boolean isClosedBeforeStoploss(){
-        return this.closedBeforeStoploss;
+    public boolean isClosedBeforeStoploss() {
+        return this.closedBeforeStopLoss;
     }
 
-    public int getTick(){
+    public int getTick() {
         return this.tick;
     }
 
-    public void setReversed(boolean reversed){
+    public void setReversed(boolean reversed) {
         this.reversed = reversed;
     }
 
-    public boolean isReversed(){
+    public boolean isReversed() {
         return this.reversed;
     }
 
-    public double getFillPrice(){
+    public double getFillPrice() {
         return this.fillPrice;
     }
 
-    public void setFillPrice(double fillPrice){
+    public void setFillPrice(double fillPrice) {
         this.fillPrice = fillPrice;
     }
 }

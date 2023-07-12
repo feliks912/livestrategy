@@ -2,8 +2,6 @@ package com.localstrategy;
 
 import java.util.ArrayList;
 
-import com.binance.api.client.domain.OrderSide;
-
 public class OrderRequestHandler {
 
     public int totalOrderLimit;
@@ -21,8 +19,7 @@ public class OrderRequestHandler {
 
     public double borrowedAmount;
 
-    //TODO: Add sending position close and cancel requests
-
+    //TODO: Add stop limit orders
     public OrderRequestHandler(ArrayList<Position> pendingPositions, ArrayList<Position> activePositions, RiskManager riskManager, AssetHandler portfolio, double risk, int totalOrderLimit){
         this.pendingPositions = pendingPositions;
         this.activePositions = activePositions;
@@ -35,7 +32,7 @@ public class OrderRequestHandler {
     public void newMarketOrder(SingleTransaction transaction, double stopLossPrice){
         if(!calculateOrderParameters(transaction.getPrice(), stopLossPrice)){
             pendingPositions.add(
-                new Position(transaction.getPrice(), stopLossPrice, positionSize, "market", requiredMargin, amountToBorrow, ++lastOrderId)
+                new Position(transaction.getPrice(), stopLossPrice, positionSize, OrderType.MARKET, requiredMargin, amountToBorrow, ++lastOrderId)
             );
         }
     }
@@ -43,7 +40,7 @@ public class OrderRequestHandler {
     public void newLimitOrder(double entryPrice, double stopLossPrice, SingleTransaction transaction){
         if(!calculateOrderParameters(entryPrice, stopLossPrice)){
             pendingPositions.add(
-                new Position(transaction.getPrice(), stopLossPrice, positionSize, "limit", requiredMargin, amountToBorrow, ++lastOrderId)
+                new Position(transaction.getPrice(), stopLossPrice, positionSize, OrderType.LIMIT, requiredMargin, amountToBorrow, ++lastOrderId)
             );
         }
     } 
@@ -59,9 +56,9 @@ public class OrderRequestHandler {
             
             //positionSize = Math.max(0.00001, Math.min(positionSize, 152));
 
-            positionSize = Math.min(positionSize, riskManager.getMaximumOrderSize(entryPrice, Math.abs(entryPrice - stopLossPrice), 10, (entryPrice > stopLossPrice ? OrderSide.BUY : OrderSide.SELL)));
+            positionSize = Math.min(positionSize, OrderBookHandler.getMaximumOrderSize(entryPrice, Math.abs(entryPrice - stopLossPrice), 10, (entryPrice > stopLossPrice ? OrderSide.BUY : OrderSide.SELL)));
 
-            positionSize = Math.min(positionSize, riskManager.getMaximumOrderSize(stopLossPrice, Math.abs(entryPrice - stopLossPrice), 10, (entryPrice > stopLossPrice ? OrderSide.SELL : OrderSide.BUY)));
+            positionSize = Math.min(positionSize, OrderBookHandler.getMaximumOrderSize(stopLossPrice, Math.abs(entryPrice - stopLossPrice), 10, (entryPrice > stopLossPrice ? OrderSide.SELL : OrderSide.BUY)));
 
             double borrowedUSDT = portfolio.getTotalBorrowedUSDT();
             double borrowedBTC = portfolio.getTotalBorrowedBTC();

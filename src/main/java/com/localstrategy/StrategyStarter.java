@@ -36,11 +36,38 @@ public class StrategyStarter {
 
             int maxPositionCount = 0;
 
+            boolean isWall = false;
+
             transactionList = transactionLoader.loadNextDay();
 
             for(SingleTransaction transaction : transactionList){
 
-                exchangeHandler.newTransaction(transaction);
+                //Positive lookahead for the wall.
+                //  Wall is defines as a series of delayed transactions made in close time proximity one from another, which    significantly move the market price and wreck chaos on the orderbook
+
+                int transactionIndex = transactionList.indexOf(transaction);
+
+                long pTTimestamp = transaction.getTimestamp();
+
+                if(!isWall){
+                    for(int w = 1; w < 6; w++){
+                        SingleTransaction pT = transactionList.get(transactionIndex + w);
+
+                        if(pT.getTimestamp() - pTTimestamp < 5){ //If 5 continuous transactions have a delta timestamp of less than 5 seconds we assume that is a wall and set the wall variable until the dt is larger than 5
+                            isWall = true;
+                        } else {
+                            isWall = false;
+                        }
+
+                        pTTimestamp = pT.getTimestamp();
+                    }
+                } else {
+                    if(transactionList.get(transactionIndex + 1).getTimestamp() - pTTimestamp > 5){
+                        isWall = false;
+                    }
+                }
+
+                exchangeHandler.newTransaction(transaction, isWall);
 
                 int currentPositionCount = exchangeHandler.getOrderCount();
                 if(maxPositionCount > currentPositionCount){

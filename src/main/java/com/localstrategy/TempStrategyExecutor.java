@@ -15,16 +15,32 @@ public class TempStrategyExecutor {
 
     ExchangeLatencyHandler exchangeLatencyHandler;
 
-    public TempStrategyExecutor(ExchangeHandler exchangeHandler, ExchangeLatencyHandler exchangeLatencyHandler){
+    //TODO: Edit RiskManager
+    private RiskManager riskManager = new RiskManager(filledPositions);
+
+    //TODO: Use orderMaker to request an order action
+    private OrderRequestHandler orderRequestHandler = 
+        new OrderRequestHandler(
+            unfilledPositions, 
+            filledPositions, 
+            riskManager, 
+            userAssets, 
+            TempStrategyExecutor.RISK_PCT, 
+            TOTAL_ORDER_LIMIT);
+
+    public TempStrategyExecutor(ExchangeHandler exchangeHandler){
 
         //TODO: Any call to exchangeHandler has a response latency. Local variables are instant.
         this.exchangeHandler = exchangeHandler;
-        this.exchangeLatencyHandler = exchangeLatencyHandler;
+        this.exchangeLatencyHandler = exchangeHandler.getExchangeLatencyHandler();
 
         //TODO: Print parameters on strategy start
     }
 
-    private void priceUpdate(SingleTransaction transaction, Candle candle){
+
+
+    
+    private void priceUpdate(SingleTransaction transaction, Candle Previouscandle, boolean isWall){
         //Let's say there's a new order created locally and pendingPositions now holds positions to be executed by Binance
         //At the end of current transaction processing, we add the pendingPositons to an ExchangeLatencyHandler object
         //It is stored in ELH until the time has parsed, and can then be read by the ExchangeHandler
@@ -33,12 +49,18 @@ public class TempStrategyExecutor {
 
     private void newCandle(SingleTransaction transaction, ArrayList<Candle> candles){
 
+
+        exchangeHandler.addToUserAssetList(userAsset);
     }
 
-    public void onTransaction(SingleTransaction transaction){
+
+
+
+
+    public void onTransaction(SingleTransaction transaction, boolean isWall){
          Candle candle = candleConstructor.processTradeEvent(transaction);
 
-        priceUpdate(transaction, candleConstructor.getLastCandle());
+        priceUpdate(transaction, candleConstructor.getLastCandle(), isWall);
 
         if(candle != null){ // New candle
             newCandle(transaction, candleConstructor.getCandles());

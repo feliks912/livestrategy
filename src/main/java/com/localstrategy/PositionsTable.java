@@ -46,7 +46,7 @@ public class PositionsTable extends JFrame {
                     position.getStopLossPrice(),
                     String.format("%.5f", position.getSize()),
                     position.getClosingPrice(),
-                    position.getDirection() > 0 ? "long" : "short",
+                    position.getDirection().equals(OrderSide.BUY) ? "long" : "short",
                     position.calculateRR(position.getClosingPrice()),
                     String.format("%.2f", position.getProfit()),
                     position.isFilled()
