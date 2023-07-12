@@ -18,8 +18,7 @@ public class StrategyExecutor {
     private ArrayList<Position> positionsToTpFixedRR = new ArrayList<Position>();
     private ArrayList<Position> positionsToBreakeven = new ArrayList<Position>();
     private ArrayList<Position> positionsToTrailingProfit = new ArrayList<Position>();
-    private ArrayList<Position> longPositionsToDiscard = new ArrayList<Position>();
-    private ArrayList<Position> shortPositionsToDiscard = new ArrayList<Position>();
+    private ArrayList<Position> positionsToDiscard = new ArrayList<Position>();
     private ArrayList<Position> longPositionsToTpRR = new ArrayList<Position>();
     private ArrayList<Position> shortPositionsToTpRR = new ArrayList<Position>();
 
@@ -190,6 +189,7 @@ public class StrategyExecutor {
             }
         } */
 
+        //Activate stoploss
         for(Position position : positions){
             if( !position.isClosed() && 
                 !position.isStoplossActive()){
@@ -245,6 +245,16 @@ public class StrategyExecutor {
             }
             shortPositionsToTpRR.clear();
             shortTpRRInProgress = false;
+        }
+
+        //FIXME: Add latency
+        if(!positionsToDiscard.isEmpty()){
+            for(Position position : positionsToDiscard){
+                if(!position.isClosed() && !position.isFilled()){ //Position could be filled in the meantime which changes the required action
+                    position.closePosition(previousCandle.getIndex() + 1, currentTransaction.getTimestamp(), position.getEntryPrice());
+                    removePositions.add(position);
+                }
+            }
         }
 
         //From new candle
@@ -310,6 +320,8 @@ public class StrategyExecutor {
             newCandle = false;
         }
 
+
+
         // Check stoplosses and fills
         for(Position position : positions){
             //Check position stoploss
@@ -334,18 +346,14 @@ public class StrategyExecutor {
             }
 
             //Fill limit orders
-            /* if(!position.isClosed() && !position.isFilled()) {
+            if(!position.isClosed() && !position.isFilled()) {
                 if((position.getDirection() == 1 && currentPrice <= position.getEntryPrice()) ||
                     position.getDirection() == -1 && currentPrice >= position.getEntryPrice()) {
-
-                    riskManager.calculateBorrows(currentPrice);
-                    position.setMargin(position.getEntryPrice() * position.getSize() / riskManager.getCurrentLeverage());
-                    position.setBorrowRatio(riskManager.borrowRatio());
 
                     if(portfolio - usedMargin > position.getMargin()){
                         usedMargin += position.fillPosition(previousCandle.getIndex() + 1);
 
-                        if(riskManager.calculateMarginLevel(currentPrice, currentTransaction.getTimestamp(), portfolio - usedMargin) < 1.1){
+                        if(riskManager.calculateMarginLevel(currentPrice, portfolio - usedMargin) < 1.1){
                             position.closePosition(previousCandle.getIndex() + 1, currentTransaction.getTimestamp(), position.getEntryPrice());
                             usedMargin -= position.getMargin();
                             removePositions.add(position);
@@ -358,25 +366,17 @@ public class StrategyExecutor {
                     }
 
                     //FIXME: Transfer to next transaction
-                    for(Position pos : positions) {
-                        if(!pos.isClosed() && pos.getDirection() != position.getDirection()) {
-                            if(pos.isFilled() && pos.calculateRR(position.getEntryPrice()) > tpRR) {
-                                
-                                double profit = position.closePosition(previousCandle.getIndex() + 1, currentTransaction.getTimestamp(), currentPrice); //Close the position at entry price
-                                temporaryProfit += profit;
-                                portfolio += profit;
-                                usedMargin -= position.getMargin(); //   Reduce used margin by the margin used by the position
-                                removePositions.add(position);
-                            }
-                            else if(!pos.isFilled()){ //Discard unfilled positions
-                                pos.closePosition(previousCandle.getIndex() + 1, currentTransaction.getTimestamp(), pos.getEntryPrice()); //   Discard
-
-                                removePositions.add(pos);
-                            }
-                        }
-                    }    
+                    if(position.getDirection() == 1){
+                        checktpRR(currentPrice, OrderSide.BUY);
+                        marketLongRequestTimestamp = currentTransaction.getTimestamp();
+                        newLongMarketTradeNextRequestLatency = calculateTradeRequestLatency() + calculateTradeEventLatency();
+                    } else {
+                        checktpRR(currentPrice, OrderSide.SELL);
+                        marketShortRequestTimestamp = currentTransaction.getTimestamp();
+                        newShortMarketTradeNextRequestLatency = calculateTradeRequestLatency() + calculateTradeEventLatency();
+                    }
                 }
-            } */
+            }
         }
 
         //FIXME: Edit this so positions are saved during investigation otherwise this lowers the memory requirements drastically
@@ -489,7 +489,7 @@ public class StrategyExecutor {
         } */
 
         // Check if price triggers entry levels for longs
-        if(orderEntryPriceShort != 0 && stopLossPriceShort != 0 && firstHighLowFound){
+        /* if(orderEntryPriceShort != 0 && stopLossPriceShort != 0 && firstHighLowFound){
             if( !usedLow && 
                 //topHighIndex == lastHighIndex && 
                 lastHigh > lastLow){
@@ -503,11 +503,11 @@ public class StrategyExecutor {
 
                             marketShortRequestTimestamp = currentTransaction.getTimestamp();
 
-                            checktpRR(currentPrice, OrderSide.SELL, topHighTick);
+                            checktpRR(currentPrice, OrderSide.SELL);
 
                             newShortMarketTradeNextRequestLatency = calculateTradeRequestLatency() + calculateTradeEventLatency();
 
-                            makeOrder(orderEntryPriceShort, stopLossPriceShort, "market", topHighTick, previousCandle.getIndex() + 1, currentTransaction.getTimestamp());
+                            makeOrder(orderEntryPriceShort, stopLossPriceShort, "market", previousCandle.getIndex() + 1, currentTransaction.getTimestamp());
                         }
                     } else if(previousCandle.getClose() < orderEntryPriceShort && currentPrice < orderEntryPriceShort){
                         usedLow = true;
@@ -538,11 +538,11 @@ public class StrategyExecutor {
 
                             marketLongRequestTimestamp = currentTransaction.getTimestamp();
 
-                            checktpRR(currentPrice, OrderSide.BUY, bottomLowTick);
+                            checktpRR(currentPrice, OrderSide.BUY);
 
                             newLongMarketTradeNextRequestLatency = calculateTradeRequestLatency() + calculateTradeEventLatency();
 
-                            makeOrder(orderEntryPriceLong, stopLossPriceLong, "market", bottomLowTick, previousCandle.getIndex() + 1, currentTransaction.getTimestamp());
+                            makeOrder(orderEntryPriceLong, stopLossPriceLong, "market", previousCandle.getIndex() + 1, currentTransaction.getTimestamp());
                         }
                     } else if(previousCandle.getClose() > orderEntryPriceLong && currentPrice > orderEntryPriceLong){
                         usedHigh = true;
@@ -556,7 +556,7 @@ public class StrategyExecutor {
                     }
                 }
             }
-        }
+        } */
     }
 
 
@@ -600,7 +600,7 @@ public class StrategyExecutor {
             startTime = lastTransaction.getTimestamp();
 
             for(Position position : positions){
-                if(!position.isClosed() && position.isFilled()){
+                if(!position.isClosed()){
                     position.increaseUnpaidInterest(lastTransaction.getPrice());
                 }
             }
@@ -638,14 +638,6 @@ public class StrategyExecutor {
                     //positionsToTrailingProfit.add(position);
                 }   
             }
-
-            /* else if(!position.isClosed() && position.isFilled() && position.getBreakEven()){
-                if(position.getDirection() == 1){
-                    position.setStopLossPrice(stopLossPriceLong);
-                } else {
-
-                }
-            } */
         }
 
         
@@ -658,8 +650,25 @@ public class StrategyExecutor {
 
         updateZigZagValue(candles);
 
+        //---------------------------Check for triggers
+        Candle previousCandle = candles.get(candles.size() - 2);
+
+        if(!usedHigh && candle.getTick() > -distance){
+            if(candle.getClose() > previousCandle.getHigh()){
+                makeOrder(previousCandle.getHigh(), stopLossPriceLong, "limit", candle.getIndex(), lastTransaction.getTimestamp());
+            }
+            usedHigh = true;
+        }
+        if(!usedLow && candle.getTick() < distance){
+            if(candle.getClose() < previousCandle.getLow()){
+                makeOrder(previousCandle.getLow(), stopLossPriceShort, "limit", candle.getIndex(), lastTransaction.getTimestamp());
+            }
+            usedLow = true;
+        }
+        //---------------------------------------------
+
         if(firstHighLowFound){
-            if(candle.getTick() < -distance){
+            if(candle.getTick() <= -distance){
                 bottomLowIndex = candle.getIndex(); //Save the candle index
                 bottomLowTick = candle.getTick();
 
@@ -681,7 +690,7 @@ public class StrategyExecutor {
                 usedHigh = false; //Entry switch on
             }
             
-            if (candle.getTick() > distance){ //'new' high
+            if (candle.getTick() >= distance){ //'new' high
                 topHighIndex = candle.getIndex(); //Save the candle index
                 topHighTick = candle.getTick();
 
@@ -785,30 +794,23 @@ public class StrategyExecutor {
 
 
 
-    private void checktpRR(double currentPrice, OrderSide orderSide, int currentTick){
+    private void checktpRR(double currentPrice, OrderSide orderSide){
         for(Position position : positions){
             if(!position.isClosed() &&
                 ((position.getDirection() == -1 && orderSide.equals(OrderSide.BUY)) ||  //  Against short position
                 (position.getDirection() == 1 && orderSide.equals(OrderSide.SELL)))){ //   Against long position
 
-                if((Math.abs(currentTick - position.getTick()) / Math.abs(position.getTick())) * 100 < 20 ||
-                    Math.abs(currentTick) > Math.abs(position.getTick())){ //Only -20% difference in tick values or higher tick values are considered to close the position
-                    if(position.isFilled() && position.calculateRR(currentPrice) > tpRR) {
-                        if(orderSide.equals(OrderSide.BUY)){
-                            shortPositionsToTpRR.add(position);
-                            shortTpRRInProgress = true;
-                        } else {
-                            longPositionsToTpRR.add(position);
-                            longTpRRInProgress = true;
-                        }
-                    } 
-                    else if(!position.isFilled()) { //Discard unfilled limit orders
-                        if(orderSide.equals(OrderSide.BUY)){
-                            shortPositionsToDiscard.add(position);
-                        } else {
-                            longPositionsToDiscard.add(position);
-                        }
+                if(position.isFilled() && position.calculateRR(currentPrice) > tpRR) {
+                    if(orderSide.equals(OrderSide.BUY)){
+                        shortPositionsToTpRR.add(position);
+                        shortTpRRInProgress = true;
+                    } else {
+                        longPositionsToTpRR.add(position);
+                        longTpRRInProgress = true;
                     }
+                } 
+                else if(!position.isFilled()) { //Discard unfilled limit orders
+                    positionsToDiscard.add(position);
                 }
             }
         }
@@ -819,7 +821,7 @@ public class StrategyExecutor {
 
 
     //makeOrder already executed with slippage
-    private void makeOrder(double entryPrice, double stopLossPrice, String orderType, int tick, int entryIndex, long entryTimestamp){
+    private void makeOrder(double entryPrice, double stopLossPrice, String orderType, int entryIndex, long entryTimestamp){
 
         int positionsSize = positions.size();
 
@@ -835,7 +837,6 @@ public class StrategyExecutor {
             riskPercentage,
             usedMargin,
             entryTimestamp,
-            tick,
             calculateTradeEventLatency() + calculateTradeRequestLatency(),
             riskManager
         );
@@ -980,6 +981,10 @@ public class StrategyExecutor {
 
     public void resetDailyPositionCount(){
         this.dailyPositionCount = 0;
+    }
+
+    public int getDistance(){
+        return this.distance;
     }
 
 }

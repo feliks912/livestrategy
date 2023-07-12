@@ -49,7 +49,6 @@ public class Position {
             double margin,
             int openIndex,
             long openTimestamp,
-            int tick,
             double exchangeLatency,
             double borrowedAmount) {
 
@@ -76,8 +75,6 @@ public class Position {
         this.partiallyClosed = false;
 
         this.exchangeLatency = exchangeLatency;
-
-        this.tick = tick;
 
         this.hourlyInterestRate = direction == 1 ? RiskManager.HOURLY_USDT_INTEREST_RATE / 100 : RiskManager.HOURLY_BTC_INTEREST_RATE / 100;
         this.totalUnpaidInterest = borrowedAmount * hourlyInterestRate * (direction == 1 ? 1 : entryPrice);

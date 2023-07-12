@@ -20,6 +20,7 @@ public class StrategyStarter {
     private MeanAndStandardDeviation totalStdDev = new MeanAndStandardDeviation();
     private MeanAndStandardDeviation orderStandardDeviation = new MeanAndStandardDeviation();
     private MeanAndStandardDeviation priceStandardDeviation = new MeanAndStandardDeviation();
+
     private double previousPrice;
 
     public StrategyStarter(String inputDataFolderPath, double candleVolume, int distance, int ZZDepth, int ZZBackstep, double tpRR, double fixedRR, double BEPercentage, double initialPortfolio, double riskPercentage, double brokerCommissionRate) {
@@ -48,18 +49,28 @@ public class StrategyStarter {
 
         StrategyExecutor zigZagStrategy = new StrategyExecutor(distance, ZZDepth, ZZBackstep, tpRR, fixedRR, BEPercentage, initialPortfolio, riskPercentage, brokerCommissionRate);
 
-        TransactionLoader transactionLoader = new TransactionLoader(inputDataFolderPath, "2022-11-22", "2023-03-23");
+        TransactionLoader transactionLoader = new TransactionLoader(inputDataFolderPath, 
+        null,
+            //"2022-11-22", 
+            "2023-03-23");
 
         int fileCount = transactionLoader.getTotalCsvFiles();
         
         System.out.println("Total days: " + fileCount + ". Starting portfolio: $" + previousPortfolioValue);
         System.out.printf("Volume: %.0f, Distance: %d, Depth: %d, Backstep: %d, tpRR: %.1f, fixedRR: %.1f, Breakeven: %.1f, risk: %.2f\n", candleVolume, distance, ZZDepth, ZZBackstep, tpRR, fixedRR, BEPercentage, riskPercentage);
 
+        SingleTransaction previousTransaction = null;
+
         for(int i = 1; i <= fileCount; i++){
 
             transactionList = transactionLoader.loadNextDay();
 
+            if(previousTransaction == null){
+                previousTransaction = transactionList.get(0);
+            }
+
             for(SingleTransaction transaction : transactionList){
+
                 Candle candle = candleConstructor.processTradeEvent(transaction);
 
                 if(previousPrice != 0){
@@ -76,6 +87,7 @@ public class StrategyStarter {
                     zigZagStrategy.newCandle(transaction, candleConstructor.getCandles());
                 }
             }
+
 
             priceStandardDeviation.addNumber(dailyStdDev.calculateFirstTwoStandardDeviations()[2]);
 

@@ -145,7 +145,17 @@
                             Here's how we can still use the model:
                                 We make it static on each price stagnation that is, we refresh it during horizontal moves. If the price moves rapidly we adjust the model so the orderbook is used by the move of the market, giving us filling prices of the half-used orderbook.
 
-                        Good news is - no more latency issues! If we wait for the market to stabilize (especially during non-volatile periods) Afaik that would make us makers on each of our orders.
+                        Good news is - no more latency issues! If we wait for the market to stabilize (especially during non-volatile periods) we will always get a fair price + slippage from the model. Afaik that would make us makers on every order made. Hopefully irl it doesn't trigger unwanted concequences...
+
+                        TODO: The trigger for a rest period is... how many transactions?
+                            Tested on non volatile and volatile period
+                                The volatile period has walls more often than it has consolidations
+                                Non volatile period vice versa
+
+                                The orderbook model is crucial during a volatile period
 
 11.7.23 18:00
     Days 2022-11-22 (632) to 2023-03-23 (753) (121 days total) terrible performance ~50% drawdown in a volatile period
+
+12.7.23 1:32
+    Looking to implement the following strategy - If the first candle whos' tick < distance closes outside of the last candle whos' tick >= distance in the oposite direction of the move, open a limit order between the last candle's high / low and the top / bottom. Discard position after ~15 candles

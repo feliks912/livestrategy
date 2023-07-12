@@ -1,22 +1,12 @@
 package com.localstrategy;
 
 public class SingleTransaction {
-    private long transactionId;
     private double price;
-    private double quantity;
     private double amount;
     private long timestamp;
 
     public SingleTransaction(){
 
-    }
-    
-    public long getTransactionId() {
-        return this.transactionId;
-    }
-
-    public void setTransactionId(long transactionId) {
-        this.transactionId = transactionId;
     }
 
     public double getPrice() {
@@ -25,14 +15,6 @@ public class SingleTransaction {
 
     public void setPrice(double price) {
         this.price = price;
-    }
-
-    public double getQuantity() {
-        return this.quantity;
-    }
-
-    public void setQuantity(double quantity) {
-        this.quantity = quantity;
     }
 
     public double getAmount() {
@@ -55,9 +37,7 @@ public class SingleTransaction {
     @Override
     public String toString() {
         return "{" +
-            " transactionId='" + getTransactionId() + "'" +
             ", price='" + getPrice() + "'" +
-            ", quantity='" + getQuantity() + "'" +
             ", amount='" + getAmount() + "'" +
             ", timestamp='" + getTimestamp() + "'" +
             "}";

@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Calendar;
 
 public class CandlestickChart extends JFrame {
-    private static final int MAX_CANDLES = 50; // Maximum number of candles on the chart
+    private static final int MAX_CANDLES = 200; // Maximum number of candles on the chart
     private CustomOHLCDataset dataset;
     private int currentIndex;
     private Calendar calendar = Calendar.getInstance();
@@ -46,12 +46,15 @@ public class CandlestickChart extends JFrame {
     private PositionsTable positionsTable;
     boolean isButtonPressed = false;
     CandleConstructor candleConstructor;
+    private int distanceSet;
 
     public CandlestickChart(double candleVolume, PositionsTable positionsTable, StrategyExecutor zigZagStrat, boolean visible) {
         super("Candlestick Chart Demo");
         this.positionsTable = positionsTable;
         this.zigZagStrat = zigZagStrat;
         this.oldPortfolio = zigZagStrat.getPortfolio();
+
+        this.distanceSet = zigZagStrat.getDistance();
 
         this.candleConstructor = new CandleConstructor(candleVolume);
 
@@ -60,7 +63,7 @@ public class CandlestickChart extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         // Create the initial dataset with empty data
-        dataset = new CustomOHLCDataset("Series");
+        dataset = new CustomOHLCDataset("Series", zigZagStrat.getDistance());
 
         // Create the candlestick chart
         JFreeChart chart = createChart(dataset);
@@ -105,13 +108,18 @@ public class CandlestickChart extends JFrame {
 
     private JFreeChart createChart(OHLCDataset dataset) {
     // Create a time series chart
-        JFreeChart chart = ChartFactory.createCandlestickChart(
+        /* JFreeChart chart = ChartFactory.createCandlestickChart(
                 "Candlestick Chart Demo",
                 "Time",
                 "Price",
                 dataset,
                 false
-        );
+        ); */
+
+        CandlestickRenderer customRenderer = new CustomCandlestickRenderer();
+        //CandlestickRenderer customRenderer = new CandlestickRenderer();
+        XYPlot customPlot = new XYPlot(dataset, new DateAxis("Date"), new NumberAxis("Price"), customRenderer);
+        JFreeChart chart = new JFreeChart("Candlestick Demo", JFreeChart.DEFAULT_TITLE_FONT, customPlot, false);
 
         // Customize the chart appearance
         XYPlot plot = (XYPlot) chart.getPlot();
@@ -173,7 +181,10 @@ public class CandlestickChart extends JFrame {
     public void executor(){
         ArrayList<SingleTransaction> transactionList = new ArrayList<SingleTransaction>();
 
-        TransactionLoader transactionLoader = new TransactionLoader("C:/--- BTCUSDT/", "2022-11-22", null);
+        TransactionLoader transactionLoader = new TransactionLoader("C:/--- BTCUSDT/", 
+        null,
+        //"2022-11-23", 
+        null);
 
         int fileCount = transactionLoader.getTotalCsvFiles();
 
@@ -199,9 +210,9 @@ public class CandlestickChart extends JFrame {
                     positionsTable.refreshTableData(zigZagStrat.getClosedPositions());
 
                     zigZagStrat.resetTemporaryProfit();
-                    isButtonPressed = false;
 
-                    if(false){
+                    if(isButtonPressed){
+                        isButtonPressed = false;
                         while (!isButtonPressed) {
                             try {
                                 // Wait for 100ms before checking again
@@ -210,13 +221,13 @@ public class CandlestickChart extends JFrame {
                                 e.printStackTrace();
                             }
                         }
+                        isButtonPressed = false;
                     } else {
                         try{
-                            Thread.sleep(150);
+                            Thread.sleep(50);
                         } catch(Exception e){
                             System.out.println(e);
                         }
-                        
                     } 
                 }
             }
@@ -287,7 +298,7 @@ public class CandlestickChart extends JFrame {
             tempCandle.getHigh(),
             tempCandle.getLow(),
             tempCandle.getClose(),
-            tempCandle.getVolume()
+            Math.abs(tempCandle.getTick()) < distanceSet ? -tempCandle.getVolume() : tempCandle.getVolume()
         );
         dataset.addCandle(candle);
         //currentIndex++;
@@ -434,7 +445,7 @@ public class CandlestickChart extends JFrame {
 class CustomOHLCDataset extends DefaultOHLCDataset {
     private List<OHLCDataItem> candles;
 
-    public CustomOHLCDataset(String seriesKey) {
+    public CustomOHLCDataset(String seriesKey, int distance) {
         super(seriesKey, new OHLCDataItem[0]);
         candles = new ArrayList<>();
     }
@@ -484,6 +495,11 @@ class CustomOHLCDataset extends DefaultOHLCDataset {
     @Override
     public Number getClose(int series, int item) {
         return candles.get(item).getClose();
+    }
+
+    @Override
+    public Number getVolume(int series, int item){
+        return candles.get(item).getVolume();
     }
 }
 

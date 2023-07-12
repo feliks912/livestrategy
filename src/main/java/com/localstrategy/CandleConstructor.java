@@ -82,7 +82,7 @@ public class CandleConstructor {
             totalVolume += currentVolume;
             candleHigh = Math.max(currentPrice, candleHigh);
             candleLow = Math.min(currentPrice, candleLow);
-            lastTransactionId = transactionEvent.getTransactionId();
+            //lastTransactionId = transactionEvent.getTransactionId();
         } else {
             totalVolume = currentVolume > volumePerCandle ? 0 : currentVolume; //FIXME: This transfers volume over days as well
             candleToBeClosed = currentVolume > volumePerCandle ? true : false;
