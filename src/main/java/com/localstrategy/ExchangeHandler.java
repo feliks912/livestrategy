@@ -6,6 +6,7 @@ import java.util.HashMap;
 
 //TODO: Add locking BTC on short and general transfer of borrowed funds into free categories
 //TODO: Add proper AssetHandler initialization
+//TODO: Check if we're clearing arrays properly
 //TODO: Add limit order immediate trigger rejection
 //TODO: Add separate responses for Borrows and Repays - those are instant and don't depend on the userDataStream. Here's something ugly (and should potentially be documented separately) - we'll add Borrow and Repay rejection reasons to the actual positon parsed. Don't yet know how that will work out for repays
 //FIXME: We don't notify the user about the positons which are rejected if they don't actually open. We thought it would be possible for the user to just check if the userDataStream holds changes and then conclude the positions are edited as required, but I imagine it being much more useful to get a separate response for the individual order. IMO Shouldn't be difficult to just add rejectedOrders using enums. Also we currently pack all reponses into a single userDataStream event. In real time responses would be handled separatelly. However, the event has a similar response time (I hope)
@@ -19,6 +20,7 @@ import java.util.HashMap;
 //TODO: Parse strategy as parameter from App instead of hardcoding it into TempStrategyExecutor, unless TempStrategyExecutor is the strategy (later)
 //TODO: Implement order rejections (later)
 //TODO: Implement borrow requests (later)
+//TODO: Add symbol rules (later)
 
 public class ExchangeHandler {
 
@@ -112,36 +114,53 @@ public class ExchangeHandler {
             switch(entry.getKey()){
                 case CREATE_ORDER: //TODO: add rejection reasons
                     for(Position position : positions){
-                        if(!(unfilledPositions.contains(position) || 
-                            filledPositions.contains(position) || 
-                            closedPositions.contains(position) || 
-                            cancelledPositions.contains(position))){
+                        if(position.getOrderType().equals(OrderType.LIMIT)){
+                            if((position.getDirection().equals(OrderSide.BUY) && position.getOpenPrice() >= transaction.getPrice()) ||
+                               (position.getDirection().equals(OrderSide.SELL) && position.getOpenPrice() <= transaction.getPrice())){
+
+                                    rejectedPositionsActions.add(newRejection(RejectionReason.WOULD_TRIGGER_IMMEDIATELY, position));
+                            }
+                        } 
+                        else if(!(unfilledPositions.contains(position) || 
+                                filledPositions.contains(position) || 
+                                closedPositions.contains(position) || 
+                                cancelledPositions.contains(position))){
 
                             double fundsToBorrow = position.getBorrowedAmount();
                             double positionMargin = position.getMargin();
 
-                            if(userAssets.getFreeUSDT() >= positionMargin &&
-                                    ((position.getOrderType().equals(OrderType.MARKET)) || 
-                                        (position.getOrderType().equals(OrderType.LIMIT) && 
-                                        filledPositions.size() + unfilledPositions.size() < MAX_PROG_ORDERS))){
+                            if(userAssets.getFreeUSDT() >= positionMargin){
+                                if(((position.getOrderType().equals(OrderType.MARKET)) || 
+                                    (position.getOrderType().equals(OrderType.LIMIT) && 
+                                    filledPositions.size() + unfilledPositions.size() < MAX_PROG_ORDERS))){
 
-                                userAssets.setFreeUSDT(userAssets.getFreeUSDT() - positionMargin);
-                                userAssets.setLockedUSDT(userAssets.getLockedUSDT() + positionMargin);
-                                
-                                userAssets.setTotalUnpaidInterest(userAssets.getTotalUnpaidInterest() + position.getTotalUnpaidInterest());
+                                        userAssets.setFreeUSDT(userAssets.getFreeUSDT() - positionMargin);
+                                        userAssets.setLockedUSDT(userAssets.getLockedUSDT() + positionMargin);
+                                        
+                                        userAssets.setTotalUnpaidInterest(userAssets.getTotalUnpaidInterest() + position.getTotalUnpaidInterest());
 
-                                if(position.getDirection().equals(OrderSide.BUY)){
-                                    userAssets.setTotalBorrowedUSDT(userAssets.getTotalBorrowedUSDT() + fundsToBorrow);
-                                } else {
-                                    userAssets.setTotalBorrowedBTC(userAssets.getTotalBorrowedBTC() + fundsToBorrow);
-                                }
+                                        if(position.getDirection().equals(OrderSide.BUY)){
+                                            userAssets.setTotalBorrowedUSDT(userAssets.getTotalBorrowedUSDT() + fundsToBorrow);
+                                        } else {
+                                            userAssets.setTotalBorrowedBTC(userAssets.getTotalBorrowedBTC() + fundsToBorrow);
+                                        }
 
-                                userAssetsChanged = true;
+                                        userAssetsChanged = true;
 
-                                unfilledPositions.add(position);
+                                        unfilledPositions.add(position);
 
-                                positionsChanged = true;
+                                        positionsChanged = true;
+                                    }
+                                    else {
+                                        rejectedPositionsActions.add(newRejection(RejectionReason.EXCESS_PROG_ORDERS, position));
+                                    }
+                            } 
+                            else {
+                                rejectedPositionsActions.add(newRejection(RejectionReason.INSUFFICIENT_MARGIN, position));
                             }
+                        } 
+                        else {
+                            rejectedPositionsActions.add(newRejection(RejectionReason.INVALID_ORDER_STATE, position));
                         }
                     }
                     break;
