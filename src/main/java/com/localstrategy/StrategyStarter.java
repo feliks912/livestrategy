@@ -80,6 +80,7 @@ public class StrategyStarter {
 
             double currentFreePortfolio = exchangeHandler.getTotalAssetsValue();
 
+            //TODO: Format file name propperly
             System.out.printf("File %s done. Portfolio: $%.2f. Profit: $%.2f, change: %.2f%%, Maximum positions: %d, Total positions: %d\n", 
                 transactionLoader.getLastFileName(), 
                 currentFreePortfolio, 

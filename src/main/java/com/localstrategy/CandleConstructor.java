@@ -43,6 +43,7 @@ public class CandleConstructor {
         previousDayOfMonth = currentDayOfMonth;
 
         //FIXME: Return value is off. Theoretically 2 candles can be formed
+        //TODO: What?
         Candle returnValue = null;
 
         currentPrice = transactionEvent.getPrice();

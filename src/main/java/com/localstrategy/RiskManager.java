@@ -2,7 +2,6 @@ package com.localstrategy;
 
 import java.util.ArrayList;
 
-import org.apache.commons.math3.distribution.LogNormalDistribution;
 import com.binance.api.client.domain.OrderSide;
 
 public class RiskManager {
