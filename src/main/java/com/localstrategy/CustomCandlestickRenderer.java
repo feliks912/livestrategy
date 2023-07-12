@@ -35,7 +35,10 @@ public class CustomCandlestickRenderer extends CandlestickRenderer {
         Paint originalUpPaint = getUpPaint();
         Paint originalDownPaint = getDownPaint();
 
-        int alphaChannel = mapInputToStandardDeviation(volume < 0 ? 1e6 : volume, volumeStats.getMean(), volumeStats.getStandardDeviation());
+        int alphaChannel = mapInputToStandardDeviation(
+            false ? Math.abs(volume) : (volume < 0 ? 1e6 : volume),
+            volumeStats.getMean(), 
+            volumeStats.getStandardDeviation());
 
         // Create semi-transparent colors with alpha = 128
         if (open > close) {

@@ -1,16 +1,19 @@
 package com.localstrategy;
 
-import com.opencsv.CSVReader;
-import com.opencsv.exceptions.CsvValidationException;
-import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.*;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ForkJoinPool;
+import java.util.stream.Collectors;
 
 public class TransactionLoader {
     private Queue<Path> filesQueue;
+    private final int parallelism = Runtime.getRuntime().availableProcessors();
+
+    private String filename;
 
     public TransactionLoader(String folderPath, String fromDate, String toDate){
         this.filesQueue = new PriorityQueue<>();
@@ -45,41 +48,41 @@ public class TransactionLoader {
                 ex.printStackTrace();
             }
         }
-        
-
-        
     }
 
-    public ArrayList<SingleTransaction> loadNextDay(){
-        ArrayList<SingleTransaction> transactions = new ArrayList<>();
+    public List<SingleTransaction> loadNextDay(){
         if(!filesQueue.isEmpty()){
             Path filePath = filesQueue.poll();
-            try(CSVReader reader = new CSVReader(new FileReader(filePath.toString()))){ //We read the whole file here
-                String[] nextLine;
-                /* while ((nextLine = reader.readNext()) != null) {
-                    SingleTransaction transaction = new SingleTransaction();
-                    transaction.setTransactionId(Long.parseLong(nextLine[0]));
-                    transaction.setPrice(Double.parseDouble(nextLine[1]));
-                    transaction.setQuantity(Double.parseDouble(nextLine[2]));
-                    transaction.setAmount(Double.parseDouble(nextLine[3]));
-                    transaction.setTimestamp(Long.parseLong(nextLine[4]));
-                    transactions.add(transaction);
-                } */
-                while ((nextLine = reader.readNext()) != null) {
-                    SingleTransaction transaction = new SingleTransaction();
-                    transaction.setPrice(Double.parseDouble(nextLine[0]));
-                    transaction.setAmount(Double.parseDouble(nextLine[1]));
-                    transaction.setTimestamp(Long.parseLong(nextLine[2]));
-                    transactions.add(transaction);
-                }
-            } catch (IOException | CsvValidationException ex){
+            filename = filePath.getFileName().toString();
+            try {
+                ForkJoinPool customThreadPool = new ForkJoinPool(parallelism);
+                return customThreadPool.submit(() -> 
+                    Files.lines(filePath)
+                    .parallel()
+                    .map(line -> line.split(","))
+                    .map(this::createTransaction)
+                    .collect(Collectors.toList())
+                ).get();
+            } catch (InterruptedException | ExecutionException ex){
                 ex.printStackTrace();
             }
         }
-        return transactions;
+        return Collections.emptyList();
+    }
+
+    private SingleTransaction createTransaction(String[] transactionData) {
+        SingleTransaction transaction = new SingleTransaction();
+        transaction.setPrice(Double.parseDouble(transactionData[0]));
+        transaction.setAmount(Double.parseDouble(transactionData[1]));
+        transaction.setTimestamp(Long.parseLong(transactionData[2]));
+        return transaction;
     }
 
     public int getTotalCsvFiles() {
         return filesQueue.size();
+    }
+
+    public String getLastFileName(){
+        return this.filename;
     }
 }

@@ -1,29 +1,39 @@
 package com.localstrategy;
 
+import java.lang.Integer;
+
 public class App {
 
     public static void main( String[] args ) {
 
-        StrategyExecutor zigZagStrategy = new StrategyExecutor(100, 5, 3, 0, 100, 0, 10000, 0.1, 0);
+        //new TradingGUI(2000000, new StrategyExecutor(200, 5, 3, 0, 100, 1, 10000, 0.1, 0)); */
 
-        TradingGUI gui = new TradingGUI(2000000, zigZagStrategy);
-
-        /* StrategyStarter strategy = new StrategyStarter(
+        /* new StrategyStarter(
             "C:/--- BTCUSDT",
-            2000000,
-            300,
-            2,
-            1,
-            0,
-            1000,
-            1,
-            10000,
-            0.1,
-            0
-        );
+            null,
+            null,
+            10000
+        ).execute(null); */
 
-        strategy.execute(null); */
+        Integer i = 0;
+        Test test = new Test(i);
+        i++;
+        test.printI();
+    }
+
+    public static class Test{
+
+        Integer i;
+        public Test(Integer i){
+            this.i = i;
+        }
+
+        public void printI(){
+            System.out.println(i);
+        }
     }
 }
+
+
 
 

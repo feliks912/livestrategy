@@ -159,3 +159,20 @@
 
 12.7.23 1:32
     Looking to implement the following strategy - If the first candle whos' tick < distance closes outside of the last candle whos' tick >= distance in the oposite direction of the move, open a limit order between the last candle's high / low and the top / bottom. Discard position after ~15 candles
+
+    Observations:
+        Unstable
+
+12.7.23 4:34
+    Todo: Build a functional backtesting engine.
+        Market orders
+        Limit orders
+        Stoplosses
+        Slippage
+        Latencies
+        Price walls
+        Margin borrows
+
+12.7.23 14:33
+    Mayor rewrite in progress, adding functional blocks to a simulated exchange engine
+    It's a oversimplified model but 10x more reliable than the previous version. The goal is to say how we can expect similar results from live testing.

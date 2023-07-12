@@ -31,7 +31,7 @@ public class ResultConsolidator {
                     joiner.add(String.valueOf(i))
                             .add(String.valueOf(position.getId()))
                             .add(String.valueOf(position.getOpenIndex()))
-                            .add(String.valueOf(position.getEntryPrice()))
+                            .add(String.valueOf(position.getOpenPrice()))
                             .add(String.valueOf(position.getInitialStopLossPrice()))
                             .add(String.valueOf(position.getFilledIndex()))
                             .add(String.valueOf(position.getClosedIndex()))

@@ -41,7 +41,7 @@ public class PositionsTable extends JFrame {
             Object[] rowData = {
                     position.getId(),
                     position.getOrderType(),
-                    position.getEntryPrice(),
+                    position.getOpenPrice(),
                     position.getInitialStopLossPrice(),
                     position.getStopLossPrice(),
                     String.format("%.5f", position.getSize()),

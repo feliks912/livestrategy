@@ -1,0 +1,4 @@
+Todo:
+    Convert Position.java to use fill price instead of entry price in calculations
+
+Done:

@@ -179,18 +179,18 @@ public class CandlestickChart extends JFrame {
     }
 
     public void executor(){
-        ArrayList<SingleTransaction> transactionList = new ArrayList<SingleTransaction>();
+        ArrayList<SingleTransaction> transactionList;
 
         TransactionLoader transactionLoader = new TransactionLoader("C:/--- BTCUSDT/", 
-        null,
-        //"2022-11-23", 
+        //null,
+        "2022-07-13", 
         null);
 
         int fileCount = transactionLoader.getTotalCsvFiles();
 
         for(int i = 1; i <= fileCount; i++){
 
-            transactionList = transactionLoader.loadNextDay();
+            transactionList = new ArrayList<SingleTransaction>(transactionLoader.loadNextDay());
 
             for(SingleTransaction transaction : transactionList){
                 if(startingTimestamp == 0){
@@ -336,7 +336,7 @@ public class CandlestickChart extends JFrame {
 
         // Add new annotations for each position
         for (Position position : positions) {
-            double priceEntry = position.getEntryPrice();
+            double priceEntry = position.getOpenPrice();
             double stopLossPrice = position.getStopLossPrice();
             int entryIndex = position.getEntryPriceIndex();
             int stopLossIndex = position.getInitialStopLossIndex();
