@@ -13,6 +13,8 @@ public class AssetHandler {
     private double totalBorrowedUSDT = 0;
     private double totalBorrowedBTC = 0;
 
+    private double marginLevel;
+
     //TODO: Calculate total unpaid interest and add an incrementing function
     private double totalUnpaidInterest = 0;
 
@@ -27,6 +29,13 @@ public class AssetHandler {
         this.lockedBTC = lockedBTC;
     }
 
+    public double getMarginLevel() {
+        return this.marginLevel;
+    }
+
+    public void setMarginLevel(double marginLevel) {
+        this.marginLevel = marginLevel;
+    }
 
     public double getFreeUSDT() {
         return this.freeUSDT;
