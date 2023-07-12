@@ -78,7 +78,7 @@ public class StrategyStarter {
             int totalDailyPositionCount = exchangeHandler.getRunningPositionCounter();
             exchangeHandler.setRunningPositionCounter(0);
 
-            double currentFreePortfolio = exchangeHandler.getAssetsValue();
+            double currentFreePortfolio = exchangeHandler.getTotalAssetsValue();
 
             System.out.printf("File %s done. Portfolio: $%.2f. Profit: $%.2f, change: %.2f%%, Maximum positions: %d, Total positions: %d\n", 
                 transactionLoader.getLastFileName(), 
@@ -92,6 +92,38 @@ public class StrategyStarter {
         }
 
         ArrayList<Double> portfolioList = exchangeHandler.terminateAndReport(outputCSVPath);
+
+        
+    }
+
+    
+    public ArrayList<AssetHandler> terminateAndReport(ArrayList<Position> allPositions, String outputCSVPath, SingleTransaction transaction){
+        //FIXME: Handle summing profit to portfolio correctly
+        for(Position position : allPositions){
+            if(!position.isClosed() && position.isFilled()){
+
+                    userAssets.setFreeUSDT(
+                        userAssets.getFreeUSDT() + 
+                        position.closePosition(transaction.getPrice(), transaction.getTimestamp()) + 
+                        position.getMargin()); //This includes paying interest
+
+                    userAssets.setLockedUSDT(userAssets.getLockedUSDT() - position.getMargin());
+
+                    closedPositions.add(position);
+            } else {
+                closedPositions.add(position);
+            }
+        }
+
+
+
+        allPositions.sort((Position p1, Position p2) -> Long.compare(p1.getOpenTimestamp(), p2.getOpenTimestamp()));
+
+        //TODO: Add more information to output CSV
+        if(outputCSVPath != null){
+            System.out.println("Trade report written to " + outputCSVPath);
+            ResultConsolidator.writePositionsToCSV(allPositions, outputCSVPath);
+        }
 
         System.out.printf("Wins: %d, Losses: %d, Breakevens: %d, Final portfolio: %.2f, Max portfolio value: %.2f, Drawdown: %.2f, R squared: %.3f\n",
             exchangeHandler.getWinCounter(),

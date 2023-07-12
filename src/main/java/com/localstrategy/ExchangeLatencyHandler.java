@@ -5,19 +5,12 @@ import java.util.Map;
 import java.util.Random;
 import java.util.ArrayList;
 
-/* Four latencies:
- *  user data - handles currency values, order responses
- *  order execution - handle positions
- */
-
-//ExchangeLatencyHandler is supposed to parse events between the exchange and our local client. When an even is requested it is first stored inside the ExchangeLatencyHandler until the time has passed, when it becomes visible to the client or binance, dependent on the sender. The latency for each of four categories is recalculated every max(categories) seconds.
-
-//For order execution and response, Position is parsed
-//Or position list, basically the current state of all positions
-
-
-
 public class ExchangeLatencyHandler {
+
+    private int TRANSACTION_LATENCY = 0;
+    private int TRADE_EXECUTION_LATENCY = 0; //request -> execution
+    private int TRADE_REPORT_LATENCY = 0; //request -> response
+    private int USER_DATA_LATENCY = 0;
 
     private Map<Long, UserDataStream> userDataStream;  //UserDataStream gets parsed from the exchange to the 
     private Map<Long, ArrayList<Position>> pendingPositions; //Pending positions get parsed from client to the exchange
@@ -34,7 +27,7 @@ public class ExchangeLatencyHandler {
 
     }
 
-    //TODO: Thank ChatGPT
+    //TODO: Thanks ChatGPT
     public UserDataStream getDelayedUserDataStream(long currentLocalTimestamp) {
         // Search through the userDataStream map.
         for (Map.Entry<Long, UserDataStream> entry : userDataStream.entrySet()) {
