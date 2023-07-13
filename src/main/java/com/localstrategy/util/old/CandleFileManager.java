@@ -1,5 +1,6 @@
-package com.localstrategy;
+package com.localstrategy.util.old;
 
+import com.localstrategy.util.types.Candle;
 import com.opencsv.CSVReader;
 import java.util.ArrayList;
 import java.util.StringJoiner;

@@ -2,9 +2,10 @@ package com.localstrategy;
 
 import java.util.ArrayList;
 
-import com.localstrategy.helper.CandleConstructor;
-import com.localstrategy.types.Candle;
-import com.localstrategy.types.SingleTransaction;
+import com.localstrategy.util.helper.CandleConstructor;
+import com.localstrategy.util.old.ZigZag;
+import com.localstrategy.util.types.Candle;
+import com.localstrategy.util.types.SingleTransaction;
 
 public class TempStrategyExecutor {
 

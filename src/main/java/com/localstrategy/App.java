@@ -1,6 +1,7 @@
 package com.localstrategy;
 
-import com.localstrategy.misc.TradingGUI;
+import com.localstrategy.util.misc.TradingGUI;
+import com.localstrategy.util.old.StrategyExecutor;
 
 public class App {
 

@@ -3,12 +3,12 @@ package com.localstrategy;
 import java.util.ArrayList;
 import java.util.Map;
 
-import com.localstrategy.Enums.OrderAction;
-import com.localstrategy.Enums.OrderSide;
-import com.localstrategy.Enums.OrderType;
-import com.localstrategy.Enums.RejectionReason;
-import com.localstrategy.types.SingleTransaction;
-import com.localstrategy.types.UserDataResponse;
+import com.localstrategy.util.enums.OrderAction;
+import com.localstrategy.util.enums.OrderSide;
+import com.localstrategy.util.enums.OrderType;
+import com.localstrategy.util.enums.RejectionReason;
+import com.localstrategy.util.types.SingleTransaction;
+import com.localstrategy.util.types.UserDataResponse;
 
 import java.util.HashMap;
 

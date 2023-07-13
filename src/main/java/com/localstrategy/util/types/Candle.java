@@ -1,4 +1,4 @@
-package com.localstrategy.types;
+package com.localstrategy.util.types;
 
 public class Candle {
     private double open;

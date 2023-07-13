@@ -1,4 +1,4 @@
-package com.localstrategy;
+package com.localstrategy.util.old;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -8,6 +8,10 @@ import org.apache.commons.math3.distribution.LogNormalDistribution;
 
 import com.binance.api.client.domain.OrderSide;
 import com.binance.api.client.domain.account.Order;
+import com.localstrategy.Position;
+import com.localstrategy.RiskManager;
+import com.localstrategy.util.types.Candle;
+import com.localstrategy.util.types.SingleTransaction;
 
 public class StrategyExecutor {
 

@@ -4,8 +4,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 
-import com.localstrategy.Enums.OrderAction;
-import com.localstrategy.types.UserDataResponse;
+import com.localstrategy.util.enums.OrderAction;
+import com.localstrategy.util.types.UserDataResponse;
 
 import java.util.ArrayList;
 

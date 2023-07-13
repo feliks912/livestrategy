@@ -1,11 +1,11 @@
-package com.localstrategy.types;
+package com.localstrategy.util.types;
 
 import java.util.ArrayList;
 import java.util.Map;
 
 import com.localstrategy.AssetHandler;
 import com.localstrategy.Position;
-import com.localstrategy.Enums.RejectionReason;
+import com.localstrategy.util.enums.RejectionReason;
 
 public class UserDataResponse {
     

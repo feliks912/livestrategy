@@ -1,4 +1,4 @@
-package com.localstrategy.misc;
+package com.localstrategy.util.misc;
 
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -12,6 +12,8 @@ import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.renderer.xy.CandlestickRenderer;
 import org.jfree.chart.renderer.xy.XYItemRendererState;
 import org.jfree.data.xy.XYDataset;
+
+import com.localstrategy.util.old.RunningStats;
 
 public class CustomCandlestickRenderer extends CandlestickRenderer {
 

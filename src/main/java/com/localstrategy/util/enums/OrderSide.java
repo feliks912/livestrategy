@@ -1,4 +1,4 @@
-package com.localstrategy.Enums;
+package com.localstrategy.util.enums;
 
 public enum OrderSide {
     BUY,

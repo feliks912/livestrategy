@@ -1,4 +1,4 @@
-package com.localstrategy.helper;
+package com.localstrategy.util.helper;
 
 import java.io.BufferedWriter;
 import java.io.IOException;

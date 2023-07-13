@@ -1,8 +1,8 @@
 package com.localstrategy;
 
-import com.localstrategy.Enums.OrderSide;
-import com.localstrategy.Enums.OrderType;
-import com.localstrategy.types.Candle;
+import com.localstrategy.util.enums.OrderSide;
+import com.localstrategy.util.enums.OrderType;
+import com.localstrategy.util.types.Candle;
 
 public class Position {
     private int id;

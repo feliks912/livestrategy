@@ -1,4 +1,4 @@
-package com.localstrategy.misc;
+package com.localstrategy.util.misc;
 
 import org.jfree.chart.*;
 import org.jfree.chart.annotations.XYAnnotation;
@@ -11,10 +11,11 @@ import org.jfree.chart.ui.TextAnchor;
 import org.jfree.data.xy.*;
 
 import com.localstrategy.Position;
-import com.localstrategy.Helper.CandleConstructor;
-import com.localstrategy.Helper.TransactionLoader;
-import com.localstrategy.types.Candle;
-import com.localstrategy.types.SingleTransaction;
+import com.localstrategy.util.helper.CandleConstructor;
+import com.localstrategy.util.helper.TransactionLoader;
+import com.localstrategy.util.old.StrategyExecutor;
+import com.localstrategy.util.types.Candle;
+import com.localstrategy.util.types.SingleTransaction;
 
 import java.time.Instant;
 import java.time.LocalDateTime;

@@ -1,9 +1,12 @@
-package com.localstrategy.misc;
+package com.localstrategy.util.misc;
 
 import javax.swing.AbstractAction;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.KeyStroke;
+
+import com.localstrategy.util.old.StrategyExecutor;
+
 import javax.swing.JSplitPane;
 import java.awt.BorderLayout;
 import java.awt.event.*;

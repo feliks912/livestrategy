@@ -1,7 +1,11 @@
-package com.localstrategy;
+package com.localstrategy.util.misc;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
+
+import com.localstrategy.Position;
+import com.localstrategy.util.enums.OrderSide;
+
 import java.awt.*;
 import java.util.Collections;
 import java.util.Comparator;

@@ -1,6 +1,6 @@
 package com.localstrategy;
 
-import com.localstrategy.Enums.OrderSide;
+import com.localstrategy.util.enums.OrderSide;
 
 public class OrderBookHandler {
 

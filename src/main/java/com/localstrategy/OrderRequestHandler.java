@@ -2,9 +2,9 @@ package com.localstrategy;
 
 import java.util.ArrayList;
 
-import com.localstrategy.Enums.OrderSide;
-import com.localstrategy.Enums.OrderType;
-import com.localstrategy.types.SingleTransaction;
+import com.localstrategy.util.enums.OrderSide;
+import com.localstrategy.util.enums.OrderType;
+import com.localstrategy.util.types.SingleTransaction;
 
 public class OrderRequestHandler {
 

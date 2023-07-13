@@ -4,8 +4,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import com.localstrategy.helper.TransactionLoader;
-import com.localstrategy.types.SingleTransaction;
+import com.localstrategy.util.helper.TransactionLoader;
+import com.localstrategy.util.types.SingleTransaction;
 
 public class StrategyStarter {
 

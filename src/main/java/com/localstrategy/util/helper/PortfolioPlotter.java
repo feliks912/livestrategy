@@ -1,4 +1,4 @@
-package com.localstrategy.helper;
+package com.localstrategy.util.helper;
 
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartFrame;
