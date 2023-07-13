@@ -1,4 +1,4 @@
-package com.localstrategy;
+package com.localstrategy.misc;
 
 import org.jfree.chart.*;
 import org.jfree.chart.annotations.XYAnnotation;
@@ -9,6 +9,12 @@ import org.jfree.chart.plot.*;
 import org.jfree.chart.renderer.xy.*;
 import org.jfree.chart.ui.TextAnchor;
 import org.jfree.data.xy.*;
+
+import com.localstrategy.Position;
+import com.localstrategy.Helper.CandleConstructor;
+import com.localstrategy.Helper.TransactionLoader;
+import com.localstrategy.types.Candle;
+import com.localstrategy.types.SingleTransaction;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -27,7 +33,7 @@ import java.util.List;
 import java.util.Calendar;
 
 public class CandlestickChart extends JFrame {
-    private static final int MAX_CANDLES = 200; // Maximum number of candles on the chart
+    private static final int MAX_CANDLES = 75; // Maximum number of candles on the chart
     private CustomOHLCDataset dataset;
     private int currentIndex;
     private Calendar calendar = Calendar.getInstance();
@@ -200,10 +206,10 @@ public class CandlestickChart extends JFrame {
                 Candle candle = candleConstructor.processTradeEvent(transaction);
 
                 if(candle == null && candleConstructor.getLastCandleIndex() != 0){ //New trasaction
-                    zigZagStrat.priceUpdate(i, transaction, candleConstructor.getLastCandle());
+                    //zigZagStrat.priceUpdate(i, transaction, candleConstructor.getLastCandle());
                 } 
                 else if(candle != null){ // New candle is formed
-                    zigZagStrat.newCandle(transaction, candleConstructor.getCandles());
+                    //zigZagStrat.newCandle(transactiodn, candleConstructor.getCandles());
 
                     //TODO: Update chart and set boolean flag to wait
                     eventUpdateAction();
@@ -224,7 +230,7 @@ public class CandlestickChart extends JFrame {
                         isButtonPressed = false;
                     } else {
                         try{
-                            Thread.sleep(50);
+                            Thread.sleep(30);
                         } catch(Exception e){
                             System.out.println(e);
                         }

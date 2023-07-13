@@ -1,9 +1,13 @@
-package com.localstrategy;
+package com.localstrategy.types;
 
 import java.util.ArrayList;
 import java.util.Map;
 
-public class UserDataStream {
+import com.localstrategy.AssetHandler;
+import com.localstrategy.Position;
+import com.localstrategy.Enums.RejectionReason;
+
+public class UserDataResponse {
     
     private AssetHandler userAssets;
 
@@ -14,7 +18,7 @@ public class UserDataStream {
 
     private ArrayList<Map<RejectionReason, Position>> rejectedPositionsActions = new ArrayList<Map<RejectionReason, Position>>();
 
-    public UserDataStream(
+    public UserDataResponse(
         AssetHandler userAssets, 
         ArrayList<Position> filledPositions,
         ArrayList<Position> unfilledPositions, 

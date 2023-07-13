@@ -1,4 +1,4 @@
-package com.localstrategy;
+package com.localstrategy.misc;
 
 import javax.swing.AbstractAction;
 import javax.swing.JComponent;

@@ -1,17 +1,19 @@
 package com.localstrategy;
 
+import com.localstrategy.misc.TradingGUI;
+
 public class App {
 
     public static void main( String[] args ) {
 
-        //new TradingGUI(2000000, new StrategyExecutor(200, 5, 3, 0, 100, 1, 10000, 0.1, 0)); */
+        new TradingGUI(5000000, new StrategyExecutor(500, 5, 3, 0, 100, 1, 10000, 0.1, 0));
 
-        new StrategyStarter(
+        /* new StrategyStarter(
             "C:/--- BTCUSDT",
             null,
             null,
             10000
-        ).execute(null);
+        ).execute(null); */
     }
 }
 

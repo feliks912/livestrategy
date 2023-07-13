@@ -1,4 +1,4 @@
-package com.localstrategy;
+package com.localstrategy.helper;
 
 import java.io.IOException;
 import java.nio.file.*;
@@ -8,6 +8,8 @@ import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.stream.Collectors;
+
+import com.localstrategy.types.SingleTransaction;
 
 public class TransactionLoader {
     private Queue<Path> filesQueue;

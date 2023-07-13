@@ -176,3 +176,33 @@
 12.7.23 14:33
     Mayor rewrite in progress, adding functional blocks to a simulated exchange engine
     It's a oversimplified model but 10x more reliable than the previous version. The goal is to say how we can expect similar results from live testing.
+
+13.7.23 4:27
+    TODO: Attempt to filter entries by
+        Number of candles with distances larger than set
+        Distance from the previous group
+        
+        Edit CandlestickChart to display lowest lows and highest highs of the dataset on a press of a button
+        Construct and store candles, then randomly select each one
+
+        Entry strategy - market on range break OR close while in range
+            Case a: close of tick < distance
+                
+            Case b: close of tick < distance below / above last range candle
+
+        New rules:
+            previous range break candle can't make a new range
+                What does this mean?
+            set minimum and maximum range length?
+            set minimum and maximum range value? As opposed to what? Absolute? Volatility?
+
+                We'll probably have all those statistics figured out.
+                    A pure candle-based strategy doesn't have many iterations overall. We could in theory test tens of candle volumes at once given 4-8 iterations of 
+
+                If we remove the maximum order size limit we could become risk percentage agnostic at low percentages.
+
+                To determine the proper stoploss / exit strategy we can use trading results combined with formed candle datasets. That will give me an abillity to have formed entry statistics.
+
+                Really we go step by step primarily for entries and stoplosses. The stoploss is mostly same for every order. Therefore the key is to get the entry figured out, and then we can iterate though candles to see where to exit etc.
+        
+        

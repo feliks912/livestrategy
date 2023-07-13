@@ -1,4 +1,4 @@
-package com.localstrategy;
+package com.localstrategy.Enums;
 
 public enum OrderAction {
     CREATE_ORDER,

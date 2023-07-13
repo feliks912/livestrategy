@@ -1,9 +1,12 @@
-package com.localstrategy;
+package com.localstrategy.helper;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.Instant;
 import java.util.ArrayList;
+
+import com.localstrategy.types.Candle;
+import com.localstrategy.types.SingleTransaction;
 
 public class CandleConstructor {
     private double currentPrice;

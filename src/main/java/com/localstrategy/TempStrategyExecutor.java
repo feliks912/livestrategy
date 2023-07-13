@@ -2,6 +2,10 @@ package com.localstrategy;
 
 import java.util.ArrayList;
 
+import com.localstrategy.helper.CandleConstructor;
+import com.localstrategy.types.Candle;
+import com.localstrategy.types.SingleTransaction;
+
 public class TempStrategyExecutor {
 
     private static final int CANDLE_VOLUME = 2_000_000;
@@ -16,7 +20,7 @@ public class TempStrategyExecutor {
     ExchangeLatencyHandler exchangeLatencyHandler;
 
     //TODO: Edit RiskManager
-    private RiskManager riskManager = new RiskManager(filledPositions);
+    /* private RiskManager riskManager = new RiskManager(filledPositions);
 
     //TODO: Use orderMaker to request an order action
     private OrderRequestHandler orderRequestHandler = 
@@ -26,7 +30,7 @@ public class TempStrategyExecutor {
             riskManager, 
             userAssets, 
             TempStrategyExecutor.RISK_PCT, 
-            TOTAL_ORDER_LIMIT);
+            TOTAL_ORDER_LIMIT); */
 
     public TempStrategyExecutor(ExchangeHandler exchangeHandler){
 
@@ -50,7 +54,7 @@ public class TempStrategyExecutor {
     private void newCandle(SingleTransaction transaction, ArrayList<Candle> candles){
 
 
-        exchangeHandler.addToUserAssetList(userAsset);
+        //exchangeHandler.addToUserAssetList(userAsset);
     }
 
 

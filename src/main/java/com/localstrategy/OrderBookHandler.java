@@ -1,5 +1,7 @@
 package com.localstrategy;
 
+import com.localstrategy.Enums.OrderSide;
+
 public class OrderBookHandler {
 
     private static final double ORDERBOOK_PCT = 0.4; //0.4%

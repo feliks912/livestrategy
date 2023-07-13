@@ -1,5 +1,9 @@
 package com.localstrategy;
 
+import com.localstrategy.Enums.OrderSide;
+import com.localstrategy.Enums.OrderType;
+import com.localstrategy.types.Candle;
+
 public class Position {
     private int id;
     private double openPrice;
@@ -98,44 +102,6 @@ public class Position {
         return 0;
     }
 
-    public double payCommission() {
-        return size * StrategyExecutor.brokerCommissionRate / 100;
-    }
-
-    // FIXME: Check calculations
-    public double partialClose(int closeIndex, long closeTimestamp, double closePrice, double positionPercentage) {
-        if (closed || positionPercentage <= 0 || positionPercentage > 1) {
-            return 0;
-        }
-
-        double tempCommission = payCommission();
-        
-        // Calculate the profit per unit size
-        double profitPerUnitSize = (closePrice - fillPrice) * (direction.equals(OrderSide.BUY) ? 1 : -1);
-        
-        double partialSize = positionPercentage * size;
-        
-        if (partialSize >= size) {
-            return closePosition(closePrice, closeTimestamp);
-        }
-        
-        margin *= partialSize / size;
-        size -= partialSize;
-        
-        double partialProfit = partialSize * profitPerUnitSize;
-
-        tempCommission -= payCommission();
-        
-        long positionLengthInHours = (closeTimestamp - openTimestamp) / 1000 / 60 / 60;
-        tempCommission += partialSize * (1 + hourlyInterestRate) * positionLengthInHours;
-
-        profit += partialProfit;
-
-        partiallyClosed = true;
-        
-        return partialProfit - tempCommission;
-    }
-
     public double closePosition(double closePrice, long closeTimestamp) {
         if (closed) {
             return 0;
@@ -151,7 +117,7 @@ public class Position {
 
         profit += calculateProfit(closePrice);
 
-        return profit - totalUnpaidInterest;
+        return profit;
     }
 
     public double cancelPosition(long closeTimestamp) {

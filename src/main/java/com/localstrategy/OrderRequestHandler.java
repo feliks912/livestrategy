@@ -2,6 +2,10 @@ package com.localstrategy;
 
 import java.util.ArrayList;
 
+import com.localstrategy.Enums.OrderSide;
+import com.localstrategy.Enums.OrderType;
+import com.localstrategy.types.SingleTransaction;
+
 public class OrderRequestHandler {
 
     public int totalOrderLimit;
@@ -46,24 +50,26 @@ public class OrderRequestHandler {
     } 
 
     private boolean calculateOrderParameters(double entryPrice, double stopLossPrice){
-        if (Math.abs(entryPrice - stopLossPrice) > 5) { //$5 difference between entry and stop required.
+        if (Math.abs(entryPrice - stopLossPrice) > 2) { //$2 difference between entry and stop required.
 
             positionSize = portfolio.getFreeUSDT() * risk / 100 / Math.abs(entryPrice - stopLossPrice);
 
-            //FIXME: Commented to simulate ideal environment.
+            double slippageLimitedPositionSize = Math.min(
+                OrderBookHandler.getMaximumOrderSize(entryPrice, Math.abs(entryPrice - stopLossPrice), 10, (entryPrice > stopLossPrice ? OrderSide.BUY : OrderSide.SELL)),
+                OrderBookHandler.getMaximumOrderSize(stopLossPrice, Math.abs(entryPrice - stopLossPrice), 10, (entryPrice > stopLossPrice ? OrderSide.SELL : OrderSide.BUY))
+            );
+        
+            positionSize = Math.min(positionSize, slippageLimitedPositionSize);
+
             positionSize = Math.max(10 / entryPrice, positionSize);
             positionSize = Math.max(positionSize, 0.00001);
-            
+            //FIXME: Commented to simulate ideal environment.
             //positionSize = Math.max(0.00001, Math.min(positionSize, 152));
-
-            positionSize = Math.min(positionSize, OrderBookHandler.getMaximumOrderSize(entryPrice, Math.abs(entryPrice - stopLossPrice), 10, (entryPrice > stopLossPrice ? OrderSide.BUY : OrderSide.SELL)));
-
-            positionSize = Math.min(positionSize, OrderBookHandler.getMaximumOrderSize(stopLossPrice, Math.abs(entryPrice - stopLossPrice), 10, (entryPrice > stopLossPrice ? OrderSide.SELL : OrderSide.BUY)));
 
             double borrowedUSDT = portfolio.getTotalBorrowedUSDT();
             double borrowedBTC = portfolio.getTotalBorrowedBTC();
 
-            amountToBorrow = positionSize * riskManager.getBorrowRatio();
+            amountToBorrow = positionSize;
 
             if(entryPrice > stopLossPrice){
                 amountToBorrow *= entryPrice;
@@ -74,7 +80,7 @@ public class OrderRequestHandler {
                 } 
                 else {
                     riskManager.checkAndUpdateTier(borrowedUSDT + amountToBorrow, borrowedBTC);
-                    amountToBorrow = positionSize * entryPrice * riskManager.getBorrowRatio();
+                    amountToBorrow = positionSize * entryPrice;
                     requiredMargin = positionSize * entryPrice / riskManager.getCurrentLeverage();
                 }
             } 
@@ -85,7 +91,7 @@ public class OrderRequestHandler {
                 } 
                 else {
                     riskManager.checkAndUpdateTier(borrowedUSDT, borrowedBTC + amountToBorrow);
-                    amountToBorrow = positionSize * riskManager.getBorrowRatio();
+                    amountToBorrow = positionSize;
                     requiredMargin = positionSize * entryPrice / riskManager.getCurrentLeverage();
                 }
             }

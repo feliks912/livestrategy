@@ -1,4 +1,4 @@
-package com.localstrategy;
+package com.localstrategy.misc;
 
 import java.awt.Color;
 import java.awt.Graphics2D;

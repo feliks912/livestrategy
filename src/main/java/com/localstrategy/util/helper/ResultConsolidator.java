@@ -1,4 +1,4 @@
-package com.localstrategy;
+package com.localstrategy.helper;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -8,6 +8,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.StringJoiner;
+
+import com.localstrategy.Position;
 
 public class ResultConsolidator {
     
