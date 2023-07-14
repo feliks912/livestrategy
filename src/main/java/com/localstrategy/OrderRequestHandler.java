@@ -16,16 +16,16 @@ public class OrderRequestHandler {
     private double amountToBorrow;
 
     private ArrayList<Position> activePositions = new ArrayList<Position>();
-    private ArrayList<Position> pendingPositions = new ArrayList<Position>();
+    private ArrayList<Position> unfilledPositions = new ArrayList<Position>();
     private AssetHandler portfolio;
     private double risk;
-    private RiskManager riskManager;
+    private TierManager riskManager;
 
     public double borrowedAmount;
 
     //TODO: Add stop limit orders
-    public OrderRequestHandler(ArrayList<Position> pendingPositions, ArrayList<Position> activePositions, RiskManager riskManager, AssetHandler portfolio, double risk, int totalOrderLimit){
-        this.pendingPositions = pendingPositions;
+    public OrderRequestHandler(ArrayList<Position> pendingPositions, ArrayList<Position> activePositions, TierManager riskManager, AssetHandler portfolio, double risk, int totalOrderLimit){
+        this.unfilledPositions = pendingPositions;
         this.activePositions = activePositions;
         this.riskManager = riskManager;
         this.portfolio = portfolio;
@@ -35,7 +35,7 @@ public class OrderRequestHandler {
 
     public void newMarketOrder(SingleTransaction transaction, double stopLossPrice){
         if(!calculateOrderParameters(transaction.getPrice(), stopLossPrice)){
-            pendingPositions.add(
+            unfilledPositions.add(
                 new Position(transaction.getPrice(), stopLossPrice, positionSize, OrderType.MARKET, requiredMargin, amountToBorrow, ++lastOrderId)
             );
         }
@@ -43,7 +43,7 @@ public class OrderRequestHandler {
 
     public void newLimitOrder(double entryPrice, double stopLossPrice, SingleTransaction transaction){
         if(!calculateOrderParameters(entryPrice, stopLossPrice)){
-            pendingPositions.add(
+            unfilledPositions.add(
                 new Position(transaction.getPrice(), stopLossPrice, positionSize, OrderType.LIMIT, requiredMargin, amountToBorrow, ++lastOrderId)
             );
         }
@@ -55,8 +55,8 @@ public class OrderRequestHandler {
             positionSize = portfolio.getFreeUSDT() * risk / 100 / Math.abs(entryPrice - stopLossPrice);
 
             double slippageLimitedPositionSize = Math.min(
-                OrderBookHandler.getMaximumOrderSize(entryPrice, Math.abs(entryPrice - stopLossPrice), 10, (entryPrice > stopLossPrice ? OrderSide.BUY : OrderSide.SELL)),
-                OrderBookHandler.getMaximumOrderSize(stopLossPrice, Math.abs(entryPrice - stopLossPrice), 10, (entryPrice > stopLossPrice ? OrderSide.SELL : OrderSide.BUY))
+                SlippageHandler.getMaximumOrderSize(entryPrice, Math.abs(entryPrice - stopLossPrice), 10, (entryPrice > stopLossPrice ? OrderSide.BUY : OrderSide.SELL)),
+                SlippageHandler.getMaximumOrderSize(stopLossPrice, Math.abs(entryPrice - stopLossPrice), 10, (entryPrice > stopLossPrice ? OrderSide.SELL : OrderSide.BUY))
             );
         
             positionSize = Math.min(positionSize, slippageLimitedPositionSize);

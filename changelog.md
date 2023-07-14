@@ -205,4 +205,11 @@
 
                 Really we go step by step primarily for entries and stoplosses. The stoploss is mostly same for every order. Therefore the key is to get the entry figured out, and then we can iterate though candles to see where to exit etc.
         
-        
+13.7.23 13:36
+    From ChatGPT, when shorting an asset - "The margin requirement doesn't change with fluctuations in the asset's price."
+        When we borrow bitcoin we lock a fixed amount of funds with the exchange
+
+[IMPORTANT] 13.7.23 17:24 Talked to customer support regarding locking funds when opening limit orders.
+    Stop-limit orders lock funds at the time of executing a limit order, which is when the price crosses the stop line
+    By using sideEffectType and autoRepayAtCancel we can ask Binance to borrow funds for us at the time of opening an order, and automatically repay if the order is canceled before being executed
+        NOTE: Out stoplosses don't have to borrow funds. We already have them unlocked in our account if the market / limit order got filled.

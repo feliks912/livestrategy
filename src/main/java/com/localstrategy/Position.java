@@ -2,6 +2,7 @@ package com.localstrategy;
 
 import com.localstrategy.util.enums.OrderSide;
 import com.localstrategy.util.enums.OrderType;
+import com.localstrategy.util.enums.OrderStatus;
 import com.localstrategy.util.types.Candle;
 
 public class Position {
@@ -40,6 +41,11 @@ public class Position {
     private long closeRequestTimestamp;
     private boolean reversed;
 
+    private OrderStatus status;
+
+    private boolean automaticBorrow = true;
+    private boolean autoRepayAtCancel = true;
+
     public Position(
             double openPrice,
             double initialStopLossPrice,
@@ -55,6 +61,8 @@ public class Position {
         this.entryPriceIndex = openIndex;
         this.initialStopLossPrice = openIndex;
         this.initialStopLossPrice = initialStopLossPrice;
+
+        this.status = OrderStatus.NEW;
 
         // TODO: Convert position to use fill price instead of open price during calculation
         this.openPrice = openPrice;
@@ -317,4 +325,29 @@ public class Position {
     public void setFillPrice(double fillPrice) {
         this.fillPrice = fillPrice;
     }
+
+    public boolean isAutomaticBorrow() {
+        return this.automaticBorrow;
+    }
+
+    public void setAutomaticBorrow(boolean automaticBorrow) {
+        this.automaticBorrow = automaticBorrow;
+    }
+
+    public boolean isAutoRepayAtCancel() {
+        return this.autoRepayAtCancel;
+    }
+
+    public void setAutoRepayAtCancel(boolean autoRepayAtCancel) {
+        this.autoRepayAtCancel = autoRepayAtCancel;
+    }
+
+    public OrderStatus getStatus(){
+        return this.status;
+    }
+
+    public void setStatus(OrderStatus status){
+        this.status = status;
+    }
+    
 }

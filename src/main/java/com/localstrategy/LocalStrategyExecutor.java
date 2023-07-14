@@ -7,7 +7,7 @@ import com.localstrategy.util.old.ZigZag;
 import com.localstrategy.util.types.Candle;
 import com.localstrategy.util.types.SingleTransaction;
 
-public class TempStrategyExecutor {
+public class LocalStrategyExecutor {
 
     private static final int CANDLE_VOLUME = 2_000_000;
     public static final double RISK_PCT = 0.1;
@@ -18,7 +18,7 @@ public class TempStrategyExecutor {
 
     ExchangeHandler exchangeHandler;
 
-    ExchangeLatencyHandler exchangeLatencyHandler;
+    LatencyHandler exchangeLatencyHandler;
 
     //TODO: Edit RiskManager
     /* private RiskManager riskManager = new RiskManager(filledPositions);
@@ -33,7 +33,7 @@ public class TempStrategyExecutor {
             TempStrategyExecutor.RISK_PCT, 
             TOTAL_ORDER_LIMIT); */
 
-    public TempStrategyExecutor(ExchangeHandler exchangeHandler){
+    public LocalStrategyExecutor(ExchangeHandler exchangeHandler){
 
         //TODO: Any call to exchangeHandler has a response latency. Local variables are instant.
         this.exchangeHandler = exchangeHandler;
@@ -53,9 +53,7 @@ public class TempStrategyExecutor {
     }
 
     private void newCandle(SingleTransaction transaction, ArrayList<Candle> candles){
-
-
-        //exchangeHandler.addToUserAssetList(userAsset);
+        
     }
 
 

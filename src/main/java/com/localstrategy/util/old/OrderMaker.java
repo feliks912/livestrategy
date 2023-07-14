@@ -4,7 +4,7 @@ import java.util.ArrayList;
 
 import com.binance.api.client.domain.OrderSide;
 import com.localstrategy.Position;
-import com.localstrategy.RiskManager;
+import com.localstrategy.TierManager;
 
 public class OrderMaker {
 
@@ -19,7 +19,7 @@ public class OrderMaker {
             double marginUsed,
             long openTimestamp,
             double exchangeLatency,
-            RiskManager riskManager
+            TierManager riskManager
     ) {
         if (Math.abs(entryPrice - stoplossPrice) > 5) { //$5 difference between entry and stop required.
 

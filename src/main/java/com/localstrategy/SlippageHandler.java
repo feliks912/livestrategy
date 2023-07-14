@@ -2,12 +2,12 @@ package com.localstrategy;
 
 import com.localstrategy.util.enums.OrderSide;
 
-public class OrderBookHandler {
+public class SlippageHandler {
 
     private static final double ORDERBOOK_PCT = 0.4; //0.4%
     private static final double ORDERBOOK_QTY = 150; //150 BTC
 
-    public OrderBookHandler() {
+    public SlippageHandler() {
     }
 
     public double getSlippagePrice(double price, double positionSize, OrderSide orderSide) {

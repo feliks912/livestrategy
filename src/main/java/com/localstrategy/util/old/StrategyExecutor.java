@@ -9,7 +9,7 @@ import org.apache.commons.math3.distribution.LogNormalDistribution;
 import com.binance.api.client.domain.OrderSide;
 import com.binance.api.client.domain.account.Order;
 import com.localstrategy.Position;
-import com.localstrategy.RiskManager;
+import com.localstrategy.TierManager;
 import com.localstrategy.util.types.Candle;
 import com.localstrategy.util.types.SingleTransaction;
 
@@ -77,7 +77,7 @@ public class StrategyExecutor {
     private boolean limitShort = false;
     private boolean limitLong = false;
 
-    private RiskManager riskManager = new RiskManager(positions);
+    private TierManager riskManager = new TierManager(positions);
 
     private double temporaryProfit = 0;
 

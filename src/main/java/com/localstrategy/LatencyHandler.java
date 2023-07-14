@@ -9,12 +9,15 @@ import com.localstrategy.util.types.UserDataResponse;
 
 import java.util.ArrayList;
 
-public class ExchangeLatencyHandler {
+public class LatencyHandler {
+
+    //TODO: Additional latency on automaticBorrow
 
     private int TRANSACTION_LATENCY = 0;
     private int TRADE_EXECUTION_LATENCY = 0; //request -> execution
     private int TRADE_REPORT_LATENCY = 0; //request -> response
     private int USER_DATA_LATENCY = 0;
+    private int BORROW_LATENCY = 0;
 
     private Map<Long, UserDataResponse> userDataStream;  //UserDataStream gets parsed from the exchange to the 
     private Map<Long, ArrayList<Position>> pendingPositions; //Pending positions get parsed from client to the exchange
@@ -27,7 +30,7 @@ public class ExchangeLatencyHandler {
 
     private static Random random = new Random();
 
-    public ExchangeLatencyHandler() {
+    public LatencyHandler() {
 
     }
 
