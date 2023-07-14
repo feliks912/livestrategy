@@ -1,92 +1,78 @@
-9.7.2023 18:30
-    Added trailing stoploss on previous candle high / low
-    Changed entry strategy - last low / high no longer have to match the lowest low / highest recent high (but new orders can still only be made on a lower low / higher high using usedHigh / usedLow flags)
-    The entry price is always ZigZag low / high, no more range.
+14.7.23 19:15
+    Removed manual BORROW and REPAY options
+    Implemented automatic borrow and repay on order fill
+        Calculating borrow amount at time of filling
+            per https://www.binance.com/en/support/faq/how-to-use-the-one-click-borrow-repay-function-360032609851
+        Repaying on new order cancel
+    Edited a bunch of other stuff
+
+    TODOS in ExchangeHandler
+        + Edit wall logic
+        + Rewrite LocalStrategyExecutor as an interface function?
+        + Write basic strategy
+        + Test.
+        + Implement candle & position display
+        + implement backtesting concurrency
+
+[IMPORTANT] 13.7.23 17:24 Talked to customer support regarding locking funds when opening limit orders.
+    Stop-limit orders lock funds at the time of executing a limit order, which is when the price crosses the stop line
+    By using sideEffectType and autoRepayAtCancel we can ask Binance to borrow funds for us at the time of opening an order, and automatically repay if the order is canceled before being executed
+        NOTE: Out stoplosses don't have to borrow funds. We already have them unlocked in our account if the market / limit order got filled.
+
+13.7.23 13:36
+    From ChatGPT, when shorting an asset - "The margin requirement doesn't change with fluctuations in the asset's price."
+        When we borrow bitcoin we lock a fixed amount of funds with the exchange
+
+13.7.23 4:27
+    TODO: Attempt to filter entries by
+        Number of candles with distances larger than set
+        Distance from the previous group
+        
+        Edit CandlestickChart to display lowest lows and highest highs of the dataset on a press of a button
+        Construct and store candles, then randomly select each one
+
+        Entry strategy - market on range break OR close while in range
+            Case a: close of tick < distance
+                
+            Case b: close of tick < distance below / above last range candle
+
+        New rules:
+            previous range break candle can't make a new range
+                What does this mean?
+            set minimum and maximum range length?
+            set minimum and maximum range value? As opposed to what? Absolute? Volatility?
+
+                We'll probably have all those statistics figured out.
+                    A pure candle-based strategy doesn't have many iterations overall. We could in theory test tens of candle volumes at once given 4-8 iterations of 
+
+                If we remove the maximum order size limit we could become risk percentage agnostic at low percentages.
+
+                To determine the proper stoploss / exit strategy we can use trading results combined with formed candle datasets. That will give me an abillity to have formed entry statistics.
+
+                Really we go step by step primarily for entries and stoplosses. The stoploss is mostly same for every order. Therefore the key is to get the entry figured out, and then we can iterate though candles to see where to exit etc.
+
+12.7.23 14:33
+    Mayor rewrite in progress, adding functional blocks to a simulated exchange engine
+    It's a oversimplified model but 10x more reliable than the previous version. The goal is to say how we can expect similar results from live testing.
+
+12.7.23 4:34
+    Todo: Build a functional backtesting engine.
+        Market orders
+        Limit orders
+        Stoplosses
+        Slippage
+        Latencies
+        Price walls
+        Margin borrows
+
+12.7.23 1:32
+    Looking to implement the following strategy - If the first candle whos' tick < distance closes outside of the last candle whos' tick >= distance in the oposite direction of the move, open a limit order between the last candle's high / low and the top / bottom. Discard position after ~15 candles
 
     Observations:
-        More positions - crazy profits, crazy losses.
-    
-    Todo:
-        Increase distance and ZigZag values
-        Introduce reversing a trade on stop
-            Fixed profit to recouperate loss (depends on stoploss percentage)
-        Convert to multi-threaded
+        Unstable
 
-9.7.2023 20:00
-    Added latency between order activation and setting a stoploss
-
-    Observation:
-        We lost some on that one
-
-    Todo: FIXME:
-        Currently we place a stop-limit order entry request when when a new stoploss level is recognized, but I forgot to cancel the previous one on new candle formation. That takes 2*trade request latency because we must cancel, then create an order (binance, of course, doesn't support closing and creating a new order in the same request ofc ofc). I must implement the latency those two requests take.
-
-        Also, it takes LONGER for us to get a response from the server because I've been analyzing how long it takes for the exchange to execute and order compared to when the request was sent, not how long it takes for us to receive that response. I've got to test that aswell, then implement it here.
-
-9.7.2023 20:33
-    Reintroduced ranges to entry triggers
-
-    Observations:
-        Higher profits
-
-    Todo:
-        Introduce BE on a percentage move from the entry price, this way we'll avoid losses where price moves away from entry but hits the stoploss in the same candle. Especially true in volatile markets. Prioritize minimizing losses.
-
-9.7.2023 21:50
-    Added trailing stoploss at a percentage between previous candle close and entry.
-
-    Observations:
-        Some days are catastrophically profitable, but on others the losses recouperate
-
-    Todo:
-        500000 volume candles just don't seem to cut it on days ~450 to ~700. Try with 2mil.
-        TODO: Priority - cut losses
-            Loss prevention methods:
-                Opposite reordering ?
-                Higher distance values
-                Higher ZigZag parameter values
-                Rollback to matching ZigZag values with highest / lowest values
-                Lower risk
-                New detection method (but refactor first)
-                    Note previous potential limit levels (but don't take them) and only open positions when price crosses that level. Hopefully those are potential reversal levels so them, and onwards would be a good place to start checking for levels
-
-10.7.23 4:15
-    2000000 candles work with 0% profit on rocky period and ~50% after with 7% drawdown check.
-
-    Todo:
-        Reintroduce limit orders
-            Set stoploss at the retouch level.
-
-10.7.23 6:21
-    Todo: revert back to original strategy, match TpRRs to opposite orders of similar distances. That should, in theory, let the runners run while getting some scalping action.
-
-10.7.23 20:00 looking at implemented features
-
-    price update
-        transaction price deviation calculation
-        stoploss active / closed before stoploss check
-        (delayed) long/short TpRR calculation
-        (delayed) new candle case
-            fixedRR
-            breakeven
-            trailing stop
-        stoploss check
-            stoploss
-            closed before stoploss
-        remove closed positions
-        margin test
-        entry logic
-        TODO: (delayed) entry logic change
-
-
-    candle update
-        set new candle flag
-        this candle request latency (event + trade)
-        interest calculation
-        fetch candle
-        closed fixedRR trades
-        breakeven / trailing stop
-        indicator calculation
+11.7.23 18:00
+    Days 2022-11-22 (632) to 2023-03-23 (753) (121 days total) terrible performance ~50% drawdown in a volatile period
 
 11.7.23 15:48
     Revisited observed latencies on AWS Tokyo-based VPS t3.small
@@ -154,62 +140,92 @@
 
                                 The orderbook model is crucial during a volatile period
 
-11.7.23 18:00
-    Days 2022-11-22 (632) to 2023-03-23 (753) (121 days total) terrible performance ~50% drawdown in a volatile period
+10.7.23 20:00 looking at implemented features
 
-12.7.23 1:32
-    Looking to implement the following strategy - If the first candle whos' tick < distance closes outside of the last candle whos' tick >= distance in the oposite direction of the move, open a limit order between the last candle's high / low and the top / bottom. Discard position after ~15 candles
+    price update
+        transaction price deviation calculation
+        stoploss active / closed before stoploss check
+        (delayed) long/short TpRR calculation
+        (delayed) new candle case
+            fixedRR
+            breakeven
+            trailing stop
+        stoploss check
+            stoploss
+            closed before stoploss
+        remove closed positions
+        margin test
+        entry logic
+        TODO: (delayed) entry logic change
+
+
+    candle update
+        set new candle flag
+        this candle request latency (event + trade)
+        interest calculation
+        fetch candle
+        closed fixedRR trades
+        breakeven / trailing stop
+        indicator calculation
+
+10.7.23 6:21
+    Todo: revert back to original strategy, match TpRRs to opposite orders of similar distances. That should, in theory, let the runners run while getting some scalping action.
+
+10.7.23 4:15
+    2000000 candles work with 0% profit on rocky period and ~50% after with 7% drawdown check.
+
+    Todo:
+        Reintroduce limit orders
+            Set stoploss at the retouch level.
+
+9.7.2023 21:50
+    Added trailing stoploss at a percentage between previous candle close and entry.
 
     Observations:
-        Unstable
+        Some days are catastrophically profitable, but on others the losses recouperate
 
-12.7.23 4:34
-    Todo: Build a functional backtesting engine.
-        Market orders
-        Limit orders
-        Stoplosses
-        Slippage
-        Latencies
-        Price walls
-        Margin borrows
+    Todo:
+        500000 volume candles just don't seem to cut it on days ~450 to ~700. Try with 2mil.
+        TODO: Priority - cut losses
+            Loss prevention methods:
+                Opposite reordering ?
+                Higher distance values
+                Higher ZigZag parameter values
+                Rollback to matching ZigZag values with highest / lowest values
+                Lower risk
+                New detection method (but refactor first)
+                    Note previous potential limit levels (but don't take them) and only open positions when price crosses that level. Hopefully those are potential reversal levels so them, and onwards would be a good place to start checking for levels
 
-12.7.23 14:33
-    Mayor rewrite in progress, adding functional blocks to a simulated exchange engine
-    It's a oversimplified model but 10x more reliable than the previous version. The goal is to say how we can expect similar results from live testing.
+9.7.2023 20:33
+    Reintroduced ranges to entry triggers
 
-13.7.23 4:27
-    TODO: Attempt to filter entries by
-        Number of candles with distances larger than set
-        Distance from the previous group
-        
-        Edit CandlestickChart to display lowest lows and highest highs of the dataset on a press of a button
-        Construct and store candles, then randomly select each one
+    Observations:
+        Higher profits
 
-        Entry strategy - market on range break OR close while in range
-            Case a: close of tick < distance
-                
-            Case b: close of tick < distance below / above last range candle
+    Todo:
+        Introduce BE on a percentage move from the entry price, this way we'll avoid losses where price moves away from entry but hits the stoploss in the same candle. Especially true in volatile markets. Prioritize minimizing losses.
 
-        New rules:
-            previous range break candle can't make a new range
-                What does this mean?
-            set minimum and maximum range length?
-            set minimum and maximum range value? As opposed to what? Absolute? Volatility?
+9.7.2023 20:00
+    Added latency between order activation and setting a stoploss
 
-                We'll probably have all those statistics figured out.
-                    A pure candle-based strategy doesn't have many iterations overall. We could in theory test tens of candle volumes at once given 4-8 iterations of 
+    Observation:
+        We lost some on that one
 
-                If we remove the maximum order size limit we could become risk percentage agnostic at low percentages.
+    Todo: FIXME:
+        Currently we place a stop-limit order entry request when when a new stoploss level is recognized, but I forgot to cancel the previous one on new candle formation. That takes 2*trade request latency because we must cancel, then create an order (binance, of course, doesn't support closing and creating a new order in the same request ofc ofc). I must implement the latency those two requests take.
 
-                To determine the proper stoploss / exit strategy we can use trading results combined with formed candle datasets. That will give me an abillity to have formed entry statistics.
+        Also, it takes LONGER for us to get a response from the server because I've been analyzing how long it takes for the exchange to execute and order compared to when the request was sent, not how long it takes for us to receive that response. I've got to test that aswell, then implement it here.
 
-                Really we go step by step primarily for entries and stoplosses. The stoploss is mostly same for every order. Therefore the key is to get the entry figured out, and then we can iterate though candles to see where to exit etc.
-        
-13.7.23 13:36
-    From ChatGPT, when shorting an asset - "The margin requirement doesn't change with fluctuations in the asset's price."
-        When we borrow bitcoin we lock a fixed amount of funds with the exchange
+9.7.2023 18:30
+    Added trailing stoploss on previous candle high / low
+    Changed entry strategy - last low / high no longer have to match the lowest low / highest recent high (but new orders can still only be made on a lower low / higher high using usedHigh / usedLow flags)
+    The entry price is always ZigZag low / high, no more range.
 
-[IMPORTANT] 13.7.23 17:24 Talked to customer support regarding locking funds when opening limit orders.
-    Stop-limit orders lock funds at the time of executing a limit order, which is when the price crosses the stop line
-    By using sideEffectType and autoRepayAtCancel we can ask Binance to borrow funds for us at the time of opening an order, and automatically repay if the order is canceled before being executed
-        NOTE: Out stoplosses don't have to borrow funds. We already have them unlocked in our account if the market / limit order got filled.
+    Observations:
+        More positions - crazy profits, crazy losses.
+    
+    Todo:
+        Increase distance and ZigZag values
+        Introduce reversing a trade on stop
+            Fixed profit to recouperate loss (depends on stoploss percentage)
+        Convert to multi-threaded
