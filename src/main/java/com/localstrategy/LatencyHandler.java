@@ -12,6 +12,7 @@ import java.util.ArrayList;
 public class LatencyHandler {
 
     //TODO: Additional latency on automaticBorrow
+    //TODO: It's possible multiple positions get parsed at once. We still need to process them in sequence.
 
     private int TRANSACTION_LATENCY = 0;
     private int TRADE_EXECUTION_LATENCY = 0; //request -> execution
@@ -52,15 +53,21 @@ public class LatencyHandler {
 
     public Map<OrderAction, ArrayList<Position>> getDelayedUserActionRequests(long currentExchangeTimestamp) {
         // Search through the pendingPositions map.
+
+        ArrayList<Map<OrderAction, ArrayList<Position>>> actionsToReturn = new ArrayList<Map<OrderAction, ArrayList<Position>>>();
+
         for (Map.Entry<Long, Map<OrderAction, ArrayList<Position>>> entry : positionsUpdateMap.entrySet()) {
             if (currentExchangeTimestamp - entry.getKey() > previousPendingPositionsLatency) {
                 // If the current time minus the key (the timestamp when the data was stored)
                 // is larger than the current latency, return the data and remove it from the map.
                 Map<OrderAction, ArrayList<Position>> positions = entry.getValue();
                 pendingPositions.remove(entry.getKey());
-                return positions;
+                actionsToReturn.add(positions);
             }
         }
+
+        return actionsToReturn;
+
         // If no suitable entry was found, return null.
         return null;
     }

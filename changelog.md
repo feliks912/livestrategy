@@ -8,7 +8,7 @@
 
     TODOS in ExchangeHandler
         + Edit wall logic
-        + Rewrite LocalStrategyExecutor as an interface function?
+        + Rewrite LocalStrategyExecutor as an abstract class
         + Write basic strategy
         + Test.
         + Implement candle & position display
