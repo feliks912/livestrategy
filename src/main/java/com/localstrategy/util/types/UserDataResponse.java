@@ -3,13 +3,13 @@ package com.localstrategy.util.types;
 import java.util.ArrayList;
 import java.util.Map;
 
-import com.localstrategy.AssetHandler;
+import com.localstrategy.UserAssets;
 import com.localstrategy.Position;
 import com.localstrategy.util.enums.RejectionReason;
 
 public class UserDataResponse {
     
-    private AssetHandler userAssets;
+    private UserAssets userAssets;
 
     private ArrayList<Position> filledPositions = new ArrayList<Position>();
     private ArrayList<Position> newPositions = new ArrayList<Position>();
@@ -19,7 +19,7 @@ public class UserDataResponse {
     private ArrayList<Map<RejectionReason, Position>> rejectedActions = new ArrayList<Map<RejectionReason, Position>>();
 
     public UserDataResponse(
-        AssetHandler userAssets,
+        UserAssets userAssets,
         ArrayList<Position> newPositions, 
         ArrayList<Position> filledPositions,
         ArrayList<Position> cancelledPositions,
@@ -35,7 +35,7 @@ public class UserDataResponse {
     }
 
 
-    public AssetHandler getUserAssets() {
+    public UserAssets getUserAssets() {
         return this.userAssets;
     }
 

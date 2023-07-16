@@ -15,28 +15,26 @@ import java.util.HashMap;
 
 
 //TODO: I didn't consider how EXACTLY these walls work.
-//TODO: we can query current leverage tier from Binance therefore change riskManager
+//TODO: we use automatic borrowings and repays therefore edit borrowed amount calculation from orderRequestManager
 //TODO: Separate Order and Position classes - Position class is a local class comprising of position value and a stoploss order, Order class is a single Binance-supported order request
+//TODO: Check if overall borrow / profit logic is alright
+//TODO: Auto repay on cancel is not auto repay on reverse order. Integrate manual repay
 
 //FIXME: Test userDataStream latency. It shouldn't be (lol shouldn't...) much different than order execution reponse latency
 //FIXME: Refactor
 
 //Note - we don't use borrowed funds when calculating or positons sizes. That's important during live trading. handle it properly that's why I made the request to the Binance API team
 
-//TODO: Check if overall borrow / profit logic is alright
-
-//TODO: implement riskManager to check tier
-//TODO: Edit riskManager logic
-
 //TODO: Parse strategy as parameter from App instead of hardcoding it into TempStrategyExecutor, unless TempStrategyExecutor is the strategy (later)
 //TODO: Add symbol rules (later)
-//TODO: Currently we only support auto borrow and repay. Add manual borrows and repays
+//TODO: Currently we only support auto borrow and repay. Add manual borrows and repays (later)
 
-public class ExchangeHandler {
+public class Exchange {
 
-    private int MAX_PROG_ORDERS = 5;
+    public final static int MAX_PROG_ORDERS = 5;
     private int MAX_BORROW_USDT = 900_000;
     private int MAX_BORROW_BTC = 72;
+
     private ArrayList<Position> newPositions = new ArrayList<Position>();
     private ArrayList<Position> filledPositions = new ArrayList<Position>();
     private ArrayList<Position> cancelledPositions = new ArrayList<Position>();
@@ -48,11 +46,11 @@ public class ExchangeHandler {
 
     private ArrayList<Position> acceptedPositionList = new ArrayList<Position>();
 
-    private AssetHandler userAssets = new AssetHandler();
+    private UserAssets userAssets = new UserAssets();
     private LatencyHandler exchangeLatencyHandler = new LatencyHandler();
-    private ArrayList<AssetHandler> userAssetsList = new ArrayList<AssetHandler>();
+    private ArrayList<UserAssets> userAssetsList = new ArrayList<UserAssets>();
     private SlippageHandler orderBookHandler = new SlippageHandler();
-    private LocalStrategyExecutor strategyExecutor;
+    private LocalStrategy strategyExecutor;
 
     private TierManager tierManager = new TierManager();
 
@@ -69,16 +67,14 @@ public class ExchangeHandler {
     private int lossCounter = 0;
     private int breakevenCounter = 0;
 
-    public ExchangeHandler(Double initialUSDTPortfolio){
+    public Exchange(Double initialUSDTPortfolio){
 
-        this.strategyExecutor = new LocalStrategyExecutor(this);
+        this.strategyExecutor = new LocalStrategy(this);
 
         this.userAssets.setFreeUSDT(initialUSDTPortfolio);
         this.userAssetsList.add(userAssets);
     }
 
-
-    //FIXME: Currently I'm using the timestamp of the current transaction to define exchange time because they are almost equal to our local time. During walls that might present a problem if I don't add dynamic transaction latencies.
     public void newTransaction(SingleTransaction transaction, boolean isWall) {
         this.transaction = transaction;
 
@@ -94,7 +90,6 @@ public class ExchangeHandler {
 
         strategyExecutor.onTransaction(transaction, isWall);
     }
-
 
     private void updateUserDataStream(){
         if(userAssetsUpdated || positionsUpdated || !rejectedActions.isEmpty()){
@@ -119,160 +114,162 @@ public class ExchangeHandler {
             positionsUpdated = false;
         }
     }
+    
+    private void handleUserRequest(ArrayList<Map<OrderAction, ArrayList<Position>>> entryBlocks){
 
-    private void handleUserRequest(Map<OrderAction, ArrayList<Position>> temp){
-
-        if(temp == null){
+        if(entryBlocks.isEmpty()){
             return;
         }
 
-        for(Map.Entry<OrderAction, ArrayList<Position>> entry : temp.entrySet()){
-            ArrayList<Position> positions = entry.getValue();
+        for(Map<OrderAction, ArrayList<Position>> entryBlock : entryBlocks){
 
-            switch(entry.getKey()){
+            for(Map.Entry<OrderAction, ArrayList<Position>> entry : entryBlock.entrySet()){
 
-                /*Supported Bincne API functions we want to emulate
-                 * New order
-                 * Cancel order(s)
-                 * Adjust max leverage (later)
-                 * Query tier data
-                 * User stream
-                 * Borrow asset (later)
-                 * Repay asset (later)
-                 */
+                ArrayList<Position> positions = entry.getValue();
 
-                case CREATE_ORDER: //Thanks ChatGPT for refactoring
-                    for(Position position : positions){
-                        boolean canProcessOrder = (position.getOrderType().equals(OrderType.MARKET)) || 
-                                                (position.getOrderType().equals(OrderType.LIMIT) && 
-                                                (newPositions.size() + filledPositions.size() < MAX_PROG_ORDERS));
+                switch(entry.getKey()){
 
-                        // Max programmatic orders reached?
-                        if(!canProcessOrder){
-                            rejectOrder(RejectionReason.EXCESS_PROG_ORDERS, position);
-                            continue;
+                    case CREATE_ORDER: //Thanks ChatGPT for refactoring
+                        for(Position position : positions){
+                            boolean canProcessOrder = (position.getOrderType().equals(OrderType.MARKET)) || 
+                                                    (position.getOrderType().equals(OrderType.LIMIT) && 
+                                                    (newPositions
+                                                        .stream()
+                                                        .filter(p -> p.getOrderType()
+                                                        .equals(OrderType.LIMIT))
+                                                        .count()
+                                                            < Exchange.MAX_PROG_ORDERS));
+
+                            // Max programmatic orders reached?
+                            if(!canProcessOrder){
+                                rejectOrder(RejectionReason.EXCESS_PROG_ORDERS, position);
+                                continue;
+                            }
+
+                            // Immediate trigger?
+                            if(position.getOrderType().equals(OrderType.LIMIT) &&
+                                ((position.getDirection().equals(OrderSide.BUY) && position.getOpenPrice() >= transaction.getPrice()) ||
+                                (position.getDirection().equals(OrderSide.SELL) && position.getOpenPrice() <= transaction.getPrice()))){
+                            
+                                rejectOrder(RejectionReason.WOULD_TRIGGER_IMMEDIATELY, position);
+                                continue;
+                            }
+
+                            newPositions.add(position);
                         }
+                        break;
+                    case CANCEL_ORDER:
+                        for(Position position : positions){
 
-                        // Immediate trigger?
-                        if(position.getOrderType().equals(OrderType.LIMIT) &&
-                            ((position.getDirection().equals(OrderSide.BUY) && position.getOpenPrice() >= transaction.getPrice()) ||
-                             (position.getDirection().equals(OrderSide.SELL) && position.getOpenPrice() <= transaction.getPrice()))){
-                        
-                            rejectOrder(RejectionReason.WOULD_TRIGGER_IMMEDIATELY, position);
-                            continue;
-                        }
+                            int index = newPositions.indexOf(position);
 
-                        newPositions.add(position);
+                            if(index == -1){
+                                rejectOrder(RejectionReason.INVALID_ORDER_STATE, position);
+                            } 
 
-                        positionsUpdated = true;
-                    }
-                    break;
-                case CANCEL_ORDER:
-                    for(Position position : positions){
+                            if(position.isAutoRepayAtCancel()){
 
-                        int index = newPositions.indexOf(position);
+                                double borrowedAmount = position.getSize();
 
-                        if(index == -1){
-                            rejectOrder(RejectionReason.INVALID_ORDER_STATE, position);
-                        } 
+                                if(position.getDirection().equals(OrderSide.BUY)){ //Borrow USDT
 
-                        if(position.isAutoRepayAtCancel()){
+                                    if(userAssets.getLockedUSDT() < borrowedAmount || userAssets.getFreeUSDT() < position.getTotalUnpaidInterest()){
+                                        //Not enough funds to return
+                                        rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, position);
+                                    }
 
-                            double borrowedAmount = position.getSize();
+                                    //Return funds
+                                    userAssets.setFreeUSDT(
+                                            userAssets.getFreeUSDT()
+                                                - position.getTotalUnpaidInterest()
+                                                + position.getMargin()
+                                    );
 
-                            if(position.getDirection().equals(OrderSide.BUY)){ //Borrow USDT
+                                    userAssets.setLockedUSDT(
+                                        userAssets.getLockedUSDT()
+                                            - borrowedAmount
+                                            - position.getMargin()
+                                    );
 
-                                if(userAssets.getLockedUSDT() < borrowedAmount || userAssets.getFreeUSDT() < position.getTotalUnpaidInterest()){
-                                    //Not enough funds to return
-                                    rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, position);
-                                }
+                                    userAssets.setTotalBorrowedUSDT(
+                                        userAssets.getTotalBorrowedUSDT()
+                                        - borrowedAmount
+                                    );
 
-                                //Return funds
-                                userAssets.setFreeUSDT(
-                                        userAssets.getFreeUSDT()
-                                            - position.getTotalUnpaidInterest()
+
+                                } else {
+
+                                    if(userAssets.getLockedBTC() < borrowedAmount || userAssets.getFreeUSDT() < position.getTotalUnpaidInterest()){
+                                        rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, position);
+                                    }
+
+                                    userAssets.setFreeBTC(
+                                        userAssets.getFreeBTC()
                                             + position.getMargin()
-                                );
+                                            - position.getTotalUnpaidInterest()
+                                    );
 
-                                userAssets.setLockedUSDT(
-                                    userAssets.getLockedUSDT()
+                                    userAssets.setLockedBTC(
+                                        userAssets.getLockedBTC()
+                                            - borrowedAmount
+                                    );
+
+                                    userAssets.setTotalBorrowedBTC(
+                                        userAssets.getTotalBorrowedBTC()
                                         - borrowedAmount
-                                        - position.getMargin()
-                                );
-
-                                userAssets.setTotalBorrowedUSDT(
-                                    userAssets.getTotalBorrowedUSDT()
-                                    - borrowedAmount
-                                );
-
-
-                            } else {
-
-                                if(userAssets.getLockedBTC() < borrowedAmount || userAssets.getFreeUSDT() < position.getTotalUnpaidInterest()){
-                                    rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, position);
+                                    );
                                 }
 
-                                userAssets.setFreeBTC(
-                                    userAssets.getFreeBTC()
-                                        + position.getMargin()
-                                        - position.getTotalUnpaidInterest()
-                                );
-
-                                userAssets.setLockedBTC(
-                                    userAssets.getLockedBTC()
-                                        - borrowedAmount
-                                );
-
-                                userAssets.setTotalBorrowedBTC(
-                                    userAssets.getTotalBorrowedBTC()
-                                    - borrowedAmount
-                                );
-
-                                
-                            }
-
-                        } else {
-
-                            if(position.getDirection().equals(OrderSide.BUY)){
-
-                                userAssets.setFreeUSDT(
-                                    userAssets.getFreeUSDT()
-                                        + position.getBorrowedAmount()  
-                                );
-
-                                userAssets.setLockedUSDT(
-                                    userAssets.getLockedUSDT()
-                                        - position.getBorrowedAmount()  
-                                );
-
                             } else {
 
-                                userAssets.setFreeBTC(
-                                    userAssets.getFreeBTC()
-                                        + position.getBorrowedAmount()
-                                );  
+                                if(position.getDirection().equals(OrderSide.BUY)){
 
-                                userAssets.setLockedBTC(
-                                    userAssets.getLockedBTC()
-                                        - position.getBorrowedAmount()
-                                );  
+                                    userAssets.setFreeUSDT(
+                                        userAssets.getFreeUSDT()
+                                            + position.getBorrowedAmount()  
+                                    );
+
+                                    userAssets.setLockedUSDT(
+                                        userAssets.getLockedUSDT()
+                                            - position.getBorrowedAmount()  
+                                    );
+
+                                } else {
+
+                                    userAssets.setFreeBTC(
+                                        userAssets.getFreeBTC()
+                                            + position.getBorrowedAmount()
+                                    );  
+
+                                    userAssets.setLockedBTC(
+                                        userAssets.getLockedBTC()
+                                            - position.getBorrowedAmount()
+                                    );  
+                                }
                             }
+
+                            userAssetsUpdated = true;
+
+                            cancelledPositions.add(position);
+                            newPositions.remove(position);
+
+                            positionsUpdated = true;
                         }
-
-                        userAssetsUpdated = true;
-
-                        cancelledPositions.add(position);
-                        newPositions.remove(position);
-
-                        positionsUpdated = true;
-                    }
-                    break;
-                default:
-                    break;
+                        break;
+                    default:
+                        break;
+                }
             }
         }
     }
     
+    //FIXME: It seems I'm handling shorting BTC as selling BTC which isn't the case
+    // We can use BTC to borrow BTC
+    // When we short we lock USDT to be used as margin and receive FreeBTC.
+    // When we long we lock USDT to be used as margin and receive FreeUSDT.
+    // TODO: To us then, closing a position is repaying dept.
+
+    //TODO: Refactor
     private void checkFills(){
 
         /*If automaticBorrow:
@@ -288,7 +285,7 @@ public class ExchangeHandler {
         */
 
         for(Position position : newPositions){
-            if(!position.isClosed() && !position.isFilled()){
+            if(position.getStatus().equals(OrderStatus.NEW)){
 
                 boolean isMarketOrder = position.getOrderType().equals(OrderType.MARKET) ? true : false;
                 boolean isLong = position.getDirection().equals(OrderSide.BUY);
@@ -306,58 +303,80 @@ public class ExchangeHandler {
                     if(position.isAutomaticBorrow()){
                         if(isLong){
 
-                            double borrowAmount = position.getSize() * fillPrice;
+                            double positionValue = position.getSize() * fillPrice;
 
-                            if(borrowAmount + userAssets.getTotalBorrowedUSDT() > MAX_BORROW_USDT){
+                            //Check maximum borrow amount
+                            if(positionValue + userAssets.getTotalBorrowedUSDT() > MAX_BORROW_USDT){
                                 rejectOrder(RejectionReason.EXCESS_BORROW, position);
                                 continue;
                             }
+
                             //Calculate leverage
-                            tierManager.checkAndUpdateTier(borrowAmount + userAssets.getTotalBorrowedUSDT(), userAssets.getTotalBorrowedBTC());
+                            tierManager.checkAndUpdateTier(positionValue + userAssets.getTotalBorrowedUSDT(), userAssets.getTotalBorrowedBTC());
 
-                            double requiredMargin = borrowAmount / tierManager.getCurrentLeverage();
-
-                            //Check margin requirement
+                            //Calculate required margin
+                            double requiredMargin = positionValue / tierManager.getCurrentLeverage();
+                            
                             if(userAssets.getFreeUSDT() < requiredMargin){
                                 rejectOrder(RejectionReason.INSUFFICIENT_MARGIN, position);
                                 continue;
                             }
 
-                            //Borrow funds
+                            //Lock funds
                             userAssets.setFreeUSDT(
                                 userAssets.getFreeUSDT()
                                     - requiredMargin
                             );
 
-                            //Lock funds
                             userAssets.setLockedUSDT(
                                 userAssets.getLockedUSDT()
                                     + requiredMargin
-                                    + borrowAmount
+                            );
+
+                            //Receive asset
+                            userAssets.setFreeUSDT(
+                                userAssets.getFreeUSDT() 
+                                    + positionValue
                             );
 
                             userAssets.setTotalBorrowedUSDT(
                                 userAssets.getTotalBorrowedUSDT()
-                                    + borrowAmount  
+                                    + positionValue  
                             );
 
-                            position.setBorrowedAmount(borrowAmount);
+                            userAssets.setTotalUnpaidInterest(
+                                userAssets.getTotalUnpaidInterest() 
+                                    + position.getTotalUnpaidInterest());
+
+                            //Buy BTC
+                            userAssets.setFreeUSDT(
+                                userAssets.getFreeUSDT()
+                                    - positionValue  
+                            );
+
+                            userAssets.setFreeBTC(
+                                userAssets.getFreeBTC()
+                                    + positionValue / fillPrice
+                            );
+
+                            position.setBorrowedAmount(positionValue);
                             position.setMargin(requiredMargin);
                             acceptedPositionList.add(position);
                         
                         } else {
 
-                            double borrowAmount = position.getSize();
+                            double positionSize = position.getSize();
 
+                            //Check maximum borrow amount
                             if(position.getSize() + userAssets.getTotalBorrowedBTC() > MAX_BORROW_BTC){
                                 rejectOrder(RejectionReason.EXCESS_BORROW, position);
                                 continue;
                             }
+
                             //Calculate leverage
+                            tierManager.checkAndUpdateTier(userAssets.getTotalBorrowedUSDT(), positionSize + userAssets.getTotalBorrowedBTC());
 
-                            tierManager.checkAndUpdateTier(userAssets.getTotalBorrowedUSDT(), borrowAmount + userAssets.getTotalBorrowedBTC());
-
-                            double requiredMargin = borrowAmount * transaction.getPrice() / tierManager.getCurrentLeverage();
+                            double requiredMargin = positionSize * transaction.getPrice() / tierManager.getCurrentLeverage();
 
                             //Check margin requirement
                             if(userAssets.getFreeUSDT() < requiredMargin){
@@ -365,6 +384,7 @@ public class ExchangeHandler {
                                 continue;
                             }
 
+                            //Lock funds
                             userAssets.setFreeUSDT(
                                 userAssets.getFreeUSDT()
                                     - requiredMargin
@@ -375,42 +395,57 @@ public class ExchangeHandler {
                                     + requiredMargin  
                             );
 
-                            userAssets.setLockedBTC(
-                                userAssets.getLockedBTC()
-                                    + borrowAmount  
+                            //Receive funds
+                            userAssets.setFreeBTC(
+                                userAssets.getFreeBTC()
+                                    + positionSize
                             );
 
                             userAssets.setTotalBorrowedBTC(
                                 userAssets.getTotalBorrowedBTC()
-                                    + borrowAmount  
+                                    + positionSize  
+                            );
+
+                            userAssets.setTotalUnpaidInterest(
+                                userAssets.getTotalUnpaidInterest() 
+                                    + position.getTotalUnpaidInterest());
+
+                            //Sell BTC
+                            userAssets.setFreeBTC(
+                                userAssets.getFreeBTC()
+                                    - positionSize
+                            );
+
+                            userAssets.setFreeUSDT(
+                                userAssets.getFreeUSDT()
+                                    + positionSize * fillPrice  
                             );
 
                             //Fill position
-                            position.setBorrowedAmount(borrowAmount);
+                            position.setBorrowedAmount(positionSize);
                             position.setMargin(requiredMargin);
                             acceptedPositionList.add(position);
                         }
                     } else {
 
-                        tierManager.checkAndUpdateTier(userAssets.getTotalBorrowedUSDT(), userAssets.getTotalBorrowedBTC());
-
                         if(isLong){
 
-                            double positionValue = position.getSize() * transaction.getPrice();
+                            double positionValue = position.getSize() * fillPrice;
 
                             if(userAssets.getFreeUSDT() < positionValue){
                                 rejectOrder(RejectionReason.INSUFFICIENT_MARGIN, position);
                                 continue;
                             }
 
+                            //Buy
                             userAssets.setFreeUSDT(
                                 userAssets.getFreeUSDT()
                                     - positionValue  
                             );
 
-                            userAssets.setLockedUSDT(
-                                userAssets.getLockedUSDT()
-                                    + positionValue  
+                            userAssets.setFreeBTC(
+                                userAssets.getFreeBTC()
+                                    + position.getSize()
                             );
 
                             acceptedPositionList.add(position);
@@ -424,20 +459,20 @@ public class ExchangeHandler {
                                 continue;
                             }
 
+                            //Sell
                             userAssets.setFreeBTC(
                                 userAssets.getFreeBTC()
-                                    - positionSize  
+                                    - positionSize
                             );
 
-                            userAssets.setLockedBTC(
-                                userAssets.getLockedBTC()
-                                    + positionSize  
+                            userAssets.setFreeUSDT(
+                                userAssets.getFreeUSDT()
+                                    + positionSize * fillPrice  
                             );
 
                             acceptedPositionList.add(position);
                         }
                     }
-
                 }
             }
         }
@@ -447,22 +482,33 @@ public class ExchangeHandler {
                 position.setStatus(OrderStatus.FILLED);
             }
 
-            positionsUpdated = true;
-            userAssetsUpdated = true;
-
             filledPositions.addAll(acceptedPositionList);
             newPositions.removeAll(acceptedPositionList);
             acceptedPositionList.clear();
+
+            positionsUpdated = true;
+            userAssetsUpdated = true;
+        }
+
+        if(!rejectedOrders.isEmpty()){
+            newPositions.removeAll(rejectedOrders);
         }
     }
 
     private void conditionallyAddInterest(){
-        if(transaction.getTimestamp() - previousInterestTimestamp > 1000 * 60 * 60){
+        if((!filledPositions.isEmpty() || !newPositions.isEmpty()) && 
+            transaction.getTimestamp() - previousInterestTimestamp > 1000 * 60 * 60){
+
             previousInterestTimestamp = transaction.getTimestamp();
 
             double totalUnpaidInterest = 0;
 
             for(Position position : filledPositions){
+                position.increaseUnpaidInterest(transaction.getPrice());
+                totalUnpaidInterest += position.getTotalUnpaidInterest();
+            }
+
+            for(Position position : newPositions){
                 position.increaseUnpaidInterest(transaction.getPrice());
                 totalUnpaidInterest += position.getTotalUnpaidInterest();
             }
@@ -474,7 +520,6 @@ public class ExchangeHandler {
         }
     }
 
-    //TODO: Add margin level notification or add it to the userAssets
     private double checkMarginLevel(){
         double totalAssetValue = 
             userAssets.getFreeUSDT() + userAssets.getLockedUSDT() +
@@ -495,20 +540,17 @@ public class ExchangeHandler {
         if(marginLevel < 1.05){
             System.out.println("marginLevel = " + marginLevel);
 
-            //TODO: We'll assume closing all filled position is enough to avoid margin call for now.
             for(Position position : filledPositions){
                 liquidatePosition(position);
             }
-
-            previousPositions.addAll(filledPositions);
-            filledPositions.clear();
         }
 
         return marginLevel;
     }
 
+    //TODO: liquidate a position
     private void liquidatePosition(Position position){
-        //TODO: liquidate a position
+        
     }
 
     private void rejectOrder(RejectionReason reason, Position position){
@@ -555,7 +597,7 @@ public class ExchangeHandler {
         return this.breakevenCounter;
     }
 
-    public void addToUserAssetList(AssetHandler userAsset){
+    public void addToUserAssetList(UserAssets userAsset){
         this.userAssetsList.add(userAsset);
     }
 
@@ -568,5 +610,9 @@ public class ExchangeHandler {
         positions.addAll(previousPositions);
 
         return positions;
+    }
+
+    public UserAssets getUserassets(){
+        return this.userAssets;
     }
 }

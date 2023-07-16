@@ -79,7 +79,7 @@ public class Position {
         this.profit = 0;
         this.partiallyClosed = false;
 
-        this.hourlyInterestRate = direction.equals(OrderSide.BUY) ? AssetHandler.HOURLY_USDT_INTEREST_RATE / 100 : AssetHandler.HOURLY_BTC_INTEREST_RATE / 100;
+        this.hourlyInterestRate = direction.equals(OrderSide.BUY) ? UserAssets.HOURLY_USDT_INTEREST_RATE / 100 : UserAssets.HOURLY_BTC_INTEREST_RATE / 100;
         this.totalUnpaidInterest = borrowedAmount * hourlyInterestRate * (direction.equals(OrderSide.BUY) ? 1 : openPrice);
     }
     

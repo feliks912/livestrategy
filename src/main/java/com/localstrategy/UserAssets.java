@@ -1,6 +1,6 @@
 package com.localstrategy;
 
-public class AssetHandler {
+public class UserAssets {
 
     public static final double HOURLY_BTC_INTEREST_RATE = 0.00019667;
     public static final double HOURLY_USDT_INTEREST_RATE = 0.00067638;
@@ -18,11 +18,11 @@ public class AssetHandler {
     //TODO: Calculate total unpaid interest and add an incrementing function
     private double totalUnpaidInterest = 0;
 
-    public AssetHandler(){
+    public UserAssets(){
 
     }
 
-    public AssetHandler(double freeUSDT, double lockedUSDT, double freeBTC, double lockedBTC) {
+    public UserAssets(double freeUSDT, double lockedUSDT, double freeBTC, double lockedBTC) {
         this.freeUSDT = freeUSDT;
         this.lockedUSDT = lockedUSDT;
         this.freeBTC = freeBTC;
@@ -103,6 +103,18 @@ public class AssetHandler {
             totalBorrowedBTC * HOURLY_BTC_INTEREST_RATE * currentPrice;
     }
 
-    
 
+    @Override
+    public String toString() {
+        return "{" +
+            " freeUSDT='" + getFreeUSDT() + "'" +
+            ", lockedUSDT='" + getLockedUSDT() + "'" +
+            ", freeBTC='" + getFreeBTC() + "'" +
+            ", lockedBTC='" + getLockedBTC() + "'" +
+            ", totalBorrowedUSDT='" + getTotalBorrowedUSDT() + "'" +
+            ", totalBorrowedBTC='" + getTotalBorrowedBTC() + "'" +
+            ", marginLevel='" + getMarginLevel() + "'" +
+            ", totalUnpaidInterest='" + getTotalUnpaidInterest() + "'" +
+            "}";
+    }
 }

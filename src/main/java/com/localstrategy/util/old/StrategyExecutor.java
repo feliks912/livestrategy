@@ -1,4 +1,4 @@
-package com.localstrategy.util.old;
+package com.localstrategy.util.misc;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -77,7 +77,7 @@ public class StrategyExecutor {
     private boolean limitShort = false;
     private boolean limitLong = false;
 
-    private TierManager riskManager = new TierManager(positions);
+    private TierManager tierManager = new TierManager();
 
     private double temporaryProfit = 0;
 
@@ -202,9 +202,13 @@ public class StrategyExecutor {
                     else if(position.isClosedBeforeStoploss() &&
                             currentTransaction.getTimestamp() - position.getClosedBeforeStoplossTimestamp() > position.getExchangeLatency()){
 
-                        double closePrice = riskManager.getSlippagePrice(currentPrice, position.getSize(), position.getDirection() == 1 ? OrderSide.SELL : OrderSide.BUY);
+                        double closePrice = tierManager.getSlippagePrice(
+                            currentPrice, 
+                            position.getSize(), 
+                            position.getDirection().equals(OrderSide.BUY) ? 
+                                OrderSide.SELL : OrderSide.BUY);
 
-                        double profit = position.closePosition(previousCandle.getIndex() + 1, currentTransaction.getTimestamp(), closePrice);
+                        double profit = position.closePosition(closePrice, currentTransaction.getTimestamp());
 
                         portfolio += profit;
                         usedMargin -= position.getMargin();
@@ -221,7 +225,7 @@ public class StrategyExecutor {
             for(Position position : longPositionsToTpRR){
                 if(!position.isClosed()){
                     
-                    double closePrice = riskManager.getSlippagePrice(currentPrice, position.getSize(), OrderSide.SELL);
+                    double closePrice = tierManager.getSlippagePrice(currentPrice, position.getSize(), OrderSide.SELL);
 
                     double profit = position.closePosition(previousCandle.getIndex() + 1, currentTransaction.getTimestamp(), closePrice);
                     portfolio += profit;
@@ -238,7 +242,7 @@ public class StrategyExecutor {
             for(Position position : shortPositionsToTpRR){
                 if(!position.isClosed()){
                     
-                    double closePrice = riskManager.getSlippagePrice(currentPrice, position.getSize(), OrderSide.BUY);
+                    double closePrice = tierManager.getSlippagePrice(currentPrice, position.getSize(), OrderSide.BUY);
 
                     double profit = position.closePosition(previousCandle.getIndex() + 1, currentTransaction.getTimestamp(), closePrice);
                     portfolio += profit;
@@ -267,7 +271,7 @@ public class StrategyExecutor {
                 for(Position position : positionsToTpFixedRR){
                     if(!position.isClosed()){
 
-                        double closePrice = riskManager.getSlippagePrice(currentPrice, position.getSize(), position.getDirection() == 1 ? OrderSide.SELL : OrderSide.BUY);
+                        double closePrice = tierManager.getSlippagePrice(currentPrice, position.getSize(), position.getDirection() == 1 ? OrderSide.SELL : OrderSide.BUY);
 
                         double profit = position.closePosition(previousCandle.getIndex() + 1, currentTransaction.getTimestamp(), closePrice);
                         portfolio += profit;
@@ -335,7 +339,7 @@ public class StrategyExecutor {
                     position.getDirection() == -1 && currentPrice >= position.getStopLossPrice()){
 
                     if(position.isStoplossActive()){
-                        double stopPrice = riskManager.getSlippagePrice(currentPrice, position.getSize(), position.getDirection() == 1 ? OrderSide.SELL : OrderSide.BUY);
+                        double stopPrice = tierManager.getSlippagePrice(currentPrice, position.getSize(), position.getDirection() == 1 ? OrderSide.SELL : OrderSide.BUY);
 
                         double profit = position.closePosition(previousCandle.getIndex() + 1, currentTransaction.getTimestamp(), stopPrice);
                         temporaryProfit += profit;
@@ -362,7 +366,7 @@ public class StrategyExecutor {
                     if(portfolio - usedMargin > position.getMargin()){
                         usedMargin += position.fillPosition(previousCandle.getIndex() + 1);
 
-                        if(riskManager.calculateMarginLevel(currentPrice, portfolio - usedMargin) < 1.1){
+                        if(tierManager.calculateMarginLevel(currentPrice, portfolio - usedMargin) < 1.1){
                             position.closePosition(previousCandle.getIndex() + 1, currentTransaction.getTimestamp(), position.getOpenPrice());
                             usedMargin -= position.getMargin();
                             removePositions.add(position);
@@ -416,7 +420,7 @@ public class StrategyExecutor {
 
         //FIXME: Cheating but slow otherwise
         if(++marginTestCounter > 10){
-            double marginLevel = riskManager.calculateMarginLevel(currentPrice, portfolio - usedMargin);
+            double marginLevel = tierManager.calculateMarginLevel(currentPrice, portfolio - usedMargin);
             if(marginLevel < 1.05){
                 System.out.println("Liquidation risk call, liquidating all open positions with loss");
                 for(Position position : positions){
@@ -882,13 +886,13 @@ public class StrategyExecutor {
             usedMargin,
             entryTimestamp,
             calculateTradeEventLatency() + calculateTradeRequestLatency(),
-            riskManager
+            tierManager
         );
 
         if(positions.size() > positionsSize && orderType.equals("market")) { // Successfully created a position
             usedMargin += positions.get(positions.size() - 1).getMargin();
 
-            if(riskManager.calculateMarginLevel(entryPrice, portfolio - usedMargin) < 1.1){
+            if(tierManager.calculateMarginLevel(entryPrice, portfolio - usedMargin) < 1.1){
                 positions.get(positions.size() - 1).closePosition(entryIndex, entryTimestamp, entryPrice); //Cancel last position
                 usedMargin -= positions.get(positions.size() - 1).getMargin();
                 positions.remove(positions.get(positions.size() - 1));

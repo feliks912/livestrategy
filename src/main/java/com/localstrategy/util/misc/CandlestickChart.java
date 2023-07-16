@@ -13,7 +13,6 @@ import org.jfree.data.xy.*;
 import com.localstrategy.Position;
 import com.localstrategy.util.helper.CandleConstructor;
 import com.localstrategy.util.helper.TransactionLoader;
-import com.localstrategy.util.old.StrategyExecutor;
 import com.localstrategy.util.types.Candle;
 import com.localstrategy.util.types.SingleTransaction;
 
@@ -49,19 +48,14 @@ public class CandlestickChart extends JFrame {
     private double oldPortfolio = 0;
     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
     private long startingTimestamp = 0;
-    private StrategyExecutor zigZagStrat;
     private PositionsTable positionsTable;
     boolean isButtonPressed = false;
     CandleConstructor candleConstructor;
     private int distanceSet;
 
-    public CandlestickChart(double candleVolume, PositionsTable positionsTable, StrategyExecutor zigZagStrat, boolean visible) {
+    public CandlestickChart(double candleVolume, PositionsTable positionsTable, boolean visible) {
         super("Candlestick Chart Demo");
         this.positionsTable = positionsTable;
-        this.zigZagStrat = zigZagStrat;
-        this.oldPortfolio = zigZagStrat.getPortfolio();
-
-        this.distanceSet = zigZagStrat.getDistance();
 
         this.candleConstructor = new CandleConstructor(candleVolume);
 
@@ -70,7 +64,7 @@ public class CandlestickChart extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         // Create the initial dataset with empty data
-        dataset = new CustomOHLCDataset("Series", zigZagStrat.getDistance());
+        dataset = new CustomOHLCDataset("Series", 0);
 
         // Create the candlestick chart
         JFreeChart chart = createChart(dataset);
@@ -123,8 +117,8 @@ public class CandlestickChart extends JFrame {
                 false
         ); */
 
-        CandlestickRenderer customRenderer = new CustomCandlestickRenderer();
-        //CandlestickRenderer customRenderer = new CandlestickRenderer();
+        //CandlestickRenderer customRenderer = new CustomCandlestickRenderer();
+        CandlestickRenderer customRenderer = new CandlestickRenderer();
         XYPlot customPlot = new XYPlot(dataset, new DateAxis("Date"), new NumberAxis("Price"), customRenderer);
         JFreeChart chart = new JFreeChart("Candlestick Demo", JFreeChart.DEFAULT_TITLE_FONT, customPlot, false);
 
@@ -190,7 +184,7 @@ public class CandlestickChart extends JFrame {
 
         TransactionLoader transactionLoader = new TransactionLoader("C:/--- BTCUSDT/", 
         //null,
-        "2022-07-13", 
+        "2022-07-20", 
         null);
 
         int fileCount = transactionLoader.getTotalCsvFiles();
@@ -214,9 +208,9 @@ public class CandlestickChart extends JFrame {
 
                     //TODO: Update chart and set boolean flag to wait
                     eventUpdateAction();
-                    positionsTable.refreshTableData(zigZagStrat.getClosedPositions());
+                    //positionsTable.refreshTableData(zigZagStrat.getClosedPositions());
 
-                    zigZagStrat.resetTemporaryProfit();
+                    //zigZagStrat.resetTemporaryProfit();
 
                     if(isButtonPressed){
                         isButtonPressed = false;
@@ -247,22 +241,22 @@ public class CandlestickChart extends JFrame {
         currentIndex++;
 
         // Update the value markers with the new candle's high and low values
-        updateValueMarkers(zigZagStrat.getPositions());
+        //updateValueMarkers(zigZagStrat.getPositions());
 
         // Update the info box with the current index information
-        updateInfoBox(infoBox, "Position count: " + Integer.toString(zigZagStrat.getPositions().size()), 0);
+        //updateInfoBox(infoBox, "Position count: " + Integer.toString(zigZagStrat.getPositions().size()), 0);
 
         //FIXME: Add temporaryProfit
-        double profit = zigZagStrat.getTemporaryProfit();
+        //double profit = zigZagStrat.getTemporaryProfit();
 
-        if(profit != 0){
+        /* if(profit != 0){
             updateInfoBox(infoBox2, "last Profit: " + String.format("%.2f", profit), 0.02);
             previousProfit = profit;
         } else {
             updateInfoBox(infoBox2, "last Profit: " + String.format("%.2f", previousProfit), 0.02);
-        }
+        } */
         
-        updateInfoBox(infoBox3, "Porftolio value: " + String.format("%.2f", zigZagStrat.getPortfolio()) , 0.04);
+        //updateInfoBox(infoBox3, "Porftolio value: " + String.format("%.2f", zigZagStrat.getPortfolio()) , 0.04);
 
         //FIXME: Current candle timestamp, add candles to candles
         long currentTimestamp = candleConstructor.getLastCandle().getTimestamp();
@@ -435,10 +429,6 @@ public class CandlestickChart extends JFrame {
         }
 
         return builder.toString().trim();
-    }
-
-    public StrategyExecutor getStrategyExecutor(){
-        return this.zigZagStrat;
     }
 
     public void setIsKeyPressed(boolean isit){

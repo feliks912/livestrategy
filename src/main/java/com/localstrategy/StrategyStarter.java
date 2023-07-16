@@ -13,7 +13,7 @@ public class StrategyStarter {
     TransactionLoader transactionLoader;
     private List<SingleTransaction> transactionList = new ArrayList<SingleTransaction>();
     
-    ExchangeHandler exchangeHandler;
+    Exchange exchangeHandler;
 
     private double initialUSDTPortfolio;
 
@@ -22,7 +22,7 @@ public class StrategyStarter {
 
         this.initialUSDTPortfolio = initialUSDTPortfolio;
 
-        this.exchangeHandler = new ExchangeHandler(initialUSDTPortfolio);
+        this.exchangeHandler = new Exchange(initialUSDTPortfolio);
         this.transactionLoader = new TransactionLoader(inputDataFolderPath, fromDate, toDate);
     }
 
@@ -49,7 +49,7 @@ public class StrategyStarter {
                 //  Wall is defines as a series of delayed transactions made in close time proximity one from another, which    significantly move the market price and wreck chaos on the orderbook
 
                 //FIXME: IndexOf seems to be **very** expensive. Change IndexOf in exchangeHandler to an alternative as well
-                int transactionIndex = transactionList.indexOf(transaction);
+                /* int transactionIndex = transactionList.indexOf(transaction);
 
                 long pTTimestamp = transaction.getTimestamp();
 
@@ -69,7 +69,7 @@ public class StrategyStarter {
                     if(transactionList.get(transactionIndex + 1).getTimestamp() - pTTimestamp > 5){
                         isWall = false;
                     }
-                }
+                } */
 
                 exchangeHandler.newTransaction(transaction, isWall);
 

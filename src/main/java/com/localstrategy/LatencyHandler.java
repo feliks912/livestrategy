@@ -1,6 +1,7 @@
 package com.localstrategy;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
@@ -20,10 +21,9 @@ public class LatencyHandler {
     private int USER_DATA_LATENCY = 0;
     private int BORROW_LATENCY = 0;
 
-    private Map<Long, UserDataResponse> userDataStream;  //UserDataStream gets parsed from the exchange to the 
-    private Map<Long, ArrayList<Position>> pendingPositions; //Pending positions get parsed from client to the exchange
-
-    private Map<Long, Map<OrderAction, ArrayList<Position>>> positionsUpdateMap;
+    private Map<Long, UserDataResponse> userDataStream = new HashMap<Long, UserDataResponse>();  //UserDataStream gets parsed from the exchange to the user
+    
+    private Map<Long, Map<OrderAction, ArrayList<Position>>> actionRequestsMap = new HashMap<Long, Map<OrderAction, ArrayList<Position>>>(); //actionRequestsMap get parsed from client to the exchange
 
     private int previousUserDataStreamLatency;
     private int previousPendingPositionsLatency;
@@ -36,41 +36,50 @@ public class LatencyHandler {
     }
 
     //TODO: Thanks ChatGPT
-    public UserDataResponse getDelayedUserDataStream(long currentLocalTimestamp) {
+    public ArrayList<UserDataResponse> getDelayedUserDataStream(long currentLocalTimestamp) {
+
+        ArrayList<UserDataResponse> userStreamsToReturn = new ArrayList<UserDataResponse>();
+
+        ArrayList<Long> keysToRemove = new ArrayList<Long>();
+
         // Search through the userDataStream map.
         for (Map.Entry<Long, UserDataResponse> entry : userDataStream.entrySet()) {
             if (currentLocalTimestamp - entry.getKey() > previousUserDataStreamLatency) {
                 // If the current time minus the key (the timestamp when the data was stored)
                 // is larger than the current latency, return the data and remove it from the map.
-                UserDataResponse data = entry.getValue();
-                userDataStream.remove(entry.getKey());
-                return data;
+                keysToRemove.add(entry.getKey());
+                userStreamsToReturn.add(entry.getValue());
             }
         }
+
+        for(Long keyToRemove : keysToRemove){
+            userDataStream.remove(keyToRemove);
+        }
+
         // If no suitable entry was found, return null.
-        return null;
+        return userStreamsToReturn;
     }
 
-    public Map<OrderAction, ArrayList<Position>> getDelayedUserActionRequests(long currentExchangeTimestamp) {
-        // Search through the pendingPositions map.
-
+    public ArrayList<Map<OrderAction, ArrayList<Position>>> getDelayedUserActionRequests(long currentExchangeTimestamp) {
         ArrayList<Map<OrderAction, ArrayList<Position>>> actionsToReturn = new ArrayList<Map<OrderAction, ArrayList<Position>>>();
+        ArrayList<Long> keysToRemove = new ArrayList<Long>();
 
-        for (Map.Entry<Long, Map<OrderAction, ArrayList<Position>>> entry : positionsUpdateMap.entrySet()) {
+        for (Map.Entry<Long, Map<OrderAction, ArrayList<Position>>> entry : actionRequestsMap.entrySet()) {
             if (currentExchangeTimestamp - entry.getKey() > previousPendingPositionsLatency) {
                 // If the current time minus the key (the timestamp when the data was stored)
                 // is larger than the current latency, return the data and remove it from the map.
-                Map<OrderAction, ArrayList<Position>> positions = entry.getValue();
-                pendingPositions.remove(entry.getKey());
-                actionsToReturn.add(positions);
+                actionsToReturn.add(entry.getValue());
+                keysToRemove.add(entry.getKey());
             }
         }
 
-        return actionsToReturn;
+        for(Long keyToRemove : keysToRemove) {
+            actionRequestsMap.remove(keyToRemove);
+        }
 
-        // If no suitable entry was found, return null.
-        return null;
+        return actionsToReturn;
     }
+
     
     public void recalculateLatencies(long currentExchangeTimestamp){
         if(currentExchangeTimestamp - previousLatencyCalculationTimestamp > Math.max(previousPendingPositionsLatency, previousUserDataStreamLatency)){
@@ -104,12 +113,12 @@ public class LatencyHandler {
         this.userDataStream.put(currentExchangeTimestamp, userDataStream);
     }
 
-    public void addPendingPositions(OrderAction actionType, ArrayList<Position> pendingPositions, long currentLocalTimestamp) {
+    public void addUserAction(OrderAction actionType, ArrayList<Position> pendingPositions, long currentLocalTimestamp) {
 
         Map<OrderAction, ArrayList<Position>> tempMap = new HashMap<OrderAction, ArrayList<Position>>();
         tempMap.put(actionType, pendingPositions);
 
-        this.positionsUpdateMap.put(currentLocalTimestamp, tempMap);
+        this.actionRequestsMap.put(currentLocalTimestamp, tempMap);
     }
 
 }

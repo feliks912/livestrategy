@@ -5,8 +5,6 @@ import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.KeyStroke;
 
-import com.localstrategy.util.old.StrategyExecutor;
-
 import javax.swing.JSplitPane;
 import java.awt.BorderLayout;
 import java.awt.event.*;
@@ -19,17 +17,16 @@ public class TradingGUI extends JFrame {
     private double currentPortfolio = 0;
 
 
-    public TradingGUI(double candleVolume, StrategyExecutor zigzagstrat) {
+    public TradingGUI(double candleVolume) {
         // Set the layout manager for the frame
         setLayout(new BorderLayout());
 
         // Create a candlestick chart
         positionsTable = new PositionsTable(false);
-        candlestickChart = new CandlestickChart(candleVolume, positionsTable, zigzagstrat, false);
+        candlestickChart = new CandlestickChart(candleVolume, positionsTable, false);
         
 
         // Get initial portfolio values
-        currentPortfolio = candlestickChart.getStrategyExecutor().getPortfolio();
         oldPortfolio = currentPortfolio;
 
         // Create a JSplitPane to display the chart and table side by side
