@@ -5,6 +5,8 @@ import com.localstrategy.util.enums.OrderType;
 import com.localstrategy.util.enums.OrderStatus;
 import com.localstrategy.util.types.Candle;
 
+import java.util.ArrayList;
+
 public class Position {
     private int id;
     private double openPrice;
@@ -74,6 +76,47 @@ public class Position {
 
         this.hourlyInterestRate = direction.equals(OrderSide.BUY) ? UserAssets.HOURLY_USDT_INTEREST_RATE / 100 : UserAssets.HOURLY_BTC_INTEREST_RATE / 100;
         this.totalUnpaidInterest = borrowedAmount * hourlyInterestRate * (direction.equals(OrderSide.BUY) ? 1 : openPrice);
+    }
+
+    public Position(Position other) {
+        this.id = other.id;
+        this.openPrice = other.openPrice;
+        this.stopLossPrice = other.stopLossPrice;
+        this.initialStopLossPrice = other.initialStopLossPrice;
+        this.size = other.size;
+        this.closingPrice = other.closingPrice;
+        this.direction = other.direction;
+        this.openIndex = other.openIndex;
+        this.breakEven = other.breakEven;
+        this.margin = other.margin;
+        this.filled = other.filled;
+        this.closed = other.closed;
+        this.filledIndex = other.filledIndex;
+        this.closedIndex = other.closedIndex;
+        this.profit = other.profit;
+        this.partiallyClosed = other.partiallyClosed;
+        this.orderType = other.orderType;
+        this.openTimestamp = other.openTimestamp;
+        this.hourlyInterestRate = other.hourlyInterestRate;
+        this.borrowedAmount = other.borrowedAmount;
+        this.fillPrice = other.fillPrice;
+        this.fillTimestamp = other.fillTimestamp;
+        this.closeTimestamp = other.closeTimestamp;
+        this.exchangeLatency = other.exchangeLatency;
+        this.activeStopLoss = other.activeStopLoss;
+        this.trailingPct = other.trailingPct;
+        this.closedBeforeStopLoss = other.closedBeforeStopLoss;
+        this.closedBeforeStopLossTimestamp = other.closedBeforeStopLossTimestamp;
+        this.initialStopLossIndex = other.initialStopLossIndex;
+        this.entryPriceIndex = other.entryPriceIndex;
+        this.tick = other.tick;
+        this.totalUnpaidInterest = other.totalUnpaidInterest;
+        this.closeRequestTimestamp = other.closeRequestTimestamp;
+        this.reversed = other.reversed;
+        this.isStopLoss = other.isStopLoss;
+        this.status = other.status;
+        this.automaticBorrow = other.automaticBorrow;
+        this.autoRepayAtCancel = other.autoRepayAtCancel;
     }
     
 
@@ -345,6 +388,22 @@ public class Position {
 
     public boolean isStopLoss(){
         return this.isStopLoss;
+    }
+
+    public void setOrderType(OrderType type){
+        this.orderType = type;
+    }
+
+    public static ArrayList<Position> deepCopyPositionList(ArrayList<Position> originalList) {
+        ArrayList<Position> newList = new ArrayList<>();
+
+        for (Position pos : originalList) {
+            // Assuming that all fields in Position are primitive types or immutable objects
+            // so a shallow copy is fine.
+            Position newPos = new Position(pos);
+            newList.add(newPos);
+        }
+        return newList;
     }
     
 }

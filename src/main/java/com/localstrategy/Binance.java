@@ -13,12 +13,15 @@ import com.localstrategy.util.types.UserDataResponse;
 
 import java.util.HashMap;
 
+//FIXME: Mayor bug is we parse references of positions around in time instead of copying them. This changes them when a change happens in a position which is not how latency manager ought to work like - FIXED added deep copy
 
-//TODO: I didn't consider how EXACTLY these walls work.
+
+//TODO: I didn't consider how EXACTLY these price walls work.
 //TODO: we use automatic borrowings and repays therefore edit borrowed amount calculation from orderRequestManager
 //TODO: Separate Order and Position classes - Position class is a local class comprising of position value and a stoploss order, Order class is a single Binance-supported order request
 //TODO: Check if overall borrow / profit logic is alright
 //TODO: Auto repay on cancel is not auto repay on reverse order. Integrate manual repay
+
 
 //FIXME: Test userDataStream latency. It shouldn't be (lol shouldn't...) much different than order execution reponse latency
 //FIXME: Refactor
@@ -28,8 +31,9 @@ import java.util.HashMap;
 //TODO: Parse strategy as parameter from App instead of hardcoding it into TempStrategyExecutor, unless TempStrategyExecutor is the strategy (later)
 //TODO: Add symbol rules (later)
 //TODO: Currently we only support auto borrow and repay. Add manual borrows and repays (later)
+//TODO: Binance doesn't actually keep track of filled positions but it does offer a list (later)
 
-public class Exchange {
+public class Binance {
 
     public final static int MAX_PROG_ORDERS = 5;
     private int MAX_BORROW_USDT = 900_000;
@@ -67,7 +71,7 @@ public class Exchange {
     private int lossCounter = 0;
     private int breakevenCounter = 0;
 
-    public Exchange(Double initialUSDTPortfolio){
+    public Binance(Double initialUSDTPortfolio){
 
         this.strategyExecutor = new LocalStrategy(this);
 
@@ -95,10 +99,10 @@ public class Exchange {
         if(userAssetsUpdated || positionsUpdated || !rejectedActions.isEmpty()){
             exchangeLatencyHandler.addUserDataStream(
                 new UserDataResponse(
-                    userAssets, 
-                    newPositions, 
-                    filledPositions, 
-                    cancelledPositions, 
+                    userAssets, // userAssets copy constructor
+                    newPositions,
+                    filledPositions,
+                    cancelledPositions,
                     rejectedOrders, 
                     rejectedActions
                 ),
@@ -107,13 +111,14 @@ public class Exchange {
             rejectedActions.clear();
 
             if(userAssetsUpdated){
-                userAssetsList.add(userAssets);
+                userAssetsList.add(new UserAssets(userAssets)); // userAssets copy constructor
             }
 
             userAssetsUpdated = false;
             positionsUpdated = false;
         }
     }
+
     
     private void handleUserRequest(ArrayList<Map<OrderAction, ArrayList<Position>>> entryBlocks){
 
@@ -138,7 +143,7 @@ public class Exchange {
                                                         .filter(p -> p.getOrderType()
                                                         .equals(OrderType.LIMIT))
                                                         .count()
-                                                            < Exchange.MAX_PROG_ORDERS));
+                                                            < Binance.MAX_PROG_ORDERS));
 
                             // Max programmatic orders reached?
                             if(!canProcessOrder){
@@ -185,8 +190,8 @@ public class Exchange {
                                     //Return funds
                                     userAssets.setFreeUSDT(
                                             userAssets.getFreeUSDT()
-                                                - position.getTotalUnpaidInterest()
                                                 + position.getMargin()
+                                                - position.getTotalUnpaidInterest()
                                     );
 
                                     userAssets.setLockedUSDT(
@@ -582,11 +587,12 @@ public class Exchange {
     }
 
     private void rejectOrder(RejectionReason reason, Position position){
-
         Map<RejectionReason, Position> map = new HashMap<>();
-        map.put(reason, position);
 
+        map.put(reason, position);
         rejectedActions.add(map);
+
+        position.setStatus(OrderStatus.REJECTED);
         rejectedOrders.add(position);
     }
 
@@ -643,4 +649,5 @@ public class Exchange {
     public UserAssets getUserassets(){
         return this.userAssets;
     }
+
 }

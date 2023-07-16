@@ -1,3 +1,29 @@
+16.7.23 17:49
+    Added some local logic for receiving updated information from Binance
+
+    Todo:
+        Complete local binance response handling
+        Manual Binance repay (basically our position exit)
+        Local automatic position reversal (no repay / borrow loop - saves funds on borrow and is probably faster)
+        Binance market and limit orders with manual borrow / repay
+        Add Order class, change position to hold 2 orders (Order is a communication object, Position is a local storage object)
+        Add reading from a csv / adding to a csv
+        Implement transaction livestream
+        Complete latencies and respective tests
+
+16.7.23 15:48
+    Edited a bunch of stuff
+    Fixed limit position handling
+        They now support 4 configurations - long / stop x isStoploss
+            Limit positions act different depending on whether the stop price is above or below the limit price, but it also depends on whethere it's a long or a short
+    Fixed state snapshotting
+        Before we sent a reference to data using UserDataResponse and LatencyHandler, now we use deep copies in UserDataResponse constructor
+        Fixed for exhange -> user and user -> exhange
+    Moved deep copy to Position class as a static method
+
+    Todo: Implement local logic and test exchange code
+    
+
 14.7.23 19:15
     Removed manual BORROW and REPAY options
     Implemented automatic borrow and repay on order fill

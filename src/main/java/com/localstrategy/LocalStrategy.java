@@ -1,8 +1,13 @@
 package com.localstrategy;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
+import com.binance.api.client.domain.OrderStatus;
 import com.localstrategy.util.enums.OrderAction;
+import com.localstrategy.util.enums.OrderType;
+import com.localstrategy.util.enums.RejectionReason;
 import com.localstrategy.util.helper.CandleConstructor;
 import com.localstrategy.util.types.Candle;
 import com.localstrategy.util.types.SingleTransaction;
@@ -13,14 +18,8 @@ public class LocalStrategy {
     private static final int CANDLE_VOLUME = 2_000_000;
     private static final double RISK_PCT = 0.1;
     private static final int SLIPPAGE_PCT = 15; //In relation to the difference between our entry and stoploss price difference, how much in percentage of slippage are we ready to accept (total, not the average fill price)
-
-    CandleConstructor candleConstructor = new CandleConstructor(CANDLE_VOLUME);
-
-    Exchange exchangeHandler;
-
-    Candle lastCandle;
-
-    LatencyHandler exchangeLatencyHandler;
+    
+    private CandleConstructor candleConstructor = new CandleConstructor(CANDLE_VOLUME);
 
     private ArrayList<Position> pendingPositions = new ArrayList<Position>();
 
@@ -29,24 +28,23 @@ public class LocalStrategy {
     private ArrayList<Position> cancelledPositions = new ArrayList<Position>();
     private ArrayList<Position> rejectedOrders = new ArrayList<Position>();
 
+    private ArrayList<Map<RejectionReason, Position>> rejectedActions = new ArrayList<Map<RejectionReason, Position>>();
+
     private ArrayList<Position> previousPositions = new ArrayList<Position>();
 
     private UserAssets userAssets = new UserAssets();
-
-    boolean test = false;
-
-    //TODO: Edit RiskManager
     private TierManager tierManager = new TierManager();
-
-    //TODO: Use orderMaker to request an order action
     private OrderRequest orderRequest;
+    private Binance exchangeHandler;
+    private Candle lastCandle;
+    private LatencyHandler latencyHandler;
        
 
-    public LocalStrategy(Exchange exchangeHandler){
+    public LocalStrategy(Binance exchangeHandler){
 
         //TODO: Any call to exchangeHandler has a response latency. Local variables are instant.
         this.exchangeHandler = exchangeHandler;
-        this.exchangeLatencyHandler = exchangeHandler.getExchangeLatencyHandler();
+        this.latencyHandler = exchangeHandler.getExchangeLatencyHandler();
 
         userAssets = exchangeHandler.getUserassets();
 
@@ -56,7 +54,7 @@ public class LocalStrategy {
             tierManager, 
             userAssets, 
             LocalStrategy.RISK_PCT, 
-            Exchange.MAX_PROG_ORDERS,
+            Binance.MAX_PROG_ORDERS,
             LocalStrategy.SLIPPAGE_PCT);
 
         //TODO: Print parameters on strategy start
@@ -64,44 +62,106 @@ public class LocalStrategy {
 
     
     private void priceUpdate(SingleTransaction transaction, boolean isWall){
-        //Let's say there's a new order created locally and pendingPositions now holds positions to be executed by Binance
-        //At the end of current transaction processing, we add the pendingPositons to an ExchangeLatencyHandler object
-        //It is stored in ELH until the time has parsed, and can then be read by the ExchangeHandler
-        //It is stored with the current transaction timestamp. The latency for the current period is calculated and held ExchangeLatencyHander to which the timestamp is compared when the list is not empty
 
-        //Position position = orderRequest.newMarketOrder(transaction, transaction.getPrice() - 100);
-        if(!test){
-            Position position = orderRequest.newLimitOrder(transaction.getPrice() - 100, transaction.getPrice() - 200, false, transaction);
-            if(position != null){
-                ArrayList<Position> tempPosition = new ArrayList<Position>();
-                tempPosition.add(position);
+        ArrayList<UserDataResponse> userDataResponses = latencyHandler.getDelayedUserDataStream(transaction.getTimestamp());
+        if(!userDataResponses.isEmpty()){
 
-                exchangeLatencyHandler.addUserAction(OrderAction.CREATE_ORDER, tempPosition, transaction.getTimestamp());
-                test = true;
-                System.out.println(transaction.getPrice());
-            }
-        }
+            //We only look for the latest update
+            int lastIndex = userDataResponses.size() - 1;
 
-        ArrayList<UserDataResponse> userData = exchangeLatencyHandler.getDelayedUserDataStream(transaction.getTimestamp());
-        if(userData.size() != 0){
-            UserDataResponse lastUserData = userData.get(userData.size() - 1);
+            userAssets = userDataResponses.get(lastIndex).getUserAssets();
 
-            UserAssets userAsset = lastUserData.getUserAssets();
+            //TODO: Add closed positions to previousPositions
 
-            //System.out.println(userAsset.toString());
-
-            newPositions = lastUserData.getNewPositions();
-            filledPositions = lastUserData.getFilledPositions();
-            rejectedOrders = lastUserData.getRejectedPositions();
-
-            if(!filledPositions.isEmpty()){
-                Position position = filledPositions.get(0);
-                System.out.println(position.getStatus() + " " + position.getFillPrice());
+            ArrayList<Position> tempNewPositions = userDataResponses.get(lastIndex).getNewPositions();
+            ArrayList<Position> newPositionDiff = findDifferences(tempNewPositions, newPositions);
+            if(!newPositionDiff.isEmpty()){
+                for(Position position : newPositionDiff){
+                    if(newPositions.contains(position)) {
+                        //Handle position removal
+                        System.out.println("Removed new position: " + position.getId());
+                    } else {
+                        //Handle new position
+                        System.out.println("Added new position: " + position.getId());
+                    }
+                }
             }
 
-            pendingPositions.removeAll(newPositions);
-            pendingPositions.removeAll(filledPositions);
-            pendingPositions.removeAll(rejectedOrders);
+            ArrayList<Position> tempFilledPositions = userDataResponses.get(lastIndex).getFilledPositions();
+            ArrayList<Position> filledPositionDiff = findDifferences(tempFilledPositions, filledPositions);
+            if(!filledPositionDiff.isEmpty()){
+                for(Position position : filledPositionDiff){
+                    if(newPositions.contains(position)) {
+                        //Handle position removal
+                        System.out.println("Removed filled position: " + position.getId());
+                    } else {
+                        //Handle new position
+                        System.out.println("Added filled position: " + position.getId());
+                    }
+                }
+            }
+
+            ArrayList<Position> tempCancelledPositions = userDataResponses.get(lastIndex).getCancelledPositions();
+            ArrayList<Position> canceledPositionDiff = findDifferences(tempCancelledPositions, cancelledPositions);
+            if(!canceledPositionDiff.isEmpty()){
+                for(Position position : canceledPositionDiff){
+                    //Handle new cancelled positions
+
+                    System.out.println("Added canceled position: " + position.getId());
+                }
+            }
+
+            ArrayList<Position> tempRejectedOrders = userDataResponses.get(lastIndex).getRejectedPositions();
+            /* ArrayList<Position> rejectedPositionsDiff = findDifferences(tempRejectedOrders, rejectedOrders);
+            if(!rejectedPositionsDiff.isEmpty()){
+                //Handle new order rejections
+
+            } */
+
+            ArrayList<Map<RejectionReason, Position>> rejectedActions = userDataResponses.get(lastIndex).getRejectedActions();
+            if(!rejectedActions.isEmpty()){
+                for(Map<RejectionReason, Position> rejection : rejectedActions){
+                    Map.Entry<RejectionReason, Position> entry = rejection.entrySet().iterator().next();
+
+                    RejectionReason reason = entry.getKey();
+                    Position position = entry.getValue();
+
+                    switch(reason){
+                        case INSUFFICIENT_MARGIN:
+                            //Handle insufficient margin
+                            //Repeat order with smaller size if limit
+                            //Discard?
+                            break;
+                        case WOULD_TRIGGER_IMMEDIATELY:
+                            if(position.isStopLoss()){ //Attempted to create a stoploss but failed, price is now going away from the stoploss
+                                //Create new market order for the opposite direction
+                                Position marketStopLoss = new Position(position);
+                                position.setOrderType(OrderType.MARKET);
+                                latencyHandler.addUserAction(OrderAction.CREATE_ORDER, tempRejectedOrders, lastIndex);
+                            }
+                            break;
+                        case EXCESS_PROG_ORDERS:
+                            if(position.isStopLoss()){ //For some reason could be we can't create a stoploss due to programmatic position count despite we test it locally
+                                //Close the position if no other clear action is available
+                            }
+                            break;
+                        case EXCESS_BORROW:
+                            if(position.isStopLoss()){ //What could this be? Close position on market
+
+                            }
+                            break;
+                        case INSUFFICIENT_FUNDS:
+                            break;
+                        case INVALID_ORDER_STATE:
+                            break;
+                    }
+                }
+            }
+
+            newPositions = Position.deepCopyPositionList(tempNewPositions);
+            filledPositions = Position.deepCopyPositionList(filledPositionDiff);
+            cancelledPositions = Position.deepCopyPositionList(canceledPositionDiff);
+            rejectedOrders = Position.deepCopyPositionList(tempRejectedOrders);
         }
     }
 
@@ -114,7 +174,7 @@ public class LocalStrategy {
 
 
     public void onTransaction(SingleTransaction transaction, boolean isWall){
-         Candle candle = candleConstructor.processTradeEvent(transaction);
+        Candle candle = candleConstructor.processTradeEvent(transaction);
 
         priceUpdate(transaction, isWall);
 
@@ -122,5 +182,38 @@ public class LocalStrategy {
             lastCandle = candle;
             newCandle(transaction, candleConstructor.getCandles());
         }
+    }
+
+    //Returns a list of Position objects in list2 but not in list1
+    public ArrayList<Position> findDifferences(ArrayList<Position> list1, ArrayList<Position> list2) {
+        ArrayList<Position> diff = new ArrayList<>();
+
+        for (Position pos1 : list1) {
+            boolean found = false;
+            for (Position pos2 : list2) {
+                if (pos1.getId() == pos2.getId()) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                diff.add(pos1);
+            }
+        }
+
+        for (Position pos2 : list2) {
+            boolean found = false;
+            for (Position pos1 : list1) {
+                if (pos1.getId() == pos2.getId()) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                diff.add(pos2);
+            }
+        }
+
+        return diff;
     }
 }

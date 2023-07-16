@@ -22,6 +22,17 @@ public class UserAssets {
 
     }
 
+    public UserAssets(UserAssets userAssets) {
+        this.freeUSDT = userAssets.getFreeUSDT();
+        this.lockedUSDT = userAssets.getLockedUSDT();
+        this.freeBTC = userAssets.getFreeBTC();
+        this.lockedBTC = userAssets.getLockedBTC();
+        this.totalBorrowedUSDT = userAssets.getTotalBorrowedUSDT();
+        this.totalBorrowedBTC = userAssets.getTotalBorrowedBTC();
+        this.marginLevel = userAssets.getMarginLevel();
+        this.totalUnpaidInterest = userAssets.getTotalUnpaidInterest();
+    }
+
     public UserAssets(double freeUSDT, double lockedUSDT, double freeBTC, double lockedBTC) {
         this.freeUSDT = freeUSDT;
         this.lockedUSDT = lockedUSDT;
@@ -102,7 +113,6 @@ public class UserAssets {
             totalBorrowedUSDT * HOURLY_USDT_INTEREST_RATE + 
             totalBorrowedBTC * HOURLY_BTC_INTEREST_RATE * currentPrice;
     }
-
 
     @Override
     public String toString() {

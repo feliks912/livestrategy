@@ -13,7 +13,7 @@ public class StrategyStarter {
     TransactionLoader transactionLoader;
     private List<SingleTransaction> transactionList = new ArrayList<SingleTransaction>();
     
-    Exchange exchangeHandler;
+    Binance exchangeHandler;
 
     private double initialUSDTPortfolio;
 
@@ -22,7 +22,7 @@ public class StrategyStarter {
 
         this.initialUSDTPortfolio = initialUSDTPortfolio;
 
-        this.exchangeHandler = new Exchange(initialUSDTPortfolio);
+        this.exchangeHandler = new Binance(initialUSDTPortfolio);
         this.transactionLoader = new TransactionLoader(inputDataFolderPath, fromDate, toDate);
     }
 

@@ -14,6 +14,9 @@ public class LatencyHandler {
 
     //TODO: Additional latency on automaticBorrow
     //TODO: It's possible multiple positions get parsed at once. We still need to process them in sequence.
+    //FIXME: Edit actionRequestMap to hold multiple same actions as the same transaction timestamp
+            // Or edit local code to store position actions to a separate variable and map them all at once. First solution seems more versitile since we can create actions at any time in code, but it does mean 
+    //TODO: Change rejection reasons from Map to Position variable where position holds an array of previous rejection reasons
 
     private int TRANSACTION_LATENCY = 0;
     private int TRADE_EXECUTION_LATENCY = 0; //request -> execution
@@ -116,7 +119,7 @@ public class LatencyHandler {
     public void addUserAction(OrderAction actionType, ArrayList<Position> pendingPositions, long currentLocalTimestamp) {
 
         Map<OrderAction, ArrayList<Position>> tempMap = new HashMap<OrderAction, ArrayList<Position>>();
-        tempMap.put(actionType, pendingPositions);
+        tempMap.put(actionType, Position.deepCopyPositionList(pendingPositions));
 
         this.actionRequestsMap.put(currentLocalTimestamp, tempMap);
     }
