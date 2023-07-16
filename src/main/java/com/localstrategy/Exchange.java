@@ -148,8 +148,12 @@ public class Exchange {
 
                             // Immediate trigger?
                             if(position.getOrderType().equals(OrderType.LIMIT) &&
-                                ((position.getDirection().equals(OrderSide.BUY) && position.getOpenPrice() >= transaction.getPrice()) ||
-                                (position.getDirection().equals(OrderSide.SELL) && position.getOpenPrice() <= transaction.getPrice()))){
+                                ((position.getDirection().equals(OrderSide.BUY) && 
+                                    (position.isStopLoss() && transaction.getPrice() >= position.getOpenPrice() || 
+                                    !position.isStopLoss() && transaction.getPrice() <= position.getOpenPrice())) ||
+                                (position.getDirection().equals(OrderSide.SELL) && 
+                                    (position.isStopLoss() && transaction.getPrice() <= position.getOpenPrice() ||
+                                    !position.isStopLoss() && transaction.getPrice() >= position.getOpenPrice())))){
                             
                                 rejectOrder(RejectionReason.WOULD_TRIGGER_IMMEDIATELY, position);
                                 continue;
@@ -268,6 +272,15 @@ public class Exchange {
     // When we short we lock USDT to be used as margin and receive FreeBTC.
     // When we long we lock USDT to be used as margin and receive FreeUSDT.
     // TODO: To us then, closing a position is repaying dept.
+    // TODO: Issue when calculating filling. On limit orders we buy when the price crosses from above.
+    //  On limit we sell when the price crosses from below
+    //  On stop we sell when the price crosses from above
+    //  On stop we buy when the price crosses from below
+
+    // So on order filling we are likely to get a better price
+    // But on stoplosses we are likely to get a worse price
+
+    //FIXME: 4 configurations of a limit order - Order direction X stop-limit difference
 
     //TODO: Refactor
     private void checkFills(){
@@ -291,14 +304,18 @@ public class Exchange {
                 boolean isLong = position.getDirection().equals(OrderSide.BUY);
 
                 double fillPrice = orderBookHandler.getSlippagePrice(
-                        isMarketOrder ? transaction.getPrice() : position.getOpenPrice(),
-                        position.getSize(), 
-                        position.getDirection()
-                    );
+                    isMarketOrder ? transaction.getPrice() : position.getOpenPrice(),
+                    position.getSize(), 
+                    position.getDirection()
+                );
 
-                if(isMarketOrder || 
-                        (position.getDirection().equals(OrderSide.BUY) && transaction.getPrice() <= position.getOpenPrice()) || 
-                        (position.getDirection().equals(OrderSide.SELL) && transaction.getPrice() >= position.getOpenPrice())){ 
+                if(isMarketOrder || (!isMarketOrder && 
+                        ((position.getDirection().equals(OrderSide.BUY) && 
+                            (position.isStopLoss() && transaction.getPrice() >= position.getOpenPrice() || 
+                            !position.isStopLoss() && transaction.getPrice() <= position.getOpenPrice())) ||
+                        (position.getDirection().equals(OrderSide.SELL) && 
+                            (position.isStopLoss() && transaction.getPrice() >= position.getOpenPrice() ||
+                            !position.isStopLoss() && transaction.getPrice() <= position.getOpenPrice()))))){ 
 
                     if(position.isAutomaticBorrow()){
                         if(isLong){
@@ -358,9 +375,11 @@ public class Exchange {
                                 userAssets.getFreeBTC()
                                     + positionValue / fillPrice
                             );
-
-                            position.setBorrowedAmount(positionValue);
+                            
+                            position.setFillPrice(fillPrice);
                             position.setMargin(requiredMargin);
+                            position.setBorrowedAmount(positionValue);
+
                             acceptedPositionList.add(position);
                         
                         } else {
@@ -422,8 +441,10 @@ public class Exchange {
                             );
 
                             //Fill position
-                            position.setBorrowedAmount(positionSize);
+                            position.setFillPrice(fillPrice);
                             position.setMargin(requiredMargin);
+                            position.setBorrowedAmount(positionSize);
+
                             acceptedPositionList.add(position);
                         }
                     } else {
@@ -448,6 +469,9 @@ public class Exchange {
                                     + position.getSize()
                             );
 
+                            //Fill position
+                            position.setFillPrice(fillPrice);
+
                             acceptedPositionList.add(position);
 
                         } else {
@@ -470,12 +494,16 @@ public class Exchange {
                                     + positionSize * fillPrice  
                             );
 
+                            //Fill position
+                            position.setFillPrice(fillPrice);
+
                             acceptedPositionList.add(position);
                         }
                     }
                 }
             }
         }
+
         if(!acceptedPositionList.isEmpty()){
 
             for(Position position : acceptedPositionList){

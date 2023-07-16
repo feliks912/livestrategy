@@ -11,17 +11,17 @@ public class Position {
     private double stopLossPrice;
     private double initialStopLossPrice;
     private double size;
-    private double closingPrice;
+    private double closingPrice = 0;
     private OrderSide direction;
     private int openIndex;
-    private boolean breakEven;
+    private boolean breakEven = false;
     private double margin;
-    private boolean filled;
-    private boolean closed;
-    private int filledIndex;
-    private int closedIndex;
-    private double profit;
-    private boolean partiallyClosed;
+    private boolean filled = false;
+    private boolean closed = false;
+    private int filledIndex = 0;
+    private int closedIndex = 0;
+    private double profit = 0;
+    private boolean partiallyClosed = false;
     private OrderType orderType;
     private long openTimestamp;
     private double hourlyInterestRate;
@@ -40,6 +40,7 @@ public class Position {
     private double totalUnpaidInterest;
     private long closeRequestTimestamp;
     private boolean reversed;
+    private boolean isStopLoss;
 
     private OrderStatus status;
 
@@ -49,6 +50,7 @@ public class Position {
     public Position(
             double openPrice,
             double initialStopLossPrice,
+            boolean isStopLoss,
             double size,
             OrderType orderType,
             double margin,
@@ -58,8 +60,7 @@ public class Position {
         this.id = positionId;
         this.orderType = orderType;
         this.stopLossPrice = initialStopLossPrice;
-        this.entryPriceIndex = openIndex;
-        this.initialStopLossPrice = openIndex;
+        this.isStopLoss = isStopLoss;
         this.initialStopLossPrice = initialStopLossPrice;
 
         this.status = OrderStatus.NEW;
@@ -67,17 +68,9 @@ public class Position {
         // TODO: Convert position to use fill price instead of open price during calculation
         this.openPrice = openPrice;
         this.size = size;
-        this.closingPrice = 0;
         this.direction = openPrice > stopLossPrice ? OrderSide.BUY : OrderSide.SELL;
         this.borrowedAmount = borrowedAmount;
-        this.breakEven = false;
         this.margin = margin;
-        this.filled = false;
-        this.closed = false;
-        this.filledIndex = 0;
-        this.closedIndex = 0;
-        this.profit = 0;
-        this.partiallyClosed = false;
 
         this.hourlyInterestRate = direction.equals(OrderSide.BUY) ? UserAssets.HOURLY_USDT_INTEREST_RATE / 100 : UserAssets.HOURLY_BTC_INTEREST_RATE / 100;
         this.totalUnpaidInterest = borrowedAmount * hourlyInterestRate * (direction.equals(OrderSide.BUY) ? 1 : openPrice);
@@ -348,6 +341,10 @@ public class Position {
 
     public void setStatus(OrderStatus status){
         this.status = status;
+    }
+
+    public boolean isStopLoss(){
+        return this.isStopLoss;
     }
     
 }

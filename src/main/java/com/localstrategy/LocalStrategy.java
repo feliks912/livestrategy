@@ -11,7 +11,7 @@ import com.localstrategy.util.types.UserDataResponse;
 public class LocalStrategy {
 
     private static final int CANDLE_VOLUME = 2_000_000;
-    private static final double RISK_PCT = 0.2;
+    private static final double RISK_PCT = 0.1;
     private static final int SLIPPAGE_PCT = 15; //In relation to the difference between our entry and stoploss price difference, how much in percentage of slippage are we ready to accept (total, not the average fill price)
 
     CandleConstructor candleConstructor = new CandleConstructor(CANDLE_VOLUME);
@@ -71,13 +71,14 @@ public class LocalStrategy {
 
         //Position position = orderRequest.newMarketOrder(transaction, transaction.getPrice() - 100);
         if(!test){
-            Position position = orderRequest.newLimitOrder(transaction.getPrice() - 100, transaction.getPrice() - 200, transaction);
+            Position position = orderRequest.newLimitOrder(transaction.getPrice() - 100, transaction.getPrice() - 200, false, transaction);
             if(position != null){
                 ArrayList<Position> tempPosition = new ArrayList<Position>();
                 tempPosition.add(position);
 
                 exchangeLatencyHandler.addUserAction(OrderAction.CREATE_ORDER, tempPosition, transaction.getTimestamp());
                 test = true;
+                System.out.println(transaction.getPrice());
             }
         }
 
@@ -87,11 +88,16 @@ public class LocalStrategy {
 
             UserAssets userAsset = lastUserData.getUserAssets();
 
-            System.out.println(userAsset.toString());
+            //System.out.println(userAsset.toString());
 
             newPositions = lastUserData.getNewPositions();
             filledPositions = lastUserData.getFilledPositions();
             rejectedOrders = lastUserData.getRejectedPositions();
+
+            if(!filledPositions.isEmpty()){
+                Position position = filledPositions.get(0);
+                System.out.println(position.getStatus() + " " + position.getFillPrice());
+            }
 
             pendingPositions.removeAll(newPositions);
             pendingPositions.removeAll(filledPositions);
@@ -100,7 +106,7 @@ public class LocalStrategy {
     }
 
     private void newCandle(SingleTransaction transaction, ArrayList<Candle> candles){
-        System.out.println("new candle");
+        
     }
 
 

@@ -45,16 +45,16 @@ public class OrderRequest {
 
     public Position newMarketOrder(SingleTransaction transaction, double stopLossPrice){
         if(!calculateOrderParameters(transaction.getPrice(), stopLossPrice)){
-            Position position = new Position(transaction.getPrice(), stopLossPrice, positionSize, OrderType.MARKET, requiredMargin, amountToBorrow, ++lastOrderId);
+            Position position = new Position(transaction.getPrice(), stopLossPrice, false, positionSize, OrderType.MARKET, requiredMargin, amountToBorrow, ++lastOrderId);
             pendingPositions.add(position);
             return position;
         }
         return null;
     }
 
-    public Position newLimitOrder(double entryPrice, double stopLossPrice, SingleTransaction transaction){
+    public Position newLimitOrder(double entryPrice, double stopLossPrice, boolean isStopLoss, SingleTransaction transaction){
         if(!calculateOrderParameters(entryPrice, stopLossPrice)){
-            Position position = new Position(transaction.getPrice(), stopLossPrice, positionSize, OrderType.LIMIT, requiredMargin, amountToBorrow, ++lastOrderId);
+            Position position = new Position(entryPrice, stopLossPrice, isStopLoss, positionSize, OrderType.LIMIT, requiredMargin, amountToBorrow, ++lastOrderId);
             pendingPositions.add(position);
             return position;
         }
