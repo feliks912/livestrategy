@@ -1,7 +1,6 @@
 package com.localstrategy;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
@@ -12,21 +11,27 @@ import java.util.ArrayList;
 
 public class LatencyHandler {
 
-    //TODO: Additional latency on automaticBorrow
-    //TODO: It's possible multiple positions get parsed at once. We still need to process them in sequence.
-    //FIXME: Edit actionRequestMap to hold multiple same actions as the same transaction timestamp
-            // Or edit local code to store position actions to a separate variable and map them all at once. First solution seems more versitile since we can create actions at any time in code, but it does mean 
-    //TODO: Change rejection reasons from Map to Position variable where position holds an array of previous rejection reasons
+    //TODO: add additional latency on automaticBorrow = true
+    //FIXME: Test userDataStream latency. It shouldn't be (lol shouldn't...) much different than order execution reponse latency
 
-    private int TRANSACTION_LATENCY = 0;
-    private int TRADE_EXECUTION_LATENCY = 0; //request -> execution
-    private int TRADE_REPORT_LATENCY = 0; //request -> response
-    private int USER_DATA_LATENCY = 0;
-    private int BORROW_LATENCY = 0;
+    private int TRANSACTION_LATENCY_MEAN = 0;
+    private int TRANSACTION_LATENCY_STD = 0;
+
+    private int TRADE_EXECUTION_LATENCY_MEAN = 0;
+    private int TRADE_EXECUTION_LATENCY_STD = 0;
+
+    private int TRADE_REPORT_LATENCY_MEAN = 0;
+    private int TRADE_REPORT_LATENCY_STD = 0;
+
+    private int USER_DATA_LATENCY_MEAN = 0;
+    private int USER_DATA_LATENCY_STD = 0;
+
+    private int BORROW_LATENCY_MEAN = 0;
+    private int BORROW_LATENCY_STD = 0;
 
     private Map<Long, UserDataResponse> userDataStream = new HashMap<Long, UserDataResponse>();  //UserDataStream gets parsed from the exchange to the user
     
-    private Map<Long, Map<OrderAction, ArrayList<Position>>> actionRequestsMap = new HashMap<Long, Map<OrderAction, ArrayList<Position>>>(); //actionRequestsMap get parsed from client to the exchange
+    private Map<Long, ArrayList<Map<OrderAction, Position>>> actionRequestsMap = new HashMap<Long, ArrayList<Map<OrderAction, Position>>>(); //actionRequestsMap get parsed from client to the exchange
 
     private int previousUserDataStreamLatency;
     private int previousPendingPositionsLatency;
@@ -42,14 +47,10 @@ public class LatencyHandler {
     public ArrayList<UserDataResponse> getDelayedUserDataStream(long currentLocalTimestamp) {
 
         ArrayList<UserDataResponse> userStreamsToReturn = new ArrayList<UserDataResponse>();
-
         ArrayList<Long> keysToRemove = new ArrayList<Long>();
 
-        // Search through the userDataStream map.
         for (Map.Entry<Long, UserDataResponse> entry : userDataStream.entrySet()) {
             if (currentLocalTimestamp - entry.getKey() > previousUserDataStreamLatency) {
-                // If the current time minus the key (the timestamp when the data was stored)
-                // is larger than the current latency, return the data and remove it from the map.
                 keysToRemove.add(entry.getKey());
                 userStreamsToReturn.add(entry.getValue());
             }
@@ -59,19 +60,17 @@ public class LatencyHandler {
             userDataStream.remove(keyToRemove);
         }
 
-        // If no suitable entry was found, return null.
         return userStreamsToReturn;
     }
 
-    public ArrayList<Map<OrderAction, ArrayList<Position>>> getDelayedUserActionRequests(long currentExchangeTimestamp) {
-        ArrayList<Map<OrderAction, ArrayList<Position>>> actionsToReturn = new ArrayList<Map<OrderAction, ArrayList<Position>>>();
+    public ArrayList<Map<OrderAction, Position>> getDelayedUserActionRequests(long currentExchangeTimestamp) {
+
+        ArrayList<Map<OrderAction, Position>> actionsToReturn = new ArrayList<Map<OrderAction, Position>>();
         ArrayList<Long> keysToRemove = new ArrayList<Long>();
 
-        for (Map.Entry<Long, Map<OrderAction, ArrayList<Position>>> entry : actionRequestsMap.entrySet()) {
+        for (Map.Entry<Long, ArrayList<Map<OrderAction, Position>>> entry : actionRequestsMap.entrySet()) {
             if (currentExchangeTimestamp - entry.getKey() > previousPendingPositionsLatency) {
-                // If the current time minus the key (the timestamp when the data was stored)
-                // is larger than the current latency, return the data and remove it from the map.
-                actionsToReturn.add(entry.getValue());
+                actionsToReturn.addAll(entry.getValue());
                 keysToRemove.add(entry.getKey());
             }
         }
@@ -116,12 +115,20 @@ public class LatencyHandler {
         this.userDataStream.put(currentExchangeTimestamp, userDataStream);
     }
 
-    public void addUserAction(OrderAction actionType, ArrayList<Position> pendingPositions, long currentLocalTimestamp) {
+    public void addUserAction(OrderAction actionType, Position position, long currentLocalTimestamp) {
 
-        Map<OrderAction, ArrayList<Position>> tempMap = new HashMap<OrderAction, ArrayList<Position>>();
-        tempMap.put(actionType, Position.deepCopyPositionList(pendingPositions));
+        Map<OrderAction, Position> tempMap = new HashMap<OrderAction, Position>();
+        tempMap.put(actionType, new Position(position));
 
-        this.actionRequestsMap.put(currentLocalTimestamp, tempMap);
+        for(Map.Entry<Long, ArrayList<Map<OrderAction, Position>>> entry : actionRequestsMap.entrySet()){
+            if(entry.getKey().equals(currentLocalTimestamp)){
+                entry.getValue().add(tempMap);
+            } else {
+                ArrayList<Map<OrderAction, Position>> tempList = new ArrayList<Map<OrderAction, Position>>();
+                tempList.add(tempMap);
+                actionRequestsMap.put(currentLocalTimestamp, tempList);
+            }
+        }
     }
 
 }

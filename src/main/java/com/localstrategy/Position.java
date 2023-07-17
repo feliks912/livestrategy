@@ -67,16 +67,13 @@ public class Position {
         this.stopLossPrice = initialStopLossPrice;
         this.isStopLoss = isStopLoss;
         this.initialStopLossPrice = initialStopLossPrice;
-
+        this.automaticBorrow = isStopLoss ? false : true; //Stoplosses don't borrow
         this.status = OrderStatus.NEW;
-
-        // TODO: Convert position to use fill price instead of open price during calculation
         this.openPrice = openPrice;
         this.size = size;
         this.direction = openPrice > stopLossPrice ? OrderSide.BUY : OrderSide.SELL;
         this.borrowedAmount = borrowedAmount;
         this.margin = margin;
-
         this.hourlyInterestRate = direction.equals(OrderSide.BUY) ? UserAssets.HOURLY_USDT_INTEREST_RATE / 100 : UserAssets.HOURLY_BTC_INTEREST_RATE / 100;
         this.totalUnpaidInterest = borrowedAmount * hourlyInterestRate * (direction.equals(OrderSide.BUY) ? 1 : openPrice);
     }

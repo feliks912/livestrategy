@@ -1,3 +1,35 @@
+[IMPORTANT] Check with Binance support? How exactly are transactions behaving during the following ![Alt text](volatile.png)
+
+17.7.23 18:02
+    Moved rejection reason to Position. Now rejecting a position simply places it into rejectedPositions list and gets parsed to the client.
+        FIXME: When rejecting a position it moves it into rejected positions automatically even though it might be in other position lists. This is a bug. When manually repaying a load a rejection will remove the position to the rejected positions list even though it might still be an active position? Basically make so client can't screw that one up. Separate them or something. Don't remove them. Add another list for rejected actions or only more the position to rejected positions if it didn't influence the system so far.
+    
+    Added checks for negative balances at all times - program exits on negative values of locked and borrowed funds, and negative total unpaid interest
+    
+    Edited actionRequestMap to hold multiple same actions at the same transaction timestamp. Now we can add to actionRequestMap used by LatencyManager at any time in our program and they will all be executed in that order when fetched by Binance
+
+    Position's isStopLoss flag now influences automaticBorrow - stoplosses don't borrow
+
+    TODO: 
+        Integrate wall using latest data from our latency test - either append to data or process during runtime the choice is mine
+        
+        Add normally distributed latencies to latencyHandler
+        
+        Check and complete Binance code for non-automatic borrowings
+        
+        Replace our linear orderbook model with a square root market impact model https://quant.stackexchange.com/questions/41937/market-impact-why-square-root
+            Definitely check this too https://mfe.baruch.cuny.edu/wp-content/uploads/2017/05/Chicago2016OptimalExecution.pdf
+        
+        Change order IDs to use unique IDs instead of incremental numbers to simulate the fucked up nature of random IDs Binance makes us use. (later)
+        
+        Implement order triggers on self-made slippage (later)
+    FIXME:
+        Check if walls operate the same way in all 4 dimensions of the limit stop order
+            *They do not.* On rising walls sell entry orders get best buy orders at the start of the wall until the price autocorrects
+                A way to avoid this is to wait for the price to consolidate, then execute a market order
+                    
+
+
 17.7.23 13:23
     Moved RejectionReason from UserDataResponse Map structure to Position
         I can edit Binance.java to support borrowing and repaying using Position as the amount necessary, since actions still get parsed along Position objects
@@ -49,7 +81,7 @@
         Complete latencies and respective tests
 
 16.7.23 15:48
-    Edited a bunch of stuff
+    Edited a bunch of stuff, didn't keep log - mainly how Binance handles stuff
     Fixed limit position handling
         They now support 4 configurations - long / stop x isStoploss
             Limit positions act different depending on whether the stop price is above or below the limit price, but it also depends on whethere it's a long or a short
@@ -58,7 +90,7 @@
         Fixed for exhange -> user and user -> exhange
     Moved deep copy to Position class as a static method
 
-    Todo: Implement local logic and test exchange code
+    Todo: Implement local logic and test Binance's logic
     
 
 14.7.23 19:15
@@ -191,7 +223,7 @@
                         The alternative is to be dumb. Follow price movement an act only when a level is reached. This allows us to decide whether we'll take the order at that price (also requires only market orders as entries).
 
                         FIXME:
-                        These observations however tell a different story for our stoplosses. The fill price could be horendous and far from our linearized orderbook model.
+                        These observations however tell a different story for our stoplosses. The fill price could be horendous and far from our linearized orderbook model ???
                             Here's how we can still use the model:
                                 We make it static on each price stagnation that is, we refresh it during horizontal moves. If the price moves rapidly we adjust the model so the orderbook is used by the move of the market, giving us filling prices of the half-used orderbook.
 

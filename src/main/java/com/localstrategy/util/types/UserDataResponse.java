@@ -24,8 +24,8 @@ public class UserDataResponse {
             this.userAssets = new UserAssets(userAssets);
             this.filledPositions = Position.deepCopyPositionList(filledPositions);
             this.newPositions = Position.deepCopyPositionList(newPositions);
-            this.rejectedPositions = Position.deepCopyPositionList(rejectedPositions);
             this.cancelledPositions = Position.deepCopyPositionList(cancelledPositions);
+            this.rejectedPositions = Position.deepCopyPositionList(rejectedPositions);
     }
 
     public UserAssets getUserAssets() {

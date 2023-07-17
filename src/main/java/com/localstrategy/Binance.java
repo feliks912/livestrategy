@@ -11,17 +11,14 @@ import com.localstrategy.util.enums.RejectionReason;
 import com.localstrategy.util.types.SingleTransaction;
 import com.localstrategy.util.types.UserDataResponse;
 
-//FIXME: Mayor bug is we parse references of positions around in time instead of copying them. This changes them when a change happens in a position which is not how latency manager ought to work like - FIXED added deep copy
-
 
 //TODO: I didn't consider how EXACTLY these price walls work.
-//TODO: Separate Order and Position classes - Position class is a local class comprising of position value and a stoploss order, Order class is a single Binance-supported order request
-//TODO: Double check borrowing calculation in OrderRequest
-//TODO: Check if overall borrow / profit logic is alright
-//TODO: Add checks for negative balance at all times
-//TODO: Position liquidation
 
-//FIXME: Test userDataStream latency. It shouldn't be (lol shouldn't...) much different than order execution reponse latency
+//TODO: Check if overall borrow / profit logic is alright
+
+//TODO: Separate Order and Position classes - Position class is a local class comprising of position value and a stoploss order, Order class is a single Binance-supported order request
+
+
 
 //FIXME: Refactor
 
@@ -30,11 +27,13 @@ import com.localstrategy.util.types.UserDataResponse;
 //TODO: Parse strategy as parameter from App instead of hardcoding it into TempStrategyExecutor, unless TempStrategyExecutor is the strategy (later)
 //TODO: Add symbol rules (later)
 //TODO: Binance doesn't actually keep track of filled positions but it does offer a list (later)
+//TODO: Add manual borrow action (later)
+//TODO: Position liquidation (later)
 
 public class Binance {
 
     public final static int MAX_PROG_ORDERS = 5;
-    
+
     private int MAX_BORROW_USDT = 900_000;
     private int MAX_BORROW_BTC = 72;
 
@@ -107,125 +106,103 @@ public class Binance {
     }
 
     
-    private void handleUserRequest(ArrayList<Map<OrderAction, ArrayList<Position>>> entryBlocks){
+    private void handleUserRequest(ArrayList<Map<OrderAction, Position>> entryBlock){
 
-        if(entryBlocks.isEmpty()){
+        if(entryBlock.isEmpty()){
             return;
         }
 
-        for(Map<OrderAction, ArrayList<Position>> entryBlock : entryBlocks){
+        for(Map<OrderAction, Position> entry : entryBlock){
 
-            for(Map.Entry<OrderAction, ArrayList<Position>> entry : entryBlock.entrySet()){
+            Map.Entry<OrderAction, Position> tempMap = entry.entrySet().iterator().next();
 
-                ArrayList<Position> positions = entry.getValue();
+            OrderAction orderAction = tempMap.getKey();
+            Position position = tempMap.getValue();
 
-                switch(entry.getKey()){
+            switch(orderAction){
+                case CREATE_ORDER: //Thanks ChatGPT for refactoring
+                    boolean canProcessOrder = (position.getOrderType().equals(OrderType.MARKET)) || 
+                                                (position.getOrderType().equals(OrderType.LIMIT) && 
+                                                (newPositions
+                                                    .stream()
+                                                    .filter(p -> p.getOrderType()
+                                                    .equals(OrderType.LIMIT))
+                                                    .count()
+                                                        < Binance.MAX_PROG_ORDERS));
 
-                    case CREATE_ORDER: //Thanks ChatGPT for refactoring
-                        for(Position position : positions){
-                            boolean canProcessOrder = (position.getOrderType().equals(OrderType.MARKET)) || 
-                                                    (position.getOrderType().equals(OrderType.LIMIT) && 
-                                                    (newPositions
-                                                        .stream()
-                                                        .filter(p -> p.getOrderType()
-                                                        .equals(OrderType.LIMIT))
-                                                        .count()
-                                                            < Binance.MAX_PROG_ORDERS));
+                    // Max programmatic orders reached?
+                    if(!canProcessOrder){
+                        rejectOrder(RejectionReason.EXCESS_PROG_ORDERS, position);
+                        continue;
+                    }
 
-                            // Max programmatic orders reached?
-                            if(!canProcessOrder){
-                                rejectOrder(RejectionReason.EXCESS_PROG_ORDERS, position);
-                                continue;
-                            }
+                    // Immediate trigger?
+                    if(position.getOrderType().equals(OrderType.LIMIT) &&
+                        ((position.getDirection().equals(OrderSide.BUY) && 
+                            (position.isStopLoss() && transaction.getPrice() >= position.getOpenPrice() || 
+                            !position.isStopLoss() && transaction.getPrice() <= position.getOpenPrice())) ||
+                        (position.getDirection().equals(OrderSide.SELL) && 
+                            (position.isStopLoss() && transaction.getPrice() <= position.getOpenPrice() ||
+                            !position.isStopLoss() && transaction.getPrice() >= position.getOpenPrice())))){
+                    
+                        rejectOrder(RejectionReason.WOULD_TRIGGER_IMMEDIATELY, position);
+                        continue;
+                    }
 
-                            // Immediate trigger?
-                            if(position.getOrderType().equals(OrderType.LIMIT) &&
-                                ((position.getDirection().equals(OrderSide.BUY) && 
-                                    (position.isStopLoss() && transaction.getPrice() >= position.getOpenPrice() || 
-                                    !position.isStopLoss() && transaction.getPrice() <= position.getOpenPrice())) ||
-                                (position.getDirection().equals(OrderSide.SELL) && 
-                                    (position.isStopLoss() && transaction.getPrice() <= position.getOpenPrice() ||
-                                    !position.isStopLoss() && transaction.getPrice() >= position.getOpenPrice())))){
-                            
-                                rejectOrder(RejectionReason.WOULD_TRIGGER_IMMEDIATELY, position);
-                                continue;
-                            }
+                    if(position.isAutomaticBorrow() && position.getOrderType().equals(OrderType.LIMIT)){ // "If you use MARGIN_BUY, the amount necessary to borrow in order to execute your order later will be borrowed at the creation time, regardless of the order type (whether it's limit or stop-limit)."
+                        RejectionReason rejectionReason = borrowFunds(position);
 
-                            if(position.isAutomaticBorrow() && position.getOrderType().equals(OrderType.LIMIT)){ //TODO: "If you use MARGIN_BUY, the amount necessary to borrow in order to execute your order later will be borrowed at the creation time, regardless of the order type (whether it's limit or stop-limit)."
-                                RejectionReason rejectionReason = borrowFunds(position);
-
-                                if(rejectionReason != null){
-                                    rejectOrder(rejectionReason, position);
-                                    continue;
-                                }
-                            }
-
-                            newPositions.add(position);
-
-                            positionsUpdated = true;
+                        if(rejectionReason != null){
+                            rejectOrder(rejectionReason, position);
+                            continue;
                         }
-                        break;
-                    case CANCEL_ORDER: //FIXME: Rejecting a cancel_order position will remove the position from new positions to rejected positions which isn't what we want.
-                        for(Position position : positions){
+                    }
 
-                            int index = newPositions.indexOf(position);
+                    newPositions.add(position);
 
-                            if(index == -1 || !position.getOrderType().equals(OrderType.LIMIT)){
-                                rejectOrder(RejectionReason.INVALID_ORDER_STATE, position);
-                                continue;
-                            }
+                    positionsUpdated = true;
 
-                            if(position.isAutoRepayAtCancel()){
+                    break;
+                case CANCEL_ORDER: //FIXME: Rejecting a cancel_order position will remove the position from new positions to rejected positions which isn't what we want.
+                    int index = newPositions.indexOf(position);
 
-                                RejectionReason rejectionReason = repayFunds(position);
+                    if(index == -1 || !position.getOrderType().equals(OrderType.LIMIT)){
+                        rejectOrder(RejectionReason.INVALID_ORDER_STATE, position);
+                        continue;
+                    }
 
-                                if(rejectionReason != null){
-                                    rejectOrder(rejectionReason, position);
-                                    continue;
-                                }
-                            }
+                    if(position.isAutoRepayAtCancel()){
 
-                            position.setStatus(OrderStatus.CANCELED);
-                            cancelledPositions.add(position);
-                            newPositions.remove(position);
+                        RejectionReason rejectionReason = repayFunds(position);
 
-                            positionsUpdated = true;
+                        if(rejectionReason != null){
+                            rejectOrder(rejectionReason, position);
+                            continue;
                         }
-                        break;
-                    case REPAY: //FIXME: Add some conditions here
-                        for(Position position : positions){
-                            RejectionReason rejectionReason = repayFunds(position);
+                    }
 
-                            if(rejectionReason != null){
-                                rejectOrder(rejectionReason, position);
-                                continue;
-                            }
-                        }
-                    default:
-                        break;
-                }
+                    position.setStatus(OrderStatus.CANCELED);
+                    cancelledPositions.add(position);
+                    newPositions.remove(position);
+
+                    positionsUpdated = true;
+
+                    break;
+                case REPAY: //FIXME: Add some conditions here
+                    RejectionReason rejectionReason = repayFunds(position);
+
+                    if(rejectionReason != null){
+                        rejectOrder(rejectionReason, position);
+                        continue;
+                    }
+
+                    break;
+                default:
+                    break;
             }
         }
     }
-    
-    //FIXME: It seems I'm handling shorting BTC as selling BTC which isn't the case
-    // We can use BTC to borrow BTC
-    // When we short we lock USDT to be used as margin and receive FreeBTC.
-    // When we long we lock USDT to be used as margin and receive FreeUSDT.
-    // TODO: To us then, closing a position is repaying dept.
-    // TODO: Issue when calculating filling. On limit orders we buy when the price crosses from above.
-    //  On limit we sell when the price crosses from below
-    //  On stop we sell when the price crosses from above
-    //  On stop we buy when the price crosses from below
 
-    // So on order filling we are likely to get a better price
-    // But on stoplosses we are likely to get a worse price
-
-    //FIXME: 4 configurations of a limit order - Order direction X stop-limit difference
-
-    //TODO: Refactor
-    //TODO: Add fund checks, there should be enough margin at all times to open a position if our local program is correct however Binance checks for available funds at the time of filling. Done.
-    //TODO: Market orders still must borrow funds at the time of filling to properly calculate the fill price. Done.
     private void checkFills(){
         for(Position position : newPositions){
             if(position.getStatus().equals(OrderStatus.NEW)){
@@ -249,7 +226,7 @@ public class Binance {
 
                     if(position.isAutomaticBorrow()){
 
-                        //Borrow funds for market orders
+                        //Borrow funds for market orders at the time of filling the order (principally incorrect, functionally equivalent)
                         if(isMarketOrder){
                             RejectionReason rejectionReason = borrowFunds(position);
 
@@ -392,7 +369,6 @@ public class Binance {
         }
     }
 
-    //FIXME: I'm fetching the fill price right here don't know if that's the way Binance works but whatever
     private RejectionReason borrowFunds(Position position){
 
         boolean isMarketOrder = position.getOrderType().equals(OrderType.MARKET) ? true : false;
@@ -503,7 +479,6 @@ public class Binance {
         return null;
     }
 
-    //TODO: Add checks whether we actually borrowed funds? I don't think Binance does that
     //TODO: Check and refactor
 
     private RejectionReason repayFunds(Position position){
@@ -516,6 +491,16 @@ public class Binance {
 
             if(userAssets.getFreeUSDT() < position.getBorrowedAmount() + position.getTotalUnpaidInterest()){
                 return RejectionReason.INSUFFICIENT_FUNDS;
+            }
+
+            if(userAssets.getLockedUSDT() < position.getMargin()){
+                System.out.println("Error at repayFunds side BUY - locked USDT has insufficient funds to unlock margin?");
+                System.exit(1);
+            }
+
+            if(userAssets.getTotalBorrowedUSDT() < position.getBorrowedAmount()){
+                System.out.println("Error at repayFunds side BUY - borrowed USDT would go negative if we were to exclude the borrowed amount?");
+                System.exit(1);
             }
 
             userAssets.setFreeUSDT(
@@ -541,7 +526,17 @@ public class Binance {
             if(userAssets.getFreeBTC() < position.getSize() || userAssets.getFreeUSDT() < position.getMargin()
                     - position.getTotalUnpaidInterest()){
                         return RejectionReason.INSUFFICIENT_FUNDS;
-                    }
+            }
+
+            if(userAssets.getLockedUSDT() < position.getMargin()){
+                System.out.println("Error at repayFunds side SELL - locked USDT has insufficient funds to unlock margin?");
+                System.exit(1);
+            }
+
+            if(userAssets.getTotalBorrowedBTC() < position.getBorrowedAmount()){
+                System.out.println("Error at repayFunds side SELL - borrowed BTC would go negative if we were to exclude the borrowed amount?");
+                System.exit(1);
+            }
 
             userAssets.setFreeBTC(
                 userAssets.getFreeBTC()
@@ -563,6 +558,12 @@ public class Binance {
                 userAssets.getTotalBorrowedBTC()
                     - position.getSize()  
             );
+        }
+
+
+        if(userAssets.getTotalBorrowedBTC() < position.getBorrowedAmount()){
+            System.out.println("Error at repayFunds - unpaid interest would go negative?");
+            System.exit(1);
         }
 
         userAssets.setTotalUnpaidInterest(
@@ -603,9 +604,10 @@ public class Binance {
         return marginLevel;
     }
 
-    //TODO: liquidate a position
+    //TODO: liquidate position
     private void liquidatePosition(Position position){
-        
+        System.out.println("Liquidation");
+        System.exit(1);
     }
 
     private void rejectOrder(RejectionReason reason, Position position){

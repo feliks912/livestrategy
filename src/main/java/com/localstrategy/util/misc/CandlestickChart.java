@@ -52,10 +52,15 @@ public class CandlestickChart extends JFrame {
     boolean isButtonPressed = false;
     CandleConstructor candleConstructor;
     private int distanceSet;
+    private String startDate;
+    private String endDate;
 
-    public CandlestickChart(double candleVolume, PositionsTable positionsTable, boolean visible) {
+    public CandlestickChart(double candleVolume, PositionsTable positionsTable, boolean visible, String startDate, String endDate) {
         super("Candlestick Chart Demo");
         this.positionsTable = positionsTable;
+
+        this.startDate = startDate;
+        this.endDate = endDate;
 
         this.candleConstructor = new CandleConstructor(candleVolume);
 
@@ -184,8 +189,8 @@ public class CandlestickChart extends JFrame {
 
         TransactionLoader transactionLoader = new TransactionLoader("C:/--- BTCUSDT/", 
         //null,
-        "2022-07-20", 
-        null);
+        startDate, 
+        endDate);
 
         int fileCount = transactionLoader.getTotalCsvFiles();
 
