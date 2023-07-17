@@ -1,3 +1,40 @@
+17.7.23 13:23
+    Moved RejectionReason from UserDataResponse Map structure to Position
+        I can edit Binance.java to support borrowing and repaying using Position as the amount necessary, since actions still get parsed along Position objects
+    Added borrowFunds and repayFunds functions
+    Added REPAY user action
+    Added user data stream snapshot deep copy
+    Edited borrow calculation in OrderRequest
+    Todo:
+        Edit borrowings in OrderRequest
+            Currently using local current transaction for new market orders. Could be it changes the amount of required borrowings. Maybe it's unneccesary to use it there other than to locally check whether we can actually borrow?
+            position borrowedAmount is set at the time of borrowing, calculated at the fill price.
+        
+        If position isStopLoss, do we borrow for it? The funds should already be in our account, and on execution it just executes and then we can repay manually? Edit OrderRequest to set auto borrows to false for stoploss orders and check the logic for non-auto borrowing orders in Binance.java
+        
+        Canceling an order might reject the request which will place the position in rejectedPositions and remove it from wherever it was. That is not what we want since the order we send (again, Order !== Position) is a reference to an existing position in Binance.java
+
+        Check borrow and repay function once again, same potential issue from above. Rejected orders can only be removed from lists under certain conditions
+    
+    TODO: Check how walls influence the fill price might present an issue when automatically borrowing
+
+    Todo:
+        From CS Cezary:
+            "If you use MARGIN_BUY, the amount necessary to borrow in order to execute your order later will be borrowed at the creation time, regardless of the order type (whether it's limit or stop-limit)."
+        
+
+16.7.23 20:56
+    Todo:
+        What should for new user data stream in local strategy do?
+            There are multiple cases
+                Failed stoploss
+                Filled limit order
+                Margin level
+                Repeating failed orders
+
+
+
+
 16.7.23 17:49
     Added some local logic for receiving updated information from Binance
 
@@ -44,6 +81,7 @@
     Stop-limit orders lock funds at the time of executing a limit order, which is when the price crosses the stop line
     By using sideEffectType and autoRepayAtCancel we can ask Binance to borrow funds for us at the time of opening an order, and automatically repay if the order is canceled before being executed
         NOTE: Out stoplosses don't have to borrow funds. We already have them unlocked in our account if the market / limit order got filled.
+            Conversation with 
 
 13.7.23 13:36
     From ChatGPT, when shorting an asset - "The margin requirement doesn't change with fluctuations in the asset's price."

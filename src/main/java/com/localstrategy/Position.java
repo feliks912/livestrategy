@@ -2,6 +2,7 @@ package com.localstrategy;
 
 import com.localstrategy.util.enums.OrderSide;
 import com.localstrategy.util.enums.OrderType;
+import com.localstrategy.util.enums.RejectionReason;
 import com.localstrategy.util.enums.OrderStatus;
 import com.localstrategy.util.types.Candle;
 
@@ -43,6 +44,8 @@ public class Position {
     private long closeRequestTimestamp;
     private boolean reversed;
     private boolean isStopLoss;
+
+    private RejectionReason rejectionReason;
 
     private OrderStatus status;
 
@@ -117,6 +120,7 @@ public class Position {
         this.status = other.status;
         this.automaticBorrow = other.automaticBorrow;
         this.autoRepayAtCancel = other.autoRepayAtCancel;
+        this.rejectionReason = other.rejectionReason;
     }
     
 
@@ -392,6 +396,14 @@ public class Position {
 
     public void setOrderType(OrderType type){
         this.orderType = type;
+    }
+
+    public void setRejectionReason(RejectionReason reason){
+        this.rejectionReason = rejectionReason;
+    }
+
+    public RejectionReason getRejectionReason(){
+        return this.rejectionReason;
     }
 
     public static ArrayList<Position> deepCopyPositionList(ArrayList<Position> originalList) {

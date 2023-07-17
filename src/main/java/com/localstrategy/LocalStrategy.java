@@ -44,7 +44,7 @@ public class LocalStrategy {
 
         //TODO: Any call to exchangeHandler has a response latency. Local variables are instant.
         this.exchangeHandler = exchangeHandler;
-        this.latencyHandler = exchangeHandler.getExchangeLatencyHandler();
+        this.latencyHandler = exchangeHandler.getLatencyHandler();
 
         userAssets = exchangeHandler.getUserassets();
 
@@ -80,9 +80,11 @@ public class LocalStrategy {
                     if(newPositions.contains(position)) {
                         //Handle position removal
                         System.out.println("Removed new position: " + position.getId());
+                        //Confirm new position
                     } else {
                         //Handle new position
                         System.out.println("Added new position: " + position.getId());
+                        //Rejected new positions handled here
                     }
                 }
             }
@@ -94,6 +96,7 @@ public class LocalStrategy {
                     if(newPositions.contains(position)) {
                         //Handle position removal
                         System.out.println("Removed filled position: " + position.getId());
+                        //Confirm new position
                     } else {
                         //Handle new position
                         System.out.println("Added filled position: " + position.getId());
@@ -168,9 +171,7 @@ public class LocalStrategy {
     private void newCandle(SingleTransaction transaction, ArrayList<Candle> candles){
         
     }
-
-
-
+    
 
 
     public void onTransaction(SingleTransaction transaction, boolean isWall){

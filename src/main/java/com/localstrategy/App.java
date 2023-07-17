@@ -6,7 +6,7 @@ public class App {
 
     public static void main( String[] args ) {
 
-        //new TradingGUI(100000, new StrategyExecutor(500, 5, 3, 0, 100, 1, 10000, 0.1, 0));
+        //new TradingGUI(2000000);
 
         new StrategyStarter(
             "C:/--- BTCUSDT",
