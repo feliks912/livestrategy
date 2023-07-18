@@ -27,8 +27,8 @@ public class OrderRequest {
     public OrderRequest(
         ArrayList<Position> pendingPositions,
         ArrayList<Position> newPositions,
-        TierManager riskManager, 
-        UserAssets portfolio, 
+        TierManager riskManager,
+        UserAssets userAssets,
         double risk, 
         int totalOrderLimit,
         int slippagePct){
@@ -36,7 +36,7 @@ public class OrderRequest {
             this.pendingPositions = pendingPositions;
             this.newPositions = newPositions;
             this.riskManager = riskManager;
-            this.userAssets = portfolio;
+            this.userAssets = userAssets;
             this.risk = risk;
             this.totalProgrammaticOrderLimit = totalOrderLimit;
             this.slippagePct = slippagePct;
@@ -48,7 +48,7 @@ public class OrderRequest {
                 transaction.getPrice(), 
                 stopLossPrice, 
                 positionSize, 
-                OrderType.LIMIT, 
+                OrderType.MARKET,
                 requiredMargin, 
                 borrowedAmount, 
                 ++lastPositionId, 
@@ -76,7 +76,7 @@ public class OrderRequest {
             return position;
         }
         return null;
-    } 
+    }
 
     //FIXME: This still calculates amount to borrow even if the position size goes over. It borrows and then takes everything else from our portfolio. Binance doesn't support that with automatic borrowings
     //TODO: Add return statuses

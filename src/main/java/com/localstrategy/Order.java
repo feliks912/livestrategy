@@ -38,7 +38,7 @@ public class Order {
                 
         this.orderType = orderType;
         this.isStopLoss = isStopLoss;
-        this.automaticBorrow = !isStopLoss; //Stop-losses don't borrow
+        this.automaticBorrow = !isStopLoss; //Stop-losses don't borrow funds as the funds are already borrowed
         this.status = OrderStatus.NEW;
         this.openPrice = openPrice;
         this.size = size;
@@ -220,8 +220,6 @@ public class Order {
         ArrayList<Order> newList = new ArrayList<>();
 
         for (Order pos : originalList) {
-            // Assuming that all fields in Order are primitive types or immutable objects
-            // so a shallow copy is fine.
             Order newPos = new Order(pos);
             newList.add(newPos);
         }

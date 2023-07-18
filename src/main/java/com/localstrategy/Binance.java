@@ -40,7 +40,6 @@ public class Binance {
     private final ArrayList<Order> rejectedOrders = new ArrayList<>();
     private final ArrayList<Order> acceptedOrderList = new ArrayList<>();
 
-
     private final ArrayList<Order> updatedOrders = new ArrayList<>();
 
     private final ArrayList<Map<ActionResponse, Order>> actionResponses = new ArrayList<>();

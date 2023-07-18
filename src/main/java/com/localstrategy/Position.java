@@ -40,6 +40,8 @@ public class Position {
     private Order entryOrder;
     private Order stopLossOrder;
 
+    private Order closeOrder;
+
     public Position(
             double openPrice,
             double initialStopLossPrice,
@@ -72,7 +74,6 @@ public class Position {
             openTimestamp
         );
 
-
         this.stopLossOrder = new Order(
             stopLossPrice, 
             direction == OrderSide.BUY ? OrderSide.SELL : OrderSide.BUY, 
@@ -83,7 +84,6 @@ public class Position {
             borrowedAmount, 
             openTimestamp
         );
-
     }
 
     public Position(Position other) {
@@ -118,6 +118,7 @@ public class Position {
         this.rejectionReason = other.rejectionReason;
         this.entryOrder = new Order(other.entryOrder);
         this.stopLossOrder = new Order(other.stopLossOrder);
+        this.closeOrder = new Order(other.closeOrder);
     }
 
     public double calculateProfit(double closePrice) {
@@ -381,13 +382,14 @@ public class Position {
         this.stopLossOrder = stopLossOrder;
     }
 
+    public Order getCloseOrder() { return this.closeOrder; }
+
+    public void setCloseOrder(Order closeOrder) { this.closeOrder = closeOrder; }
 
     public static ArrayList<Position> deepCopyPositionList(ArrayList<Position> originalList) {
         ArrayList<Position> newList = new ArrayList<>();
 
         for (Position pos : originalList) {
-            // Assuming that all fields in Position are primitive types or immutable objects
-            // so a shallow copy is fine.
             Position newPos = new Position(pos);
             newList.add(newPos);
         }

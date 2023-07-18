@@ -8,15 +8,12 @@
 
     Changed userDataStream to send only updated orders instead of entire lists
 
-    Todo: 
-        Binance doesn't send a list of all orders and actions in an user data stream. It only sends the latest updates. Instead of sending orders lists, add them all to a singular list of updated orders and send that to the user.
-        Make sure the statues are set beforehand.
-        
+    Todo:
         Locally map action responses with action type (OrderAction.java) so when we receive ACTION_REJECTED we know what we're working with
 
         Handle local Position and Order parameter matching
 
-        Position-specific interest calculation must be local for every case that is not automatic repay on cancelling a position
+        Position-specific interest calculation must be local for every case that is not automatic repay when cancelling a position
 
 18.7.23 15:17
     Introduced Order, edited code to support it. Position now holds 2 Order which are created at the time of creating a position locally. Order requests are now sent to Binance instead of Positions
@@ -48,7 +45,7 @@
         Replace our linear orderbook model with a square root market impact model https://quant.stackexchange.com/questions/41937/market-impact-why-square-root
             Definitely check this too https://mfe.baruch.cuny.edu/wp-content/uploads/2017/05/Chicago2016OptimalExecution.pdf
         
-        Change order IDs to use unique IDs instead of incremental numbers to simulate the fucked up nature of random IDs Binance makes us use. (later)
+        Change order IDs to use unique IDs instead of incremental numbers to simulate the fucked up nature of random IDs. (later)
         
         Implement order triggers on self-made slippage (later)
     FIXME:
