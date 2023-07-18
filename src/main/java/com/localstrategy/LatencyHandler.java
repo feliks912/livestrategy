@@ -1,43 +1,39 @@
 package com.localstrategy;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
-
 import com.localstrategy.util.enums.OrderAction;
 import com.localstrategy.util.types.UserDataResponse;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
 
 public class LatencyHandler {
 
     //TODO: add additional latency on automaticBorrow = true
-    //FIXME: Test userDataStream latency. It shouldn't be (lol shouldn't...) much different than order execution reponse latency
+    //FIXME: Test userDataStream latency. It shouldn't be (lol shouldn't...) much different than order execution response latency
 
-    private int TRANSACTION_LATENCY_MEAN = 0;
-    private int TRANSACTION_LATENCY_STD = 0;
+    private final int TRADE_EXECUTION_LATENCY_MEAN = 0;
+    private final int TRADE_EXECUTION_LATENCY_STD = 0;
 
-    private int TRADE_EXECUTION_LATENCY_MEAN = 0;
-    private int TRADE_EXECUTION_LATENCY_STD = 0;
+    private final int TRADE_REPORT_LATENCY_MEAN = 0;
+    private final int TRADE_REPORT_LATENCY_STD = 0;
 
-    private int TRADE_REPORT_LATENCY_MEAN = 0;
-    private int TRADE_REPORT_LATENCY_STD = 0;
+    private final int USER_DATA_LATENCY_MEAN = 0;
+    private final int USER_DATA_LATENCY_STD = 0;
 
-    private int USER_DATA_LATENCY_MEAN = 0;
-    private int USER_DATA_LATENCY_STD = 0;
+    private final int BORROW_LATENCY_MEAN = 0;
+    private final int BORROW_LATENCY_STD = 0;
 
-    private int BORROW_LATENCY_MEAN = 0;
-    private int BORROW_LATENCY_STD = 0;
-
-    private Map<Long, UserDataResponse> userDataStream = new HashMap<Long, UserDataResponse>();  //UserDataStream gets parsed from the exchange to the user
+    private final Map<Long, UserDataResponse> userDataStream = new HashMap<>();  //UserDataStream gets parsed from the exchange to the user
     
-    private Map<Long, ArrayList<Map<OrderAction, Order>>> actionRequestsMap = new HashMap<Long, ArrayList<Map<OrderAction, Order>>>(); //actionRequestsMap get parsed from client to the exchange
+    private final Map<Long, ArrayList<Map<OrderAction, Order>>> actionRequestsMap = new HashMap<>(); //actionRequestsMap get parsed from client to the exchange
 
     private int previousUserDataStreamLatency;
     private int previousPendingOrdersLatency;
     private long previousLatencyCalculationTimestamp;
 
-    private static Random random = new Random();
+    private static final Random random = new Random();
 
     public LatencyHandler() {
 
@@ -46,8 +42,8 @@ public class LatencyHandler {
     //TODO: Thanks ChatGPT
     public ArrayList<UserDataResponse> getDelayedUserDataStream(long currentLocalTimestamp) {
 
-        ArrayList<UserDataResponse> userStreamsToReturn = new ArrayList<UserDataResponse>();
-        ArrayList<Long> keysToRemove = new ArrayList<Long>();
+        ArrayList<UserDataResponse> userStreamsToReturn = new ArrayList<>();
+        ArrayList<Long> keysToRemove = new ArrayList<>();
 
         for (Map.Entry<Long, UserDataResponse> entry : userDataStream.entrySet()) {
             if (currentLocalTimestamp - entry.getKey() > previousUserDataStreamLatency) {
@@ -65,8 +61,8 @@ public class LatencyHandler {
 
     public ArrayList<Map<OrderAction, Order>> getDelayedUserActionRequests(long currentExchangeTimestamp) {
 
-        ArrayList<Map<OrderAction, Order>> actionsToReturn = new ArrayList<Map<OrderAction, Order>>();
-        ArrayList<Long> keysToRemove = new ArrayList<Long>();
+        ArrayList<Map<OrderAction, Order>> actionsToReturn = new ArrayList<>();
+        ArrayList<Long> keysToRemove = new ArrayList<>();
 
         for (Map.Entry<Long, ArrayList<Map<OrderAction, Order>>> entry : actionRequestsMap.entrySet()) {
             if (currentExchangeTimestamp - entry.getKey() > previousPendingOrdersLatency) {
@@ -117,18 +113,17 @@ public class LatencyHandler {
 
     public void addUserAction(OrderAction actionType, Order order, long currentLocalTimestamp) {
 
-        Map<OrderAction, Order> tempMap = new HashMap<OrderAction, Order>();
+        Map<OrderAction, Order> tempMap = new HashMap<>();
         tempMap.put(actionType, new Order(order));
 
         for(Map.Entry<Long, ArrayList<Map<OrderAction, Order>>> entry : actionRequestsMap.entrySet()){
             if(entry.getKey().equals(currentLocalTimestamp)){
                 entry.getValue().add(tempMap);
             } else {
-                ArrayList<Map<OrderAction, Order>> tempList = new ArrayList<Map<OrderAction, Order>>();
+                ArrayList<Map<OrderAction, Order>> tempList = new ArrayList<>();
                 tempList.add(tempMap);
                 actionRequestsMap.put(currentLocalTimestamp, tempList);
             }
         }
     }
-
 }

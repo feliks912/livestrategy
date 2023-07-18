@@ -1,9 +1,9 @@
 package com.localstrategy;
 
 import com.localstrategy.util.enums.OrderSide;
+import com.localstrategy.util.enums.OrderStatus;
 import com.localstrategy.util.enums.OrderType;
 import com.localstrategy.util.enums.RejectionReason;
-import com.localstrategy.util.enums.OrderStatus;
 
 import java.util.ArrayList;
 
@@ -26,7 +26,7 @@ public class Order {
 
     private OrderStatus status;
 
-    private boolean automaticBorrow = true;
+    private boolean automaticBorrow;
     private boolean autoRepayAtCancel = true;
 
     public Order(
@@ -41,7 +41,7 @@ public class Order {
                 
         this.orderType = orderType;
         this.isStopLoss = isStopLoss;
-        this.automaticBorrow = isStopLoss ? false : true; //Stoplosses don't borrow
+        this.automaticBorrow = !isStopLoss; //Stop-losses don't borrow
         this.status = OrderStatus.NEW;
         this.openPrice = openPrice;
         this.size = size;

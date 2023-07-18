@@ -1,26 +1,25 @@
 package com.localstrategy;
 
-import java.util.ArrayList;
-
 import com.localstrategy.util.enums.OrderSide;
 import com.localstrategy.util.enums.OrderType;
 import com.localstrategy.util.types.SingleTransaction;
 
+import java.util.ArrayList;
+
 public class OrderRequest {
 
-    public int totalProgrammaticalOrderLimit;
+    public int totalProgrammaticOrderLimit;
     public int lastPositionId = 0;
 
     private double positionSize;
     private double requiredMargin;
-    private double amountToBorrow;
 
-    private ArrayList<Position> pendingPositions = new ArrayList<Position>();
-    private ArrayList<Position> newPositions = new ArrayList<Position>();
-    private UserAssets userAssets;
-    private double risk;
-    private TierManager riskManager;
-    private int slippagePct;
+    private final ArrayList<Position> pendingPositions;
+    private final ArrayList<Position> newPositions;
+    private final UserAssets userAssets;
+    private final double risk;
+    private final TierManager riskManager;
+    private final int slippagePct;
 
     public double borrowedAmount;
 
@@ -39,12 +38,12 @@ public class OrderRequest {
             this.riskManager = riskManager;
             this.userAssets = portfolio;
             this.risk = risk;
-            this.totalProgrammaticalOrderLimit = totalOrderLimit;
+            this.totalProgrammaticOrderLimit = totalOrderLimit;
             this.slippagePct = slippagePct;
     }
 
     public Position newMarketPosition(SingleTransaction transaction, double stopLossPrice){
-        if(!calculatePositionParameters(transaction.getPrice(), stopLossPrice)){
+        if(calculatePositionParameters(transaction.getPrice(), stopLossPrice)){
             Position position = new Position(
                 transaction.getPrice(), 
                 stopLossPrice, 
@@ -61,8 +60,8 @@ public class OrderRequest {
         return null;
     }
 
-    public Position newLimitPosition(double entryPrice, double stopLossPrice, boolean isStopLoss, SingleTransaction transaction){
-        if(!calculatePositionParameters(entryPrice, stopLossPrice)){
+    public Position newLimitPosition(double entryPrice, double stopLossPrice, SingleTransaction transaction){
+        if(calculatePositionParameters(entryPrice, stopLossPrice)){
             Position position = new Position(
                 entryPrice, 
                 stopLossPrice, 
@@ -79,9 +78,9 @@ public class OrderRequest {
         return null;
     } 
 
-    //FIXME: This still calcualates amount to borrow even if the position size goes over. It borrows and then takes everything else from our portfolio. Binance doesn't support that with automatic borrowings
+    //FIXME: This still calculates amount to borrow even if the position size goes over. It borrows and then takes everything else from our portfolio. Binance doesn't support that with automatic borrowings
     //TODO: Add return statuses
-    //TODO: Add condition when slippage crosses the stoploss
+    //TODO: Add condition when slippage crosses the stop-loss
     private boolean calculatePositionParameters(double entryPrice, double stopLossPrice){
         if (Math.abs(entryPrice - stopLossPrice) > 2) { //Minimum $2 difference between entry and stop.
 
@@ -99,36 +98,31 @@ public class OrderRequest {
             double borrowedUSDT = userAssets.getTotalBorrowedUSDT();
             double borrowedBTC = userAssets.getTotalBorrowedBTC();
 
-            amountToBorrow = positionSize;
+            double amountToBorrow = positionSize;
 
             if(entryPrice > stopLossPrice){
                 amountToBorrow *= entryPrice;
 
                 if(borrowedUSDT + amountToBorrow > 900000){
-                    return true;
+                    return false;
                 }
 
                 riskManager.checkAndUpdateTier(borrowedUSDT + amountToBorrow, borrowedBTC);
-                requiredMargin = positionSize * entryPrice / riskManager.getCurrentLeverage();
-            } 
+            }
             else {
                 if(borrowedBTC + amountToBorrow > 72){
-                    return true;
+                    return false;
                 } 
                 
                 riskManager.checkAndUpdateTier(borrowedUSDT, borrowedBTC + amountToBorrow);
-                requiredMargin = positionSize * entryPrice / riskManager.getCurrentLeverage();
             }
 
-            if (userAssets.getFreeUSDT() > requiredMargin && 
+            requiredMargin = positionSize * entryPrice / riskManager.getCurrentLeverage();
+
+            return userAssets.getFreeUSDT() > requiredMargin &&
                     pendingPositions.size()
-                    + newPositions.size()
-                        < totalProgrammaticalOrderLimit){
-
-                return false;
-            }
-            return true;
+                            + newPositions.size() < totalProgrammaticOrderLimit;
         }
-        return true;
+        return false;
     }
 }

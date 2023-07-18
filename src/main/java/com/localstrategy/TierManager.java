@@ -20,7 +20,7 @@ public class TierManager {
     }
 
     public void checkAndUpdateTier(double totalBorrowedAmountUsdt, double totalBorrowedAmountBtc) {
-        int i = 0;
+        int i;
         for (i = 0; i < MAX_BORROWING_AMOUNT_USDT_TIERS.length; i++) {
             if (totalBorrowedAmountUsdt <= MAX_BORROWING_AMOUNT_USDT_TIERS[i] && totalBorrowedAmountBtc <= MAX_BORROWING_AMOUNT_BTC_TIERS[i]) {
                 break;
@@ -30,14 +30,6 @@ public class TierManager {
         if (i != currentTier) {
             updateTier(i);
         }
-    }
-
-    public int getCurrentTier(){
-        return this.currentTier;
-    }
-
-    public void setCurrentTier(int tier){
-        updateTier(tier);
     }
 
     public double getCurrentLeverage(){

@@ -1,21 +1,20 @@
 package com.localstrategy;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
 import com.localstrategy.util.helper.TransactionLoader;
 import com.localstrategy.util.types.SingleTransaction;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class StrategyStarter {
 
     
     TransactionLoader transactionLoader;
-    private List<SingleTransaction> transactionList = new ArrayList<SingleTransaction>();
-    
+    private List<SingleTransaction> transactionList = new ArrayList<>();
+
     Binance exchangeHandler;
 
-    private double initialUSDTPortfolio;
+    private final double initialUSDTPortfolio;
 
 
     public StrategyStarter(String inputDataFolderPath, String fromDate, String toDate, double initialUSDTPortfolio) {
@@ -83,7 +82,7 @@ public class StrategyStarter {
             exchangeHandler.setRunningPositionCounter(0);
 
             double currentFreePortfolio = exchangeHandler.getTotalAssetsValue();
-            //TODO: Format file name propperly
+            //TODO: Format file name properly
             System.out.printf("File %s done. Portfolio: $%.2f. Profit: $%.2f, change: %.2f%%, Maximum positions: %d, Total positions: %d\n", 
                 transactionLoader.getLastFileName(), 
                 currentFreePortfolio, 
@@ -129,13 +128,13 @@ public class StrategyStarter {
             ResultConsolidator.writePositionsToCSV(allPositions, outputCSVPath);
         }
 
-        System.out.printf("Wins: %d, Losses: %d, Breakevens: %d, Final portfolio: %.2f, Max portfolio value: %.2f, Drawdown: %.2f, R squared: %.3f\n",
+        System.out.printf("Wins: %d, Losses: %d, Break-evens: %d, Final portfolio: %.2f, Max portfolio value: %.2f, Draw-down: %.2f, R squared: %.3f\n",
             exchangeHandler.getWinCounter(),
             exchangeHandler.getLossCounter(),              
-            exchangeHandler.getBreakevenCounter(),
+            exchangeHandler.getBreak-evenCounter(),
             portfolioList.get(portfolioList.size() - 1),
             Collections.max(portfolioList, null),
-            DrawdownCalculator.calculateMaxDrawdown(portfolioList) * 100,
+            Draw-downCalculator.calculateMaxDraw-down(portfolioList) * 100,
             LinearDegree.calculateRSquared(portfolioList));
 
         PortfolioPlotter.plot(portfolioList);

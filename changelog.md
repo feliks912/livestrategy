@@ -1,8 +1,11 @@
 18.7.23 15:17
     Introduced Order, edited code to support it. Position now holds 2 Order which are created at the time of creating a position locally. Order requests are now sent to Binance instead of Positions
+    Refactored using IntelliJ IDEA
 
-    Todo: Import to IntelliJ IDEA, handle positions in local exhchange
-
+    Todo: 
+        Import to IntelliJ IDEA, handle positions in local exhchange
+        FIXME: User doesn't get a response from any action unless they manually loop through positions. Add some sort of response other than updating userDataStream.
+        
 [IMPORTANT] Check with Binance support? How exactly are transactions behaving during the following ![Alt text](volatile.png)
 
 17.7.23 18:02
@@ -167,7 +170,7 @@
         Margin borrows
 
 12.7.23 1:32
-    Looking to implement the following strategy - If the first candle whos' tick < distance closes outside of the last candle whos' tick >= distance in the oposite direction of the move, open a limit order between the last candle's high / low and the top / bottom. Discard position after ~15 candles
+    Looking to implement the following strategy - If the first candle whos' tick < distance closes outside the last candle whos' tick >= distance in the oposite direction of the move, open a limit order between the last candle's high / low and the top / bottom. Discard position after ~15 candles
 
     Observations:
         Unstable
@@ -270,7 +273,7 @@
         indicator calculation
 
 10.7.23 6:21
-    Todo: revert back to original strategy, match TpRRs to opposite orders of similar distances. That should, in theory, let the runners run while getting some scalping action.
+    Todo: revert to original strategy, match TpRRs to opposite orders of similar distances. That should, in theory, let the runners run while getting some scalping action.
 
 10.7.23 4:15
     2000000 candles work with 0% profit on rocky period and ~50% after with 7% drawdown check.

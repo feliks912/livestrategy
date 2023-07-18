@@ -1,10 +1,5 @@
 package com.localstrategy;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
-import com.binance.api.client.domain.OrderStatus;
 import com.localstrategy.util.enums.OrderAction;
 import com.localstrategy.util.enums.OrderType;
 import com.localstrategy.util.enums.RejectionReason;
@@ -13,24 +8,27 @@ import com.localstrategy.util.types.Candle;
 import com.localstrategy.util.types.SingleTransaction;
 import com.localstrategy.util.types.UserDataResponse;
 
+import java.util.ArrayList;
+import java.util.Map;
+
 public class LocalStrategy {
 
     private static final int CANDLE_VOLUME = 2_000_000;
     private static final double RISK_PCT = 0.1;
-    private static final int SLIPPAGE_PCT = 15; //In relation to the difference between our entry and stoploss price difference, how much in percentage of slippage are we ready to accept (total, not the average fill price)
+    private static final int SLIPPAGE_PCT = 15; //In relation to the difference between our entry and stop-loss price difference, how much in percentage of slippage are we ready to accept (total, not the average fill price)
     
     private CandleConstructor candleConstructor = new CandleConstructor(CANDLE_VOLUME);
 
-    private ArrayList<Position> pendingPositions = new ArrayList<Position>();
+    private ArrayList<Position> pendingPositions = new ArrayList<>();
 
-    private ArrayList<Position> newPositions = new ArrayList<Position>();
-    private ArrayList<Position> filledPositions = new ArrayList<Position>();
-    private ArrayList<Position> cancelledPositions = new ArrayList<Position>();
-    private ArrayList<Position> rejectedOrders = new ArrayList<Position>();
+    private ArrayList<Position> newPositions = new ArrayList<>();
+    private ArrayList<Position> filledPositions = new ArrayList<>();
+    private ArrayList<Position> cancelledPositions = new ArrayList<>();
+    private ArrayList<Position> rejectedOrders = new ArrayList<>();
 
-    private ArrayList<Map<RejectionReason, Position>> rejectedActions = new ArrayList<Map<RejectionReason, Position>>();
+    private ArrayList<Map<RejectionReason, Position>> rejectedActions = new ArrayList<>();
 
-    private ArrayList<Position> previousPositions = new ArrayList<Position>();
+    private ArrayList<Position> previousPositions = new ArrayList<>();
 
     private UserAssets userAssets = new UserAssets();
     private TierManager tierManager = new TierManager();
@@ -46,7 +44,7 @@ public class LocalStrategy {
         this.exchangeHandler = exchangeHandler;
         this.latencyHandler = exchangeHandler.getLatencyHandler();
 
-        userAssets = exchangeHandler.getUserassets();
+        userAssets = exchangeHandler.getUserAssets();
 
         orderRequest =  new OrderRequest(
             pendingPositions,
@@ -136,7 +134,7 @@ public class LocalStrategy {
                             //Discard?
                             break;
                         case WOULD_TRIGGER_IMMEDIATELY:
-                            if(position.isStopLoss()){ //Attempted to create a stoploss but failed, price is now going away from the stoploss
+                            if(position.isStopLoss()){ //Attempted to create a stop-loss but failed, price is now going away from the stop-loss
                                 //Create new market order for the opposite direction
                                 Position marketStopLoss = new Position(position);
                                 position.setOrderType(OrderType.MARKET);
@@ -144,7 +142,7 @@ public class LocalStrategy {
                             }
                             break;
                         case EXCESS_PROG_ORDERS:
-                            if(position.isStopLoss()){ //For some reason could be we can't create a stoploss due to programmatic position count despite we test it locally
+                            if(position.isStopLoss()){ //For some reason could be we can't create a stop-loss due to programmatic position count despite we test it locally
                                 //Close the position if no other clear action is available
                             }
                             break;
