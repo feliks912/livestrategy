@@ -34,7 +34,7 @@ public class Position {
     private boolean reversed;
     private boolean isStopLoss;
     private RejectionReason rejectionReason;
-    private boolean automaticBorrow = true;
+    private boolean automaticBorrow;
     private boolean autoRepayAtCancel = true;
 
     private Order entryOrder;
@@ -54,7 +54,6 @@ public class Position {
         this.orderType = orderType;
         this.stopLossPrice = initialStopLossPrice;
         this.initialStopLossPrice = initialStopLossPrice;
-        this.automaticBorrow = isStopLoss ? false : true; //Stoplosses don't borrow
         this.openPrice = openPrice;
         this.openTimestamp = openTimestamp;
         this.size = size;

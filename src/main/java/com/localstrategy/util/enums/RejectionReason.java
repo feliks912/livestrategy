@@ -6,5 +6,5 @@ public enum RejectionReason {
     INSUFFICIENT_MARGIN,
     EXCESS_BORROW,
     INSUFFICIENT_FUNDS,
-    INVALID_ORDER_STATE
+    INVALID_ORDER_STATE //This one is to be interpreted locally?
 }

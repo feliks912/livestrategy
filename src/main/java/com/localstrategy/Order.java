@@ -21,11 +21,8 @@ public class Order {
     private long fillTimestamp;
     private double totalUnpaidInterest;
     private boolean isStopLoss;
-
     private RejectionReason rejectionReason;
-
     private OrderStatus status;
-
     private boolean automaticBorrow;
     private boolean autoRepayAtCancel = true;
 
@@ -49,7 +46,7 @@ public class Order {
         this.borrowedAmount = borrowedAmount;
         this.margin = margin;
         this.openTimestamp = openTimestamp;
-        this.hourlyInterestRate = direction.equals(OrderSide.BUY) ? UserAssets.HOURLY_USDT_INTEREST_RATE / 100 : UserAssets.HOURLY_BTC_INTEREST_RATE / 100;
+        this.hourlyInterestRate = direction.equals(OrderSide.BUY) ? TierManager.HOURLY_USDT_INTEREST_RATE / 100 : TierManager.HOURLY_BTC_INTEREST_RATE / 100;
         this.totalUnpaidInterest = borrowedAmount * hourlyInterestRate * (direction.equals(OrderSide.BUY) ? 1 : openPrice);
     }
 

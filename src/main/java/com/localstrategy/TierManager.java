@@ -6,6 +6,9 @@ public class TierManager {
     private static final double[] MAX_BORROWING_AMOUNT_BTC_TIERS = { 7.2, 14.4, 21.6, 28.8, 36, 43.2, 50.4, 57.6, 64.8, 72 };
     private static final double[] LEVERAGE_TIERS = { 10, 8.91, 8.05, 7.36, 6.79, 6.31, 5.91, 5.57, 5.26, 5 };
 
+    public static final double HOURLY_BTC_INTEREST_RATE = 0.00019667;
+    public static final double HOURLY_USDT_INTEREST_RATE = 0.00067638;
+
     private int currentTier;
     private double currentLeverage;
 

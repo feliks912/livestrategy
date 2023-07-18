@@ -70,7 +70,7 @@ public class StrategyStarter {
                     }
                 } */
 
-                exchangeHandler.newTransaction(transaction, isWall);
+                exchangeHandler.onTransaction(transaction, isWall);
 
                 int currentPositionCount = exchangeHandler.getOrderCount();
                 if(maxPositionCount > currentPositionCount){

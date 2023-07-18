@@ -138,7 +138,7 @@ public class LocalStrategy {
                                 //Create new market order for the opposite direction
                                 Position marketStopLoss = new Position(position);
                                 position.setOrderType(OrderType.MARKET);
-                                latencyHandler.addUserAction(OrderAction.CREATE_ORDER, tempRejectedOrders, lastIndex);
+                                latencyHandler.addActionRequest(OrderAction.CREATE_ORDER, tempRejectedOrders, lastIndex);
                             }
                             break;
                         case EXCESS_PROG_ORDERS:

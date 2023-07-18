@@ -1,3 +1,23 @@
+18.7.23 17:22
+    Added action responses.
+        Action responses get sent to the user immediately after processing an action request. 
+        This solves the problem with order cancellation since the order remains unmoved from its current state, but the user still gets a response.
+        [NOTE] orders are still rejected without the action response. Example is during borrowing before filling. The order is moved to the rejectedOrders list and sent to the user through userDataStream. it is on the user to handle that rejection properly.
+
+    Fixed total interest calculation on the Binance's side
+
+    Changed userDataStream to send only updated orders instead of entire lists
+
+    Todo: 
+        Binance doesn't send a list of all orders and actions in an user data stream. It only sends the latest updates. Instead of sending orders lists, add them all to a singular list of updated orders and send that to the user.
+        Make sure the statues are set beforehand.
+        
+        Locally map action responses with action type (OrderAction.java) so when we receive ACTION_REJECTED we know what we're working with
+
+        Handle local Position and Order parameter matching
+
+        Position-specific interest calculation must be local for every case that is not automatic repay on cancelling a position
+
 18.7.23 15:17
     Introduced Order, edited code to support it. Position now holds 2 Order which are created at the time of creating a position locally. Order requests are now sent to Binance instead of Positions
     Refactored using IntelliJ IDEA
@@ -47,7 +67,7 @@
     Edited borrow calculation in OrderRequest
     Todo:
         Edit borrowings in OrderRequest
-            Currently using local current transaction for new market orders. Could be it changes the amount of required borrowings. Maybe it's unneccesary to use it there other than to locally check whether we can actually borrow?
+            Currently using local current transaction for new market orders. Could be it changes the amount of required borrowings. Maybe it's unnecessary to use it there other than to locally check whether we can actually borrow?
             position borrowedAmount is set at the time of borrowing, calculated at the fill price.
         
         If position isStopLoss, do we borrow for it? The funds should already be in our account, and on execution it just executes and then we can repay manually? Edit OrderRequest to set auto borrows to false for stoploss orders and check the logic for non-auto borrowing orders in Binance.java
@@ -67,7 +87,7 @@
     Todo:
         What should for new user data stream in local strategy do?
             There are multiple cases
-                Failed stoploss
+                Failed stop-loss
                 Filled limit order
                 Margin level
                 Repeating failed orders
@@ -91,11 +111,11 @@
 16.7.23 15:48
     Edited a bunch of stuff, didn't keep log - mainly how Binance handles stuff
     Fixed limit position handling
-        They now support 4 configurations - long / stop x isStoploss
-            Limit positions act different depending on whether the stop price is above or below the limit price, but it also depends on whethere it's a long or a short
+        They now support 4 configurations - long / stop x isStop loss
+            Limit positions act different depending on whether the stop price is above or below the limit price, but it also depends on whether it's a long or a short
     Fixed state snapshotting
         Before we sent a reference to data using UserDataResponse and LatencyHandler, now we use deep copies in UserDataResponse constructor
-        Fixed for exhange -> user and user -> exhange
+        Fixed for exchange -> user and user -> exchange
     Moved deep copy to Position class as a static method
 
     Todo: Implement local logic and test Binance's logic
@@ -120,7 +140,7 @@
 [IMPORTANT] 13.7.23 17:24 Talked to customer support regarding locking funds when opening limit orders.
     Stop-limit orders lock funds at the time of executing a limit order, which is when the price crosses the stop line
     By using sideEffectType and autoRepayAtCancel we can ask Binance to borrow funds for us at the time of opening an order, and automatically repay if the order is canceled before being executed
-        NOTE: Out stoplosses don't have to borrow funds. We already have them unlocked in our account if the market / limit order got filled.
+        NOTE: Out stop-losses don't have to borrow funds. We already have them unlocked in our account if the market / limit order got filled.
             Conversation with 
 
 13.7.23 13:36
@@ -157,26 +177,26 @@
 
 12.7.23 14:33
     Mayor rewrite in progress, adding functional blocks to a simulated exchange engine
-    It's a oversimplified model but 10x more reliable than the previous version. The goal is to say how we can expect similar results from live testing.
+    It's an oversimplified model but 10x more reliable than the previous version. The goal is to say how we can expect similar results from live testing.
 
 12.7.23 4:34
-    Todo: Build a functional backtesting engine.
+    Todo: Build a functional back testing engine.
         Market orders
         Limit orders
-        Stoplosses
+        Stop losses
         Slippage
         Latencies
         Price walls
         Margin borrows
 
 12.7.23 1:32
-    Looking to implement the following strategy - If the first candle whos' tick < distance closes outside the last candle whos' tick >= distance in the oposite direction of the move, open a limit order between the last candle's high / low and the top / bottom. Discard position after ~15 candles
+    Looking to implement the following strategy - If the first candle who's' tick < distance closes outside the last candle who's' tick >= distance in the opposite direction of the move, open a limit order between the last candle's high / low and the top / bottom. Discard position after ~15 candles
 
     Observations:
         Unstable
 
 11.7.23 18:00
-    Days 2022-11-22 (632) to 2023-03-23 (753) (121 days total) terrible performance ~50% drawdown in a volatile period
+    Days 2022-11-22 (632) to 2023-03-23 (753) (121 days total) terrible performance ~50% draw-down in a volatile period
 
 11.7.23 15:48
     Revisited observed latencies on AWS Tokyo-based VPS t3.small
@@ -276,14 +296,14 @@
     Todo: revert to original strategy, match TpRRs to opposite orders of similar distances. That should, in theory, let the runners run while getting some scalping action.
 
 10.7.23 4:15
-    2000000 candles work with 0% profit on rocky period and ~50% after with 7% drawdown check.
+    2000000 candles work with 0% profit on rocky period and ~50% after with 7% draw-down check.
 
     Todo:
         Reintroduce limit orders
             Set stoploss at the retouch level.
 
 9.7.2023 21:50
-    Added trailing stoploss at a percentage between previous candle close and entry.
+    Added trailing stop-loss at a percentage between previous candle close and entry.
 
     Observations:
         Some days are catastrophically profitable, but on others the losses recouperate
@@ -310,7 +330,7 @@
         Introduce BE on a percentage move from the entry price, this way we'll avoid losses where price moves away from entry but hits the stoploss in the same candle. Especially true in volatile markets. Prioritize minimizing losses.
 
 9.7.2023 20:00
-    Added latency between order activation and setting a stoploss
+    Added latency between order activation and setting a stop-loss
 
     Observation:
         We lost some on that one
@@ -321,8 +341,8 @@
         Also, it takes LONGER for us to get a response from the server because I've been analyzing how long it takes for the exchange to execute and order compared to when the request was sent, not how long it takes for us to receive that response. I've got to test that aswell, then implement it here.
 
 9.7.2023 18:30
-    Added trailing stoploss on previous candle high / low
-    Changed entry strategy - last low / high no longer have to match the lowest low / highest recent high (but new orders can still only be made on a lower low / higher high using usedHigh / usedLow flags)
+    Added trailing stop-loss on previous candle high / low
+    Changed entry strategy - last low / high no longer have to match the lowest low / the highest recent high (but new orders can still only be made on a lower low / higher high using usedHigh / usedLow flags)
     The entry price is always ZigZag low / high, no more range.
 
     Observations:

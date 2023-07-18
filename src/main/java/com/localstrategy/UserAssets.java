@@ -2,9 +2,6 @@ package com.localstrategy;
 
 public class UserAssets {
 
-    public static final double HOURLY_BTC_INTEREST_RATE = 0.00019667;
-    public static final double HOURLY_USDT_INTEREST_RATE = 0.00067638;
-
     private double freeUSDT = 0;
     private double lockedUSDT = 0;
     private double freeBTC = 0;
@@ -110,8 +107,8 @@ public class UserAssets {
 
     public void increaseTotalUnpaidInterest(double currentPrice){
         this.totalUnpaidInterest += 
-            totalBorrowedUSDT * HOURLY_USDT_INTEREST_RATE + 
-            totalBorrowedBTC * HOURLY_BTC_INTEREST_RATE * currentPrice;
+            totalBorrowedUSDT * TierManager.HOURLY_USDT_INTEREST_RATE +
+            totalBorrowedBTC * TierManager.HOURLY_BTC_INTEREST_RATE * currentPrice;
     }
 
     @Override
