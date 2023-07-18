@@ -37,14 +37,14 @@ public class Binance {
     private int MAX_BORROW_USDT = 900_000;
     private int MAX_BORROW_BTC = 72;
 
-    private ArrayList<Position> newPositions = new ArrayList<Position>();
-    private ArrayList<Position> filledPositions = new ArrayList<Position>();
-    private ArrayList<Position> cancelledPositions = new ArrayList<Position>();
-    private ArrayList<Position> rejectedOrders = new ArrayList<Position>();
+    private ArrayList<Order> newOrders = new ArrayList<Order>();
+    private ArrayList<Order> filledOrders = new ArrayList<Order>();
+    private ArrayList<Order> cancelledOrders = new ArrayList<Order>();
+    private ArrayList<Order> rejectedOrders = new ArrayList<Order>();
 
-    private ArrayList<Position> previousPositions = new ArrayList<Position>();
+    private ArrayList<Order> previousOrders = new ArrayList<Order>();
 
-    private ArrayList<Position> acceptedPositionList = new ArrayList<Position>();
+    private ArrayList<Order> acceptedOrders = new ArrayList<Order>();
 
     private UserAssets userAssets = new UserAssets();
     private LatencyHandler latencyHandler = new LatencyHandler();
@@ -58,7 +58,7 @@ public class Binance {
     private long previousInterestTimestamp = 0;
 
     private boolean userAssetsUpdated = false;
-    private boolean positionsUpdated = false;
+    private boolean ordersUpdated = false;
 
     public Binance(Double initialUSDTPortfolio){
 
@@ -85,13 +85,13 @@ public class Binance {
     }
 
     private void updateUserDataStream(){
-        if(userAssetsUpdated || positionsUpdated){
+        if(userAssetsUpdated || ordersUpdated){
             latencyHandler.addUserDataStream(
                 new UserDataResponse(
                     userAssets, // userAssets copy constructor
-                    newPositions,
-                    filledPositions,
-                    cancelledPositions,
+                    newOrders,
+                    filledOrders,
+                    cancelledOrders,
                     rejectedOrders
                 ),
                 transaction.getTimestamp());
@@ -101,29 +101,29 @@ public class Binance {
             }
 
             userAssetsUpdated = false;
-            positionsUpdated = false;
+            ordersUpdated = false;
         }
     }
 
     
-    private void handleUserRequest(ArrayList<Map<OrderAction, Position>> entryBlock){
+    private void handleUserRequest(ArrayList<Map<OrderAction, Order>> entryBlock){
 
         if(entryBlock.isEmpty()){
             return;
         }
 
-        for(Map<OrderAction, Position> entry : entryBlock){
+        for(Map<OrderAction, Order> entry : entryBlock){
 
-            Map.Entry<OrderAction, Position> tempMap = entry.entrySet().iterator().next();
+            Map.Entry<OrderAction, Order> tempMap = entry.entrySet().iterator().next();
 
             OrderAction orderAction = tempMap.getKey();
-            Position position = tempMap.getValue();
+            Order order = tempMap.getValue();
 
             switch(orderAction){
                 case CREATE_ORDER: //Thanks ChatGPT for refactoring
-                    boolean canProcessOrder = (position.getOrderType().equals(OrderType.MARKET)) || 
-                                                (position.getOrderType().equals(OrderType.LIMIT) && 
-                                                (newPositions
+                    boolean canProcessOrder = (order.getOrderType().equals(OrderType.MARKET)) || 
+                                                (order.getOrderType().equals(OrderType.LIMIT) && 
+                                                (newOrders
                                                     .stream()
                                                     .filter(p -> p.getOrderType()
                                                     .equals(OrderType.LIMIT))
@@ -132,67 +132,67 @@ public class Binance {
 
                     // Max programmatic orders reached?
                     if(!canProcessOrder){
-                        rejectOrder(RejectionReason.EXCESS_PROG_ORDERS, position);
+                        rejectOrder(RejectionReason.EXCESS_PROG_ORDERS, order);
                         continue;
                     }
 
                     // Immediate trigger?
-                    if(position.getOrderType().equals(OrderType.LIMIT) &&
-                        ((position.getDirection().equals(OrderSide.BUY) && 
-                            (position.isStopLoss() && transaction.getPrice() >= position.getOpenPrice() || 
-                            !position.isStopLoss() && transaction.getPrice() <= position.getOpenPrice())) ||
-                        (position.getDirection().equals(OrderSide.SELL) && 
-                            (position.isStopLoss() && transaction.getPrice() <= position.getOpenPrice() ||
-                            !position.isStopLoss() && transaction.getPrice() >= position.getOpenPrice())))){
+                    if(order.getOrderType().equals(OrderType.LIMIT) &&
+                        ((order.getDirection().equals(OrderSide.BUY) && 
+                            (order.isStopLoss() && transaction.getPrice() >= order.getOpenPrice() || 
+                            !order.isStopLoss() && transaction.getPrice() <= order.getOpenPrice())) ||
+                        (order.getDirection().equals(OrderSide.SELL) && 
+                            (order.isStopLoss() && transaction.getPrice() <= order.getOpenPrice() ||
+                            !order.isStopLoss() && transaction.getPrice() >= order.getOpenPrice())))){
                     
-                        rejectOrder(RejectionReason.WOULD_TRIGGER_IMMEDIATELY, position);
+                        rejectOrder(RejectionReason.WOULD_TRIGGER_IMMEDIATELY, order);
                         continue;
                     }
 
-                    if(position.isAutomaticBorrow() && position.getOrderType().equals(OrderType.LIMIT)){ // "If you use MARGIN_BUY, the amount necessary to borrow in order to execute your order later will be borrowed at the creation time, regardless of the order type (whether it's limit or stop-limit)."
-                        RejectionReason rejectionReason = borrowFunds(position);
+                    if(order.isAutomaticBorrow() && order.getOrderType().equals(OrderType.LIMIT)){ // "If you use MARGIN_BUY, the amount necessary to borrow in order to execute your order later will be borrowed at the creation time, regardless of the order type (whether it's limit or stop-limit)."
+                        RejectionReason rejectionReason = borrowFunds(order);
 
                         if(rejectionReason != null){
-                            rejectOrder(rejectionReason, position);
+                            rejectOrder(rejectionReason, order);
                             continue;
                         }
                     }
 
-                    newPositions.add(position);
+                    newOrders.add(order);
 
-                    positionsUpdated = true;
+                    ordersUpdated = true;
 
                     break;
                 case CANCEL_ORDER: //FIXME: Rejecting a cancel_order position will remove the position from new positions to rejected positions which isn't what we want.
-                    int index = newPositions.indexOf(position);
+                    int index = newOrders.indexOf(order);
 
-                    if(index == -1 || !position.getOrderType().equals(OrderType.LIMIT)){
-                        rejectOrder(RejectionReason.INVALID_ORDER_STATE, position);
+                    if(index == -1 || !order.getOrderType().equals(OrderType.LIMIT)){
+                        rejectOrder(RejectionReason.INVALID_ORDER_STATE, order);
                         continue;
                     }
 
-                    if(position.isAutoRepayAtCancel()){
+                    if(order.isAutoRepayAtCancel()){
 
-                        RejectionReason rejectionReason = repayFunds(position);
+                        RejectionReason rejectionReason = repayFunds(order);
 
                         if(rejectionReason != null){
-                            rejectOrder(rejectionReason, position);
+                            rejectOrder(rejectionReason, order);
                             continue;
                         }
                     }
 
-                    position.setStatus(OrderStatus.CANCELED);
-                    cancelledPositions.add(position);
-                    newPositions.remove(position);
+                    order.setStatus(OrderStatus.CANCELED);
+                    cancelledOrders.add(order);
+                    newOrders.remove(order);
 
-                    positionsUpdated = true;
+                    ordersUpdated = true;
 
                     break;
                 case REPAY: //FIXME: Add some conditions here
-                    RejectionReason rejectionReason = repayFunds(position);
+                    RejectionReason rejectionReason = repayFunds(order);
 
                     if(rejectionReason != null){
-                        rejectOrder(rejectionReason, position);
+                        rejectOrder(rejectionReason, order);
                         continue;
                     }
 
@@ -204,185 +204,185 @@ public class Binance {
     }
 
     private void checkFills(){
-        for(Position position : newPositions){
-            if(position.getStatus().equals(OrderStatus.NEW)){
+        for(Order order : newOrders){
+            if(order.getStatus().equals(OrderStatus.NEW)){
 
-                boolean isMarketOrder = position.getOrderType().equals(OrderType.MARKET) ? true : false;
-                boolean isLong = position.getDirection().equals(OrderSide.BUY);
+                boolean isMarketOrder = order.getOrderType().equals(OrderType.MARKET) ? true : false;
+                boolean isLong = order.getDirection().equals(OrderSide.BUY);
 
                 double fillPrice = slippageHandler.getSlippagePrice(
-                    isMarketOrder ? transaction.getPrice() : position.getOpenPrice(),
-                    position.getSize(), 
-                    position.getDirection()
+                    isMarketOrder ? transaction.getPrice() : order.getOpenPrice(),
+                    order.getSize(), 
+                    order.getDirection()
                 );
 
                 if(isMarketOrder || (!isMarketOrder && 
-                        ((position.getDirection().equals(OrderSide.BUY) && 
-                            (position.isStopLoss() && transaction.getPrice() >= position.getOpenPrice() || 
-                            !position.isStopLoss() && transaction.getPrice() <= position.getOpenPrice())) ||
-                        (position.getDirection().equals(OrderSide.SELL) && 
-                            (position.isStopLoss() && transaction.getPrice() >= position.getOpenPrice() ||
-                            !position.isStopLoss() && transaction.getPrice() <= position.getOpenPrice()))))){ 
+                        ((order.getDirection().equals(OrderSide.BUY) && 
+                            (order.isStopLoss() && transaction.getPrice() >= order.getOpenPrice() || 
+                            !order.isStopLoss() && transaction.getPrice() <= order.getOpenPrice())) ||
+                        (order.getDirection().equals(OrderSide.SELL) && 
+                            (order.isStopLoss() && transaction.getPrice() >= order.getOpenPrice() ||
+                            !order.isStopLoss() && transaction.getPrice() <= order.getOpenPrice()))))){ 
 
-                    if(position.isAutomaticBorrow()){
+                    if(order.isAutomaticBorrow()){
 
                         //Borrow funds for market orders at the time of filling the order (principally incorrect, functionally equivalent)
                         if(isMarketOrder){
-                            RejectionReason rejectionReason = borrowFunds(position);
+                            RejectionReason rejectionReason = borrowFunds(order);
 
                             if(rejectionReason != null){
-                                rejectOrder(rejectionReason, position);
+                                rejectOrder(rejectionReason, order);
                                 continue;
                             }
                         }
 
                         if(isLong){
 
-                            if(userAssets.getFreeUSDT() < position.getBorrowedAmount()){
-                                rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, position);
+                            if(userAssets.getFreeUSDT() < order.getBorrowedAmount()){
+                                rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, order);
                                 continue;
                             }
 
                             //Buy BTC
                             userAssets.setFreeUSDT(
                                 userAssets.getFreeUSDT()
-                                    - position.getBorrowedAmount()  
+                                    - order.getBorrowedAmount()  
                             );
 
                             userAssets.setFreeBTC(
                                 userAssets.getFreeBTC()
-                                    + position.getSize()
+                                    + order.getSize()
                             );
 
-                            position.setFillPrice(fillPrice);
-                            acceptedPositionList.add(position);
+                            order.setFillPrice(fillPrice);
+                            acceptedOrders.add(order);
                         
                         } else { //Short
 
-                            if(userAssets.getFreeBTC() < position.getSize()){
-                                rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, position);
+                            if(userAssets.getFreeBTC() < order.getSize()){
+                                rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, order);
                                 continue;
                             }
 
                             //Sell BTC
                             userAssets.setFreeBTC(
                                 userAssets.getFreeBTC()
-                                    - position.getSize()
+                                    - order.getSize()
                             );
 
                             userAssets.setFreeUSDT(
                                 userAssets.getFreeUSDT()
-                                    + position.getBorrowedAmount()
+                                    + order.getBorrowedAmount()
                             );
 
-                            position.setFillPrice(fillPrice);
-                            acceptedPositionList.add(position);
+                            order.setFillPrice(fillPrice);
+                            acceptedOrders.add(order);
                         }
                     } else {
 
                         if(isLong){
 
-                            if(userAssets.getFreeUSDT() < position.getBorrowedAmount()){
-                                rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, position);
+                            if(userAssets.getFreeUSDT() < order.getBorrowedAmount()){
+                                rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, order);
                                 continue;
                             }
 
                             //Buy
                             userAssets.setFreeUSDT(
                                 userAssets.getFreeUSDT()
-                                    - position.getBorrowedAmount()  
+                                    - order.getBorrowedAmount()  
                             );
 
                             userAssets.setFreeBTC(
                                 userAssets.getFreeBTC()
-                                    + position.getSize()
+                                    + order.getSize()
                             );
 
-                            position.setFillPrice(fillPrice);
-                            acceptedPositionList.add(position);
+                            order.setFillPrice(fillPrice);
+                            acceptedOrders.add(order);
 
                         } else {
 
-                            if(userAssets.getFreeBTC() < position.getSize()){
-                                rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, position);
+                            if(userAssets.getFreeBTC() < order.getSize()){
+                                rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, order);
                                 continue;
                             }
 
                             //Sell
                             userAssets.setFreeBTC(
                                 userAssets.getFreeBTC()
-                                    - position.getSize()
+                                    - order.getSize()
                             );
 
                             userAssets.setFreeUSDT(
                                 userAssets.getFreeUSDT()
-                                    + position.getBorrowedAmount()
+                                    + order.getBorrowedAmount()
                             );
 
-                            position.setFillPrice(fillPrice);
-                            acceptedPositionList.add(position);
+                            order.setFillPrice(fillPrice);
+                            acceptedOrders.add(order);
                         }
                     }
                 }
             }
         }
 
-        if(!acceptedPositionList.isEmpty()){
+        if(!acceptedOrders.isEmpty()){
 
-            for(Position position : acceptedPositionList){
-                position.setStatus(OrderStatus.FILLED);
+            for(Order order : acceptedOrders){
+                order.setStatus(OrderStatus.FILLED);
             }
 
-            filledPositions.addAll(acceptedPositionList);
-            newPositions.removeAll(acceptedPositionList);
-            acceptedPositionList.clear();
+            filledOrders.addAll(acceptedOrders);
+            newOrders.removeAll(acceptedOrders);
+            acceptedOrders.clear();
 
-            positionsUpdated = true;
+            ordersUpdated = true;
             userAssetsUpdated = true;
         }
 
-        newPositions.removeAll(rejectedOrders);
+        newOrders.removeAll(rejectedOrders);
     }
 
     private void conditionallyAddInterest(){
-        if((!filledPositions.isEmpty() || !newPositions.isEmpty()) && 
+        if((!filledOrders.isEmpty() || !newOrders.isEmpty()) && 
             transaction.getTimestamp() - previousInterestTimestamp > 1000 * 60 * 60){
 
             previousInterestTimestamp = transaction.getTimestamp();
 
             double totalUnpaidInterest = 0;
 
-            for(Position position : filledPositions){
-                position.increaseUnpaidInterest(transaction.getPrice());
-                totalUnpaidInterest += position.getTotalUnpaidInterest();
+            for(Order order : filledOrders){
+                order.increaseUnpaidInterest(transaction.getPrice());
+                totalUnpaidInterest += order.getTotalUnpaidInterest();
             }
 
-            for(Position position : newPositions){
-                position.increaseUnpaidInterest(transaction.getPrice());
-                totalUnpaidInterest += position.getTotalUnpaidInterest();
+            for(Order order : newOrders){
+                order.increaseUnpaidInterest(transaction.getPrice());
+                totalUnpaidInterest += order.getTotalUnpaidInterest();
             }
 
             userAssets.setTotalUnpaidInterest(totalUnpaidInterest);
 
             userAssetsUpdated = true;
-            positionsUpdated = true;
+            ordersUpdated = true;
         }
     }
 
-    private RejectionReason borrowFunds(Position position){
+    private RejectionReason borrowFunds(Order order){
 
-        boolean isMarketOrder = position.getOrderType().equals(OrderType.MARKET) ? true : false;
-        boolean isLong = position.getDirection().equals(OrderSide.BUY);
+        boolean isMarketOrder = order.getOrderType().equals(OrderType.MARKET) ? true : false;
+        boolean isLong = order.getDirection().equals(OrderSide.BUY);
 
         double fillPrice = slippageHandler.getSlippagePrice(
-            isMarketOrder ? transaction.getPrice() : position.getOpenPrice(),
-            position.getSize(), 
-            position.getDirection()
+            isMarketOrder ? transaction.getPrice() : order.getOpenPrice(),
+            order.getSize(), 
+            order.getDirection()
         );
 
         if(isLong){
 
-            double positionValue = position.getSize() * fillPrice;
+            double positionValue = order.getSize() * fillPrice;
 
             //Check maximum borrow amount
             if(positionValue + userAssets.getTotalBorrowedUSDT() > MAX_BORROW_USDT){
@@ -423,17 +423,17 @@ public class Binance {
 
             userAssets.setTotalUnpaidInterest(
                 userAssets.getTotalUnpaidInterest() 
-                    + position.getTotalUnpaidInterest());
+                    + order.getTotalUnpaidInterest());
 
-            position.setMargin(requiredMargin);
-            position.setBorrowedAmount(positionValue);
+            order.setMargin(requiredMargin);
+            order.setBorrowedAmount(positionValue);
         
         } else {
 
-            double positionSize = position.getSize();
+            double positionSize = order.getSize();
 
             //Check maximum borrow amount
-            if(position.getSize() + userAssets.getTotalBorrowedBTC() > MAX_BORROW_BTC){
+            if(order.getSize() + userAssets.getTotalBorrowedBTC() > MAX_BORROW_BTC){
                 return RejectionReason.EXCESS_BORROW;
             }
 
@@ -471,104 +471,103 @@ public class Binance {
 
             userAssets.setTotalUnpaidInterest(
                 userAssets.getTotalUnpaidInterest() 
-                    + position.getTotalUnpaidInterest());
+                    + order.getTotalUnpaidInterest());
 
-            position.setMargin(requiredMargin);
-            position.setBorrowedAmount(positionSize);
+            order.setMargin(requiredMargin);
+            order.setBorrowedAmount(positionSize);
         }
         return null;
     }
 
     //TODO: Check and refactor
 
-    private RejectionReason repayFunds(Position position){
-        if(position.getBorrowedAmount() == 0){
+    private RejectionReason repayFunds(Order order){
+        if(order.getBorrowedAmount() == 0){
             return RejectionReason.INVALID_ORDER_STATE;
         }
 
-        if(position.getDirection().equals(OrderSide.BUY)){
+        if(order.getDirection().equals(OrderSide.BUY)){
             //Return USDT
 
-            if(userAssets.getFreeUSDT() < position.getBorrowedAmount() + position.getTotalUnpaidInterest()){
+            if(userAssets.getFreeUSDT() < order.getBorrowedAmount() + order.getTotalUnpaidInterest()){
                 return RejectionReason.INSUFFICIENT_FUNDS;
             }
 
-            if(userAssets.getLockedUSDT() < position.getMargin()){
+            if(userAssets.getLockedUSDT() < order.getMargin()){
                 System.out.println("Error at repayFunds side BUY - locked USDT has insufficient funds to unlock margin?");
                 System.exit(1);
             }
 
-            if(userAssets.getTotalBorrowedUSDT() < position.getBorrowedAmount()){
+            if(userAssets.getTotalBorrowedUSDT() < order.getBorrowedAmount()){
                 System.out.println("Error at repayFunds side BUY - borrowed USDT would go negative if we were to exclude the borrowed amount?");
                 System.exit(1);
             }
 
             userAssets.setFreeUSDT(
                 userAssets.getFreeUSDT()
-                    - position.getBorrowedAmount()
-                    + position.getMargin()
-                    - position.getTotalUnpaidInterest()
+                    - order.getBorrowedAmount()
+                    + order.getMargin()
+                    - order.getTotalUnpaidInterest()
             );
 
             userAssets.setLockedUSDT(
                 userAssets.getLockedUSDT()
-                    - position.getMargin()
+                    - order.getMargin()
             );
 
             userAssets.setTotalBorrowedUSDT(
                 userAssets.getTotalBorrowedUSDT()
-                    - position.getBorrowedAmount()  
+                    - order.getBorrowedAmount()  
             );
 
         } else {
             //Return BTC
 
-            if(userAssets.getFreeBTC() < position.getSize() || userAssets.getFreeUSDT() < position.getMargin()
-                    - position.getTotalUnpaidInterest()){
+            if(userAssets.getFreeBTC() < order.getSize() || userAssets.getFreeUSDT() < order.getMargin()
+                    - order.getTotalUnpaidInterest()){
                         return RejectionReason.INSUFFICIENT_FUNDS;
             }
 
-            if(userAssets.getLockedUSDT() < position.getMargin()){
+            if(userAssets.getLockedUSDT() < order.getMargin()){
                 System.out.println("Error at repayFunds side SELL - locked USDT has insufficient funds to unlock margin?");
                 System.exit(1);
             }
 
-            if(userAssets.getTotalBorrowedBTC() < position.getBorrowedAmount()){
+            if(userAssets.getTotalBorrowedBTC() < order.getBorrowedAmount()){
                 System.out.println("Error at repayFunds side SELL - borrowed BTC would go negative if we were to exclude the borrowed amount?");
                 System.exit(1);
             }
 
             userAssets.setFreeBTC(
                 userAssets.getFreeBTC()
-                    - position.getSize()  
+                    - order.getSize()  
             );
 
             userAssets.setFreeUSDT(
                 userAssets.getFreeUSDT()
-                    + position.getMargin()
-                    - position.getTotalUnpaidInterest()
+                    + order.getMargin()
+                    - order.getTotalUnpaidInterest()
             );
 
             userAssets.setLockedUSDT(
                 userAssets.getLockedUSDT()
-                    - position.getMargin()  
+                    - order.getMargin()  
             );
 
             userAssets.setTotalBorrowedBTC(
                 userAssets.getTotalBorrowedBTC()
-                    - position.getSize()  
+                    - order.getSize()  
             );
         }
 
-
-        if(userAssets.getTotalBorrowedBTC() < position.getBorrowedAmount()){
+        if(userAssets.getTotalBorrowedBTC() < order.getBorrowedAmount()){
             System.out.println("Error at repayFunds - unpaid interest would go negative?");
             System.exit(1);
         }
 
         userAssets.setTotalUnpaidInterest(
             userAssets.getTotalUnpaidInterest()
-                - position.getTotalUnpaidInterest()
+                - order.getTotalUnpaidInterest()
         );
 
         userAssetsUpdated = true;
@@ -596,27 +595,27 @@ public class Binance {
         if(marginLevel < 1.05){
             System.out.println("marginLevel = " + marginLevel);
 
-            for(Position position : filledPositions){
-                liquidatePosition(position);
+            for(Order order : filledOrders){
+                liquidatePosition(order);
             }
         }
 
         return marginLevel;
     }
 
-    //TODO: liquidate position
-    private void liquidatePosition(Position position){
+    //TODO: liquidate 'position'?
+    private void liquidatePosition(Order order){
         System.out.println("Liquidation");
         System.exit(1);
     }
 
-    private void rejectOrder(RejectionReason reason, Position position){
+    private void rejectOrder(RejectionReason reason, Order order){
 
-        position.setStatus(OrderStatus.REJECTED);
-        position.setRejectionReason(reason);
-        rejectedOrders.add(position);
+        order.setStatus(OrderStatus.REJECTED);
+        order.setRejectionReason(reason);
+        rejectedOrders.add(order);
 
-        positionsUpdated = true;
+        ordersUpdated = true;
     }
 
     public double getTotalAssetsValue(){
@@ -634,15 +633,15 @@ public class Binance {
         this.userAssetsList.add(userAsset);
     }
 
-    public ArrayList<Position> getAllPositions(){
-        ArrayList<Position> positions = new ArrayList<Position>();
-        positions.addAll(newPositions);
-        positions.addAll(filledPositions);
-        positions.addAll(rejectedOrders);
-        positions.addAll(cancelledPositions);
-        positions.addAll(previousPositions);
+    public ArrayList<Order> getAllOrders(){
+        ArrayList<Order> orders = new ArrayList<Order>();
+        orders.addAll(newOrders);
+        orders.addAll(filledOrders);
+        orders.addAll(rejectedOrders);
+        orders.addAll(cancelledOrders);
+        orders.addAll(previousOrders);
 
-        return positions;
+        return orders;
     }
 
     public UserAssets getUserassets(){

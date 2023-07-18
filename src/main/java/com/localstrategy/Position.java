@@ -3,8 +3,6 @@ package com.localstrategy;
 import com.localstrategy.util.enums.OrderSide;
 import com.localstrategy.util.enums.OrderType;
 import com.localstrategy.util.enums.RejectionReason;
-import com.localstrategy.util.enums.OrderStatus;
-import com.localstrategy.util.types.Candle;
 
 import java.util.ArrayList;
 
@@ -16,13 +14,10 @@ public class Position {
     private double size;
     private double closingPrice = 0;
     private OrderSide direction;
-    private int openIndex;
     private boolean breakEven = false;
     private double margin;
     private boolean filled = false;
     private boolean closed = false;
-    private int filledIndex = 0;
-    private int closedIndex = 0;
     private double profit = 0;
     private boolean partiallyClosed = false;
     private OrderType orderType;
@@ -32,50 +27,64 @@ public class Position {
     private double fillPrice;
     private long fillTimestamp;
     private long closeTimestamp;
-    private double exchangeLatency;
     private boolean activeStopLoss;
-    private double trailingPct;
     private boolean closedBeforeStopLoss;
-    private long closedBeforeStopLossTimestamp;
-    private int initialStopLossIndex;
-    private int entryPriceIndex;
-    private int tick;
     private double totalUnpaidInterest;
     private long closeRequestTimestamp;
     private boolean reversed;
     private boolean isStopLoss;
-
     private RejectionReason rejectionReason;
-
-    private OrderStatus status;
-
     private boolean automaticBorrow = true;
     private boolean autoRepayAtCancel = true;
+
+    private Order entryOrder;
+    private Order stopLossOrder;
 
     public Position(
             double openPrice,
             double initialStopLossPrice,
-            boolean isStopLoss,
             double size,
             OrderType orderType,
             double margin,
             double borrowedAmount,
-            int positionId) {
+            int positionId,
+            long openTimestamp) {
 
         this.id = positionId;
         this.orderType = orderType;
         this.stopLossPrice = initialStopLossPrice;
-        this.isStopLoss = isStopLoss;
         this.initialStopLossPrice = initialStopLossPrice;
         this.automaticBorrow = isStopLoss ? false : true; //Stoplosses don't borrow
-        this.status = OrderStatus.NEW;
         this.openPrice = openPrice;
+        this.openTimestamp = openTimestamp;
         this.size = size;
         this.direction = openPrice > stopLossPrice ? OrderSide.BUY : OrderSide.SELL;
         this.borrowedAmount = borrowedAmount;
         this.margin = margin;
-        this.hourlyInterestRate = direction.equals(OrderSide.BUY) ? UserAssets.HOURLY_USDT_INTEREST_RATE / 100 : UserAssets.HOURLY_BTC_INTEREST_RATE / 100;
-        this.totalUnpaidInterest = borrowedAmount * hourlyInterestRate * (direction.equals(OrderSide.BUY) ? 1 : openPrice);
+    
+        this.entryOrder = new Order(
+            openPrice,
+            direction,
+            false, 
+            size, 
+            orderType, 
+            margin, 
+            borrowedAmount, 
+            openTimestamp
+        );
+
+
+        this.stopLossOrder = new Order(
+            stopLossPrice, 
+            direction == OrderSide.BUY ? OrderSide.SELL : OrderSide.BUY, 
+            true, 
+            size, 
+            OrderType.LIMIT, 
+            margin, 
+            borrowedAmount, 
+            openTimestamp
+        );
+
     }
 
     public Position(Position other) {
@@ -86,13 +95,10 @@ public class Position {
         this.size = other.size;
         this.closingPrice = other.closingPrice;
         this.direction = other.direction;
-        this.openIndex = other.openIndex;
         this.breakEven = other.breakEven;
         this.margin = other.margin;
         this.filled = other.filled;
         this.closed = other.closed;
-        this.filledIndex = other.filledIndex;
-        this.closedIndex = other.closedIndex;
         this.profit = other.profit;
         this.partiallyClosed = other.partiallyClosed;
         this.orderType = other.orderType;
@@ -102,135 +108,46 @@ public class Position {
         this.fillPrice = other.fillPrice;
         this.fillTimestamp = other.fillTimestamp;
         this.closeTimestamp = other.closeTimestamp;
-        this.exchangeLatency = other.exchangeLatency;
         this.activeStopLoss = other.activeStopLoss;
-        this.trailingPct = other.trailingPct;
         this.closedBeforeStopLoss = other.closedBeforeStopLoss;
-        this.closedBeforeStopLossTimestamp = other.closedBeforeStopLossTimestamp;
-        this.initialStopLossIndex = other.initialStopLossIndex;
-        this.entryPriceIndex = other.entryPriceIndex;
-        this.tick = other.tick;
         this.totalUnpaidInterest = other.totalUnpaidInterest;
         this.closeRequestTimestamp = other.closeRequestTimestamp;
         this.reversed = other.reversed;
         this.isStopLoss = other.isStopLoss;
-        this.status = other.status;
         this.automaticBorrow = other.automaticBorrow;
         this.autoRepayAtCancel = other.autoRepayAtCancel;
         this.rejectionReason = other.rejectionReason;
-    }
-    
-
-    public double checkStopLoss(Candle candle, long closeTimestamp) {
-        if (closed) {
-            return 0;
-        }
-
-        if ((direction.equals(OrderSide.BUY) && candle.getLow() <= stopLossPrice) || (direction.equals(OrderSide.SELL) && candle.getHigh() >= stopLossPrice)) {
-            return closePosition(stopLossPrice, closeTimestamp);
-        }
-
-        return 0;
+        this.entryOrder = new Order(other.entryOrder);
+        this.stopLossOrder = new Order(other.stopLossOrder);
     }
 
     public double calculateProfit(double closePrice) {
         return (closePrice - fillPrice) * size * (direction.equals(OrderSide.BUY) ? 1 : -1);
     }
 
-    public double fillPosition(double fillPrice, long fillTime) {
-        if (!closed && !filled) {
-            filled = true;
-            this.fillPrice = fillPrice;
-            fillTimestamp = fillTime;
-            return margin;
-        }
-        return 0;
-    }
-
-    public double closePosition(double closePrice, long closeTimestamp) {
-        if (closed) {
-            return 0;
-        }
-
-        closed = true;
-        this.closeTimestamp = closeTimestamp;
-        closingPrice = closePrice;
-
-        if (!filled) {
-            return 0;
-        }
-
-        profit += calculateProfit(closePrice);
-
-        return profit;
-    }
-
-    public double cancelPosition(long closeTimestamp) {
-        if (filled) {
-            return 0;
-        }
-
-        return closePosition(openPrice, closeTimestamp);
-    }
-
-    public void setTrailingPct(double price) {
-        this.trailingPct = Math.abs(openPrice - stopLossPrice) / price;
-    }
-
-    public double getTrailingPct() {
-        return this.trailingPct;
-    }
-
     public double calculateRR(double closePrice) {
         return (closePrice - fillPrice) / (fillPrice - initialStopLossPrice);
     }
 
-    public int getInitialStopLossIndex() {
-        return this.initialStopLossIndex;
+    public void setClosedBeforeStoploss() {
+        this.closedBeforeStopLoss = true;
     }
 
-    public void setInitialStopLossIndex(int initialStopLossIndex) {
-        this.initialStopLossIndex = initialStopLossIndex;
-    }
-
-    public int getEntryPriceIndex() {
-        return this.entryPriceIndex;
-    }
-
-    public void setSize(double size) {
-        this.size = size;
-    }
-
-    public void setEntryPriceIndex(int entryPriceIndex) {
-        this.entryPriceIndex = entryPriceIndex;
-    }
-
-    public long getOpenTimestamp() {
-        return this.openTimestamp;
-    }
-
-    public void setMargin(double margin) {
-        this.margin = margin;
-    }
-
-    public double getBorrowedAmount() {
-        return this.borrowedAmount;
-    }
-
-    public void setBorrowedAmount(double amount) {
-        this.borrowedAmount = amount;
-    }
-
-    public OrderType getOrderType() {
-        return this.orderType;
-    }
 
     public int getId() {
         return this.id;
     }
 
+    public void setId(int id) {
+        this.id = id;
+    }
+
     public double getOpenPrice() {
         return this.openPrice;
+    }
+
+    public void setOpenPrice(double openPrice) {
+        this.openPrice = openPrice;
     }
 
     public double getStopLossPrice() {
@@ -245,31 +162,43 @@ public class Position {
         return this.initialStopLossPrice;
     }
 
+    public void setInitialStopLossPrice(double initialStopLossPrice) {
+        this.initialStopLossPrice = initialStopLossPrice;
+    }
+
     public double getSize() {
         return this.size;
+    }
+
+    public void setSize(double size) {
+        this.size = size;
     }
 
     public double getClosingPrice() {
         return this.closingPrice;
     }
 
+    public void setClosingPrice(double closingPrice) {
+        this.closingPrice = closingPrice;
+    }
+
     public OrderSide getDirection() {
         return this.direction;
     }
 
-    public int getOpenIndex() {
-        return this.openIndex;
+    public void setDirection(OrderSide direction) {
+        this.direction = direction;
     }
 
     public boolean isBreakEven() {
         return this.breakEven;
     }
 
-    public boolean isBreakevenSet() {
+    public boolean getBreakEven() {
         return this.breakEven;
     }
 
-    public void setBreakevenFlag(boolean breakEven) {
+    public void setBreakEven(boolean breakEven) {
         this.breakEven = breakEven;
     }
 
@@ -277,82 +206,64 @@ public class Position {
         return this.margin;
     }
 
+    public void setMargin(double margin) {
+        this.margin = margin;
+    }
+
     public boolean isFilled() {
         return this.filled;
+    }
+
+    public boolean getFilled() {
+        return this.filled;
+    }
+
+    public void setFilled(boolean filled) {
+        this.filled = filled;
     }
 
     public boolean isClosed() {
         return this.closed;
     }
 
-    public int getFilledIndex() {
-        return this.filledIndex;
+    public boolean getClosed() {
+        return this.closed;
     }
 
-    public int getClosedIndex() {
-        return this.closedIndex;
+    public void setClosed(boolean closed) {
+        this.closed = closed;
     }
 
     public double getProfit() {
         return this.profit;
     }
 
-    public boolean getPartiallyClosed() {
-        return this.partiallyClosed;
-    }
-    
-    public void setCloseRequestTimestamp(long timestamp) {
-        this.closeRequestTimestamp = timestamp;
-    }
-    
-    public long getCloseRequestTimestamp() {
-        return this.closeRequestTimestamp;
+    public void setProfit(double profit) {
+        this.profit = profit;
     }
 
-    public double getTotalUnpaidInterest() {
-        return this.totalUnpaidInterest;
+    public OrderType getOrderType() {
+        return this.orderType;
     }
 
-    // FIXME: borrowedAmount doesn't account for partial closes
-    public void increaseUnpaidInterest(double currentPrice) {
-        this.totalUnpaidInterest += borrowedAmount * hourlyInterestRate * (direction.equals(OrderSide.BUY) ? 1 : currentPrice);
+    public void setOrderType(OrderType orderType) {
+        this.orderType = orderType;
     }
 
-    public void setStoplossActive() {
-        this.activeStopLoss = true;
+    public long getOpenTimestamp() {
+        return this.openTimestamp;
     }
 
-    public boolean isStoplossActive() {
-        return this.activeStopLoss;
+    public void setOpenTimestamp(long openTimestamp) {
+        this.openTimestamp = openTimestamp;
     }
 
-    public double getExchangeLatency() {
-        return this.exchangeLatency;
+    public double getBorrowedAmount() {
+        return this.borrowedAmount;
     }
 
-    public void setClosedBeforeStoploss(long closedBeforeStoplossTimestamp) {
-        this.closedBeforeStopLoss = true;
-        this.closedBeforeStopLossTimestamp = closedBeforeStoplossTimestamp;
-    }
-
-    public long getClosedBeforeStoplossTimestamp() {
-        return this.closedBeforeStopLossTimestamp;
-    }
-
-    public boolean isClosedBeforeStoploss() {
-        return this.closedBeforeStopLoss;
-    }
-
-    public int getTick() {
-        return this.tick;
-    }
-
-    public void setReversed(boolean reversed) {
-        this.reversed = reversed;
-    }
-
-    public boolean isReversed() {
-        return this.reversed;
+    public void setBorrowedAmount(double borrowedAmount) {
+        this.borrowedAmount = borrowedAmount;
     }
 
     public double getFillPrice() {
@@ -363,7 +274,79 @@ public class Position {
         this.fillPrice = fillPrice;
     }
 
+    public long getFillTimestamp() {
+        return this.fillTimestamp;
+    }
+
+    public void setFillTimestamp(long fillTimestamp) {
+        this.fillTimestamp = fillTimestamp;
+    }
+
+    public long getCloseTimestamp() {
+        return this.closeTimestamp;
+    }
+
+    public void setCloseTimestamp(long closeTimestamp) {
+        this.closeTimestamp = closeTimestamp;
+    }
+
+    public boolean isActiveStopLoss() {
+        return this.activeStopLoss;
+    }
+
+    public boolean getActiveStopLoss() {
+        return this.activeStopLoss;
+    }
+
+    public void setActiveStopLoss(boolean activeStopLoss) {
+        this.activeStopLoss = activeStopLoss;
+    }
+
+    public boolean isClosedBeforeStopLoss() {
+        return this.closedBeforeStopLoss;
+    }
+
+    public boolean getClosedBeforeStopLoss() {
+        return this.closedBeforeStopLoss;
+    }
+
+    public void setClosedBeforeStopLoss(boolean closedBeforeStopLoss) {
+        this.closedBeforeStopLoss = closedBeforeStopLoss;
+    }
+
+    public double getTotalUnpaidInterest() {
+        return this.totalUnpaidInterest;
+    }
+
+    public void setTotalUnpaidInterest(double totalUnpaidInterest) {
+        this.totalUnpaidInterest = totalUnpaidInterest;
+    }
+
+    public long getCloseRequestTimestamp() {
+        return this.closeRequestTimestamp;
+    }
+
+    public void setCloseRequestTimestamp(long closeRequestTimestamp) {
+        this.closeRequestTimestamp = closeRequestTimestamp;
+    }
+
+    public boolean isReversed() {
+        return this.reversed;
+    }
+
+    public boolean getReversed() {
+        return this.reversed;
+    }
+
+    public void setReversed(boolean reversed) {
+        this.reversed = reversed;
+    }
+
     public boolean isAutomaticBorrow() {
+        return this.automaticBorrow;
+    }
+
+    public boolean getAutomaticBorrow() {
         return this.automaticBorrow;
     }
 
@@ -375,33 +358,30 @@ public class Position {
         return this.autoRepayAtCancel;
     }
 
+    public boolean getAutoRepayAtCancel() {
+        return this.autoRepayAtCancel;
+    }
+
     public void setAutoRepayAtCancel(boolean autoRepayAtCancel) {
         this.autoRepayAtCancel = autoRepayAtCancel;
     }
 
-    public OrderStatus getStatus(){
-        return this.status;
+    public Order getEntryOrder() {
+        return this.entryOrder;
     }
 
-    public void setStatus(OrderStatus status){
-        this.status = status;
+    public void setEntryOrder(Order entryOrder) {
+        this.entryOrder = entryOrder;
     }
 
-    public boolean isStopLoss(){
-        return this.isStopLoss;
+    public Order getStopLossOrder() {
+        return this.stopLossOrder;
     }
 
-    public void setOrderType(OrderType type){
-        this.orderType = type;
+    public void setStopLossOrder(Order stopLossOrder) {
+        this.stopLossOrder = stopLossOrder;
     }
 
-    public void setRejectionReason(RejectionReason reason){
-        this.rejectionReason = rejectionReason;
-    }
-
-    public RejectionReason getRejectionReason(){
-        return this.rejectionReason;
-    }
 
     public static ArrayList<Position> deepCopyPositionList(ArrayList<Position> originalList) {
         ArrayList<Position> newList = new ArrayList<>();

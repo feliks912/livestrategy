@@ -9,7 +9,7 @@ import com.localstrategy.util.types.SingleTransaction;
 public class OrderRequest {
 
     public int totalProgrammaticalOrderLimit;
-    public int lastOrderId = 0;
+    public int lastPositionId = 0;
 
     private double positionSize;
     private double requiredMargin;
@@ -43,18 +43,36 @@ public class OrderRequest {
             this.slippagePct = slippagePct;
     }
 
-    public Position newMarketOrder(SingleTransaction transaction, double stopLossPrice){
-        if(!calculateOrderParameters(transaction.getPrice(), stopLossPrice)){
-            Position position = new Position(transaction.getPrice(), stopLossPrice, false, positionSize, OrderType.MARKET, requiredMargin, amountToBorrow, ++lastOrderId);
+    public Position newMarketPosition(SingleTransaction transaction, double stopLossPrice){
+        if(!calculatePositionParameters(transaction.getPrice(), stopLossPrice)){
+            Position position = new Position(
+                transaction.getPrice(), 
+                stopLossPrice, 
+                positionSize, 
+                OrderType.LIMIT, 
+                requiredMargin, 
+                borrowedAmount, 
+                ++lastPositionId, 
+                transaction.getTimestamp()
+            );
             pendingPositions.add(position);
             return position;
         }
         return null;
     }
 
-    public Position newLimitOrder(double entryPrice, double stopLossPrice, boolean isStopLoss, SingleTransaction transaction){
-        if(!calculateOrderParameters(entryPrice, stopLossPrice)){
-            Position position = new Position(entryPrice, stopLossPrice, isStopLoss, positionSize, OrderType.LIMIT, requiredMargin, amountToBorrow, ++lastOrderId);
+    public Position newLimitPosition(double entryPrice, double stopLossPrice, boolean isStopLoss, SingleTransaction transaction){
+        if(!calculatePositionParameters(entryPrice, stopLossPrice)){
+            Position position = new Position(
+                entryPrice, 
+                stopLossPrice, 
+                positionSize, 
+                OrderType.LIMIT, 
+                requiredMargin, 
+                borrowedAmount, 
+                ++lastPositionId, 
+                transaction.getTimestamp()
+            );
             pendingPositions.add(position);
             return position;
         }
@@ -64,7 +82,7 @@ public class OrderRequest {
     //FIXME: This still calcualates amount to borrow even if the position size goes over. It borrows and then takes everything else from our portfolio. Binance doesn't support that with automatic borrowings
     //TODO: Add return statuses
     //TODO: Add condition when slippage crosses the stoploss
-    private boolean calculateOrderParameters(double entryPrice, double stopLossPrice){
+    private boolean calculatePositionParameters(double entryPrice, double stopLossPrice){
         if (Math.abs(entryPrice - stopLossPrice) > 2) { //Minimum $2 difference between entry and stop.
 
             positionSize = userAssets.getFreeUSDT() * risk / 100 / Math.abs(entryPrice - stopLossPrice);
@@ -103,8 +121,8 @@ public class OrderRequest {
             }
 
             if (userAssets.getFreeUSDT() > requiredMargin && 
-                    pendingPositions.stream().filter(p -> p.getOrderType().equals(OrderType.LIMIT)).count()
-                    + newPositions.stream().filter(p -> p.getOrderType().equals(OrderType.LIMIT)).count()
+                    pendingPositions.size()
+                    + newPositions.size()
                         < totalProgrammaticalOrderLimit){
 
                 return false;

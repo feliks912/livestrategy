@@ -3,48 +3,48 @@ package com.localstrategy.util.types;
 import java.util.ArrayList;
 
 import com.localstrategy.UserAssets;
-import com.localstrategy.Position;
+import com.localstrategy.Order;
 
 public class UserDataResponse {
     
     private UserAssets userAssets;
 
-    private ArrayList<Position> filledPositions = new ArrayList<Position>();
-    private ArrayList<Position> newPositions = new ArrayList<Position>();
-    private ArrayList<Position> cancelledPositions = new ArrayList<Position>();
-    private ArrayList<Position> rejectedPositions = new ArrayList<Position>();
+    private ArrayList<Order> filledOrders = new ArrayList<Order>();
+    private ArrayList<Order> newOrders = new ArrayList<Order>();
+    private ArrayList<Order> cancelledOrders = new ArrayList<Order>();
+    private ArrayList<Order> rejectedOrders = new ArrayList<Order>();
 
     public UserDataResponse(
         UserAssets userAssets,
-        ArrayList<Position> newPositions, 
-        ArrayList<Position> filledPositions,
-        ArrayList<Position> cancelledPositions,
-        ArrayList<Position> rejectedPositions) {
+        ArrayList<Order> newOrders, 
+        ArrayList<Order> filledOrders,
+        ArrayList<Order> cancelledOrders,
+        ArrayList<Order> rejectedOrders) {
 
             this.userAssets = new UserAssets(userAssets);
-            this.filledPositions = Position.deepCopyPositionList(filledPositions);
-            this.newPositions = Position.deepCopyPositionList(newPositions);
-            this.cancelledPositions = Position.deepCopyPositionList(cancelledPositions);
-            this.rejectedPositions = Position.deepCopyPositionList(rejectedPositions);
+            this.filledOrders = Order.deepCopyOrderList(filledOrders);
+            this.newOrders = Order.deepCopyOrderList(newOrders);
+            this.cancelledOrders = Order.deepCopyOrderList(cancelledOrders);
+            this.rejectedOrders = Order.deepCopyOrderList(rejectedOrders);
     }
 
     public UserAssets getUserAssets() {
         return this.userAssets;
     }
 
-    public ArrayList<Position> getFilledPositions() {
-        return this.filledPositions;
+    public ArrayList<Order> getFilledOrders() {
+        return this.filledOrders;
     }
 
-    public ArrayList<Position> getNewPositions() {
-        return this.newPositions;
+    public ArrayList<Order> getNewOrders() {
+        return this.newOrders;
     }
 
-    public ArrayList<Position> getCancelledPositions() {
-        return this.cancelledPositions;
+    public ArrayList<Order> getCancelledOrders() {
+        return this.cancelledOrders;
     }
 
-    public ArrayList<Position> getRejectedPositions() {
-        return this.rejectedPositions;
+    public ArrayList<Order> getRejectedOrders() {
+        return this.rejectedOrders;
     }
 }

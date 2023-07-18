@@ -31,10 +31,10 @@ public class LatencyHandler {
 
     private Map<Long, UserDataResponse> userDataStream = new HashMap<Long, UserDataResponse>();  //UserDataStream gets parsed from the exchange to the user
     
-    private Map<Long, ArrayList<Map<OrderAction, Position>>> actionRequestsMap = new HashMap<Long, ArrayList<Map<OrderAction, Position>>>(); //actionRequestsMap get parsed from client to the exchange
+    private Map<Long, ArrayList<Map<OrderAction, Order>>> actionRequestsMap = new HashMap<Long, ArrayList<Map<OrderAction, Order>>>(); //actionRequestsMap get parsed from client to the exchange
 
     private int previousUserDataStreamLatency;
-    private int previousPendingPositionsLatency;
+    private int previousPendingOrdersLatency;
     private long previousLatencyCalculationTimestamp;
 
     private static Random random = new Random();
@@ -63,13 +63,13 @@ public class LatencyHandler {
         return userStreamsToReturn;
     }
 
-    public ArrayList<Map<OrderAction, Position>> getDelayedUserActionRequests(long currentExchangeTimestamp) {
+    public ArrayList<Map<OrderAction, Order>> getDelayedUserActionRequests(long currentExchangeTimestamp) {
 
-        ArrayList<Map<OrderAction, Position>> actionsToReturn = new ArrayList<Map<OrderAction, Position>>();
+        ArrayList<Map<OrderAction, Order>> actionsToReturn = new ArrayList<Map<OrderAction, Order>>();
         ArrayList<Long> keysToRemove = new ArrayList<Long>();
 
-        for (Map.Entry<Long, ArrayList<Map<OrderAction, Position>>> entry : actionRequestsMap.entrySet()) {
-            if (currentExchangeTimestamp - entry.getKey() > previousPendingPositionsLatency) {
+        for (Map.Entry<Long, ArrayList<Map<OrderAction, Order>>> entry : actionRequestsMap.entrySet()) {
+            if (currentExchangeTimestamp - entry.getKey() > previousPendingOrdersLatency) {
                 actionsToReturn.addAll(entry.getValue());
                 keysToRemove.add(entry.getKey());
             }
@@ -84,9 +84,9 @@ public class LatencyHandler {
 
     
     public void recalculateLatencies(long currentExchangeTimestamp){
-        if(currentExchangeTimestamp - previousLatencyCalculationTimestamp > Math.max(previousPendingPositionsLatency, previousUserDataStreamLatency)){
+        if(currentExchangeTimestamp - previousLatencyCalculationTimestamp > Math.max(previousPendingOrdersLatency, previousUserDataStreamLatency)){
             previousUserDataStreamLatency = calculateUserDataStreamLatency();
-            previousPendingPositionsLatency = calculatePendingPositionsLatency();
+            previousPendingOrdersLatency = calculatePendingPositionsLatency();
             previousLatencyCalculationTimestamp = currentExchangeTimestamp;
         }
     }
@@ -115,16 +115,16 @@ public class LatencyHandler {
         this.userDataStream.put(currentExchangeTimestamp, userDataStream);
     }
 
-    public void addUserAction(OrderAction actionType, Position position, long currentLocalTimestamp) {
+    public void addUserAction(OrderAction actionType, Order order, long currentLocalTimestamp) {
 
-        Map<OrderAction, Position> tempMap = new HashMap<OrderAction, Position>();
-        tempMap.put(actionType, new Position(position));
+        Map<OrderAction, Order> tempMap = new HashMap<OrderAction, Order>();
+        tempMap.put(actionType, new Order(order));
 
-        for(Map.Entry<Long, ArrayList<Map<OrderAction, Position>>> entry : actionRequestsMap.entrySet()){
+        for(Map.Entry<Long, ArrayList<Map<OrderAction, Order>>> entry : actionRequestsMap.entrySet()){
             if(entry.getKey().equals(currentLocalTimestamp)){
                 entry.getValue().add(tempMap);
             } else {
-                ArrayList<Map<OrderAction, Position>> tempList = new ArrayList<Map<OrderAction, Position>>();
+                ArrayList<Map<OrderAction, Order>> tempList = new ArrayList<Map<OrderAction, Order>>();
                 tempList.add(tempMap);
                 actionRequestsMap.put(currentLocalTimestamp, tempList);
             }

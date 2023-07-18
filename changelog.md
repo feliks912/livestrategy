@@ -1,3 +1,8 @@
+18.7.23 15:17
+    Introduced Order, edited code to support it. Position now holds 2 Order which are created at the time of creating a position locally. Order requests are now sent to Binance instead of Positions
+
+    Todo: Import to IntelliJ IDEA, handle positions in local exhchange
+
 [IMPORTANT] Check with Binance support? How exactly are transactions behaving during the following ![Alt text](volatile.png)
 
 17.7.23 18:02
@@ -15,7 +20,7 @@
         
         Add normally distributed latencies to latencyHandler
         
-        Check and complete Binance code for non-automatic borrowings
+        Check and complete Binance code for non-automatic borrowings (later)
         
         Replace our linear orderbook model with a square root market impact model https://quant.stackexchange.com/questions/41937/market-impact-why-square-root
             Definitely check this too https://mfe.baruch.cuny.edu/wp-content/uploads/2017/05/Chicago2016OptimalExecution.pdf
