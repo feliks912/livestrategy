@@ -2,6 +2,7 @@ package com.localstrategy;
 
 import com.localstrategy.util.enums.ActionResponse;
 import com.localstrategy.util.enums.OrderAction;
+import com.localstrategy.util.types.SingleTransaction;
 import com.localstrategy.util.types.UserDataResponse;
 
 import java.util.ArrayList;
@@ -26,9 +27,16 @@ public class LatencyHandler {
     private final int BORROW_LATENCY_MEAN = 0;
     private final int BORROW_LATENCY_STD = 0;
 
+    private final int TRANSACTION_LATENCY_MEAN = 0;
+    private final int TRANSACTION_LATENCY_STD = 0;
+
+
+    private final ArrayList<SingleTransaction> delayedTransactions = new ArrayList<>();
+
     private final Map<Long, UserDataResponse> userDataStream = new HashMap<>();  //UserDataStream gets parsed from the exchange to the user
     private final Map<Long, ArrayList<Map<OrderAction, Order>>> actionRequestsMap = new HashMap<>(); //actionRequestsMap get parsed from client to the exchange
     private final Map<Long, ArrayList<Map<ActionResponse, Order>>> actionResponseMap = new HashMap<>();
+
     private int previousUserDataStreamLatency;
     private int previousPendingOrdersLatency;
     private long previousLatencyCalculationTimestamp;
@@ -36,6 +44,26 @@ public class LatencyHandler {
     public LatencyHandler() {}
 
 
+
+    public void addTransactionEvent(SingleTransaction transaction){
+
+    }
+
+    //Transactions have no delay for Binance
+    //Transactions have delay for client
+    //Both the exchange and the client operate on discrete transactions
+    //Therefore how do we make the client tick if we use delayed transactions?
+    public SingleTransaction getDelayedTransaction(long localTime){
+
+        SingleTransaction transaction = delayedTransactions.get(0);
+
+        if(localTime - transaction.getTimestamp() >= transaction.getLatency()){
+            delayedTransactions.remove(0);
+            return transaction;
+        }
+
+        return null;
+    }
 
 
     public void addActionRequest(OrderAction actionType, Order order, long localTime) {
@@ -137,7 +165,9 @@ public class LatencyHandler {
 
 
     public void recalculateLatencies(long exchangeTime){
-        if(exchangeTime - previousLatencyCalculationTimestamp > Math.max(previousPendingOrdersLatency, previousUserDataStreamLatency)){
+
+        if(exchangeTime - previousLatencyCalculationTimestamp >
+                Math.max(previousPendingOrdersLatency, previousUserDataStreamLatency)){
             previousUserDataStreamLatency = calculateUserDataStreamLatency();
             previousPendingOrdersLatency = calculatePendingPositionsLatency();
             previousLatencyCalculationTimestamp = exchangeTime;

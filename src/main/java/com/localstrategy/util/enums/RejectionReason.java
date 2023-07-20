@@ -2,7 +2,7 @@ package com.localstrategy.util.enums;
 
 public enum RejectionReason {
     WOULD_TRIGGER_IMMEDIATELY,
-    EXCESS_PROG_ORDERS,
+    MAX_NUM_ALGO_ORDERS,
     INSUFFICIENT_MARGIN,
     EXCESS_BORROW,
     INSUFFICIENT_FUNDS,

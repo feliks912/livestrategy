@@ -5,6 +5,10 @@ public class SingleTransaction {
     private double amount;
     private long timestamp;
 
+    private int latency;
+
+    private boolean isWall;
+
     public SingleTransaction(){
 
     }
@@ -33,15 +37,30 @@ public class SingleTransaction {
         this.timestamp = timestamp;
     }
 
+    public void setLatency(int latency){
+        this.latency = latency;
+    }
 
-    @Override
-    public String toString() {
-        return "{" +
-            ", price='" + getPrice() + "'" +
-            ", amount='" + getAmount() + "'" +
-            ", timestamp='" + getTimestamp() + "'" +
-            "}";
+    public int getLatency(){
+        return this.latency;
+    }
+
+    public void setWall(boolean isWall){
+        this.isWall = isWall;
+    }
+
+    public boolean isWall(){
+        return this.isWall;
     }
 
 
+    @Override
+    public String toString() {
+        return "SingleTransaction{" +
+                "price=" + price +
+                ", amount=" + amount +
+                ", timestamp=" + timestamp +
+                ", latency=" + latency +
+                '}';
+    }
 }

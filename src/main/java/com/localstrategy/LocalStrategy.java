@@ -52,7 +52,7 @@ public class LocalStrategy {
             tierManager, 
             userAssets, 
             LocalStrategy.RISK_PCT, 
-            Binance.MAX_PROG_ORDERS,
+            Binance.ALGO_ORDER_LIMIT,
             LocalStrategy.SLIPPAGE_PCT);
 
         //TODO: Print parameters on strategy start
@@ -60,6 +60,8 @@ public class LocalStrategy {
 
     
     private void priceUpdate(SingleTransaction transaction, boolean isWall){
+
+        latencyHandler.getDelayedTransaction(transaction.getTimestamp());
 
         ArrayList<UserDataResponse> userDataResponses = latencyHandler.getDelayedUserDataStream(transaction.getTimestamp());
         if(!userDataResponses.isEmpty()){
@@ -141,7 +143,7 @@ public class LocalStrategy {
                                 latencyHandler.addActionRequest(OrderAction.CREATE_ORDER, tempRejectedOrders, lastIndex);
                             }
                             break;
-                        case EXCESS_PROG_ORDERS:
+                        case MAX_NUM_ALGO_ORDERS:
                             if(position.isStopLoss()){ //For some reason could be we can't create a stop-loss due to programmatic position count despite we test it locally
                                 //Close the position if no other clear action is available
                             }

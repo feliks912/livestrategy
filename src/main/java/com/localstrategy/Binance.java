@@ -29,7 +29,7 @@ import java.util.Map;
 
 public class Binance {
 
-    public final static int MAX_PROG_ORDERS = 5;
+    public final static int ALGO_ORDER_LIMIT = 5;
 
     private final int MAX_BORROW_USDT = 900_000;
     private final int MAX_BORROW_BTC = 72;
@@ -119,11 +119,11 @@ public class Binance {
                                             .filter(p -> p.getOrderType()
                                             .equals(OrderType.LIMIT))
                                             .count()
-                                                >= Binance.MAX_PROG_ORDERS);
+                                                >= Binance.ALGO_ORDER_LIMIT);
 
                     if (progOrdersReached) {
                         order.setStatus(OrderStatus.REJECTED);
-                        order.setRejectionReason(RejectionReason.EXCESS_PROG_ORDERS);
+                        order.setRejectionReason(RejectionReason.MAX_NUM_ALGO_ORDERS);
                         respondToAction(ActionResponse.ACTION_REJECTED, order);
                         continue;
                     }
@@ -205,7 +205,7 @@ public class Binance {
                 boolean isMarketOrder = order.getOrderType().equals(OrderType.MARKET);
                 boolean isLong = order.getDirection().equals(OrderSide.BUY);
 
-                double fillPrice = slippageHandler.getSlippagePrice(
+                double fillPrice = slippageHandler.getSlippageFillPrice(
                     isMarketOrder ? transaction.getPrice() : order.getOpenPrice(),
                     order.getSize(), 
                     order.getDirection()
@@ -303,7 +303,7 @@ public class Binance {
         boolean isMarketOrder = order.getOrderType().equals(OrderType.MARKET);
         boolean isLong = order.getDirection().equals(OrderSide.BUY);
 
-        double fillPrice = slippageHandler.getSlippagePrice(
+        double fillPrice = slippageHandler.getSlippageFillPrice(
             isMarketOrder ? transaction.getPrice() : order.getOpenPrice(),
             order.getSize(), 
             order.getDirection()

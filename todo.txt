@@ -2,10 +2,15 @@ Todo:
     LatencyHandler.java
         Introduce transaction stream latency - binance operates on all transactions regardless of their latency, but our local client must lag behind in terms of transaction stream
             That means our local strategy must have 2 'threads' - one for handling responses from the exchange which are unrelated to the latency of the transactions, and the other which process transactions as they are received. It must also understand when it's impossible to act on transactions due to them being reported too late.
+            Untrue, we call a local transaction processing method on every new transaction from the binance's side, meaning we still follow the same absolute time. Now we can just filter whether it gets the transaction data or not.
+
+    Fix using MARGIN_BUY when enough funds is in our account. Refer to changelog
+
+    Introduce separate Balance Update Payload and Order Update Payload. Both are packed together and get the same latency
 
     Binance.java
         Add normally distributed latencies to latencyHandler
-        Replace linear orderbook model with a square root market impact
+        Replace linear orderbook model with a square root market impact (later)
         Check and complete Binance code for non-automatic borrowings (later)
             Implement order triggers on self-made slippage (later)
 
@@ -13,6 +18,7 @@ Todo:
         Locally map action responses with action type (OrderAction.java) so when we receive ACTION_REJECTED we know what action we sent
         Position-specific interest calculation must be local for every case that is not automatic repay when cancelling a position
         Local position closing, profit calculation
+        Handle communication and test a simple strategy (1 day remains)
 
     Other
         Change order IDs to use unique IDs instead of incremental numbers to simulate the fucked up nature of random IDs. (later)

@@ -1,3 +1,35 @@
+[IMPORTANT] test streaming aggregated trades. It might be those sudden walls are single orders which get filled through multiple transactions. [IMPORTANT]
+
+20.7.34 00:54
+    Ruminating on latencies. It takes Binance the same amount of time to report on any processed request. User data stream, trade execution, transaction stream, and borrow report
+    Separate latencies are for order execution and borrowings (due to time it takes Binance to get our request and process it). Other than that, we can place all 4 of the previous groups in a single report queue because they all abide by the same latency, and simply apply the latency rule (t2 + l2 >= t1 + l1).
+
+    We will assume all new requests processed on the Binance's side happend instantaneously. On a given transaction we pack user data stream updates and action request responses in a single batch to be received on the user's end at the same time (it usually takes a few ms of difference) but *I think it's sensible*.
+
+    The Trade execution and borrow execution will likely take a while longer to process, but we can pack the under the same latency.
+
+    Therefore we got our latency figure out. Now to determine our states of execution.
+
+    Our main loop is transaction-based. Meaning, every time there's a transaction we will run the loop with that transaction's timestmap. The same goes for our local loop.
+
+        The local loop will run on a new transaction, user data stream, or action response.
+
+            If we have to process multiple delayed events locally, we must insure they will be processed one by one, with respective delays.
+
+                Given LR is local request, ER is exchange response, and T is a transaction, and T' is the delayed transaction received by the client
+
+                    T1 -> T1' + LR1 -> ER1 -> LR2 -> ER2 is a normal sequence of requests and responses we can process on both the Binance and local side.
+
+                        What happens if we use transactions to time our loops, and a new transaction comes on the exchange's side only after more than one delayed response had to be delivered to the client? That would mean that transaction on the Binance's side would likely miss some information from the client
+
+                        The answer is to run our loops on every event that must be processed individually. I don't really know how to implement that but I'll do it.
+
+[IMPORTANT] From Binance support 'first of all generally test-nets run under low performance, so it might take a little more time for your order/query to execute. Once you used MARGIN_BUY it won't affect your query too much. Just might be a few ms or none'
+
+[IMPORTANT] It seems Binance doesn't execute the borrow regardless whether we're use MARGIN_BUY if enough funds is in our margin account 
+    https://dev.binance.vision/t/margin-buy-does-not-execute-the-loan-if-you-have-funds/689/3
+        Instead it uses the funds from our account. Fix that in code. This might change the way we handle our orders from the local side.
+
 18.7.23 17:22
     Added action responses.
         Action responses get sent to the user immediately after processing an action request. 
