@@ -2,7 +2,7 @@ package com.localstrategy;
 
 import com.localstrategy.util.enums.*;
 import com.localstrategy.util.types.SingleTransaction;
-import com.localstrategy.util.types.UserDataResponse;
+import com.localstrategy.util.types.UserDataStream;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -70,13 +70,13 @@ public class Binance {
     public void onTransaction(SingleTransaction transaction, boolean isWall) {
         this.transaction = transaction;
 
-        latencyHandler.recalculateLatencies(transaction.getTimestamp());
+        latencyHandler.recalculateLatencies(transaction.timestamp());
         addInterest();
 
         checkFills();
         checkMarginLevel();
         
-        handleUserActionRequest(latencyHandler.getDelayedActionRequests(transaction.getTimestamp()));
+        handleUserActionRequest(latencyHandler.getDelayedActionRequests(transaction.timestamp()));
 
         updateUserDataStream();
 
@@ -86,8 +86,8 @@ public class Binance {
     private void updateUserDataStream(){
         if(userAssetsUpdated || !updatedOrders.isEmpty()){
             latencyHandler.addUserDataStream(
-                new UserDataResponse(userAssets, updatedOrders),
-                transaction.getTimestamp()
+                new UserDataStream(userAssets, updatedOrders),
+                transaction.timestamp()
             );
 
             if(userAssetsUpdated){
@@ -131,11 +131,11 @@ public class Binance {
                     // Immediate trigger?
                     if (order.getOrderType().equals(OrderType.LIMIT) &&
                             ((order.getDirection().equals(OrderSide.BUY) &&
-                                    (order.isStopLoss() && transaction.getPrice() >= order.getOpenPrice() ||
-                                            !order.isStopLoss() && transaction.getPrice() <= order.getOpenPrice())) ||
+                                    (order.isStopLoss() && transaction.price() >= order.getOpenPrice() ||
+                                            !order.isStopLoss() && transaction.price() <= order.getOpenPrice())) ||
                                     (order.getDirection().equals(OrderSide.SELL) &&
-                                            (order.isStopLoss() && transaction.getPrice() <= order.getOpenPrice() ||
-                                                    !order.isStopLoss() && transaction.getPrice() >= order.getOpenPrice())))) {
+                                            (order.isStopLoss() && transaction.price() <= order.getOpenPrice() ||
+                                                    !order.isStopLoss() && transaction.price() >= order.getOpenPrice())))) {
 
                         order.setStatus(OrderStatus.REJECTED);
                         order.setRejectionReason(RejectionReason.WOULD_TRIGGER_IMMEDIATELY);
@@ -206,18 +206,18 @@ public class Binance {
                 boolean isLong = order.getDirection().equals(OrderSide.BUY);
 
                 double fillPrice = slippageHandler.getSlippageFillPrice(
-                    isMarketOrder ? transaction.getPrice() : order.getOpenPrice(),
+                    isMarketOrder ? transaction.price() : order.getOpenPrice(),
                     order.getSize(), 
                     order.getDirection()
                 );
 
                 if(isMarketOrder ||
                         ((order.getDirection().equals(OrderSide.BUY) &&
-                            (order.isStopLoss() && transaction.getPrice() >= order.getOpenPrice() ||
-                            !order.isStopLoss() && transaction.getPrice() <= order.getOpenPrice())) ||
+                            (order.isStopLoss() && transaction.price() >= order.getOpenPrice() ||
+                            !order.isStopLoss() && transaction.price() <= order.getOpenPrice())) ||
                         (order.getDirection().equals(OrderSide.SELL) &&
-                            (order.isStopLoss() && transaction.getPrice() >= order.getOpenPrice() ||
-                            !order.isStopLoss() && transaction.getPrice() <= order.getOpenPrice())))){
+                            (order.isStopLoss() && transaction.price() >= order.getOpenPrice() ||
+                            !order.isStopLoss() && transaction.price() <= order.getOpenPrice())))){
 
                     if(isMarketOrder && order.isAutomaticBorrow()){
                         RejectionReason rejectionReason = borrowFunds(order);
@@ -285,9 +285,9 @@ public class Binance {
 
     private void addInterest(){
         if((!filledOrders.isEmpty() || !newOrders.isEmpty()) && 
-            transaction.getTimestamp() - previousInterestTimestamp > 1000 * 60 * 60){
+            transaction.timestamp() - previousInterestTimestamp > 1000 * 60 * 60){
 
-            previousInterestTimestamp = transaction.getTimestamp();
+            previousInterestTimestamp = transaction.timestamp();
 
             userAssets.setTotalUnpaidInterest(
                     userAssets.getTotalUnpaidInterest()
@@ -304,7 +304,7 @@ public class Binance {
         boolean isLong = order.getDirection().equals(OrderSide.BUY);
 
         double fillPrice = slippageHandler.getSlippageFillPrice(
-            isMarketOrder ? transaction.getPrice() : order.getOpenPrice(),
+            isMarketOrder ? transaction.price() : order.getOpenPrice(),
             order.getSize(), 
             order.getDirection()
         );
@@ -369,7 +369,7 @@ public class Binance {
             //Calculate leverage
             tierManager.checkAndUpdateTier(userAssets.getTotalBorrowedUSDT(), positionSize + userAssets.getTotalBorrowedBTC());
 
-            double requiredMargin = positionSize * transaction.getPrice() / tierManager.getCurrentLeverage();
+            double requiredMargin = positionSize * transaction.price() / tierManager.getCurrentLeverage();
 
             //Check margin requirement
             if(userAssets.getFreeUSDT() < requiredMargin){
@@ -507,11 +507,11 @@ public class Binance {
     private double checkMarginLevel(){
         double totalAssetValue = 
             userAssets.getFreeUSDT() + userAssets.getLockedUSDT() +
-            (userAssets.getFreeBTC() + userAssets.getLockedBTC()) * transaction.getPrice();
+            (userAssets.getFreeBTC() + userAssets.getLockedBTC()) * transaction.price();
 
         double totalBorrowedAssetValue = 
             userAssets.getTotalBorrowedUSDT() + 
-            userAssets.getTotalBorrowedBTC() * transaction.getPrice();
+            userAssets.getTotalBorrowedBTC() * transaction.price();
 
         if(totalBorrowedAssetValue + userAssets.getTotalUnpaidInterest() == 0){
             return 999;
@@ -553,7 +553,7 @@ public class Binance {
 
     public double getTotalAssetsValue(){
         if(transaction != null){
-            return userAssets.getTotalAssetValue(transaction.getPrice());
+            return userAssets.getTotalAssetValue(transaction.price());
         }
         return 0.0;
     }

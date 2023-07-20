@@ -1,36 +1,34 @@
 package com.localstrategy.util.misc;
 
-import org.jfree.chart.*;
-import org.jfree.chart.annotations.XYAnnotation;
-import org.jfree.chart.annotations.XYLineAnnotation;
-import org.jfree.chart.annotations.XYTextAnnotation;
-import org.jfree.chart.axis.*;
-import org.jfree.chart.plot.*;
-import org.jfree.chart.renderer.xy.*;
-import org.jfree.chart.ui.TextAnchor;
-import org.jfree.data.xy.*;
-
 import com.localstrategy.Position;
 import com.localstrategy.util.helper.CandleConstructor;
 import com.localstrategy.util.helper.TransactionLoader;
 import com.localstrategy.util.types.Candle;
 import com.localstrategy.util.types.SingleTransaction;
-
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.Period;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.time.Duration;
-
+import org.jfree.chart.ChartPanel;
+import org.jfree.chart.JFreeChart;
+import org.jfree.chart.annotations.XYAnnotation;
+import org.jfree.chart.annotations.XYLineAnnotation;
+import org.jfree.chart.annotations.XYTextAnnotation;
+import org.jfree.chart.axis.DateAxis;
+import org.jfree.chart.axis.NumberAxis;
+import org.jfree.chart.plot.ValueMarker;
+import org.jfree.chart.plot.XYPlot;
+import org.jfree.chart.renderer.xy.CandlestickRenderer;
+import org.jfree.chart.ui.TextAnchor;
 import org.jfree.data.Range;
+import org.jfree.data.xy.DefaultOHLCDataset;
+import org.jfree.data.xy.OHLCDataItem;
+import org.jfree.data.xy.OHLCDataset;
 
 import javax.swing.*;
 import java.awt.*;
 import java.text.SimpleDateFormat;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Calendar;
+import java.util.List;
 
 public class CandlestickChart extends JFrame {
     private static final int MAX_CANDLES = 75; // Maximum number of candles on the chart
@@ -200,7 +198,7 @@ public class CandlestickChart extends JFrame {
 
             for(SingleTransaction transaction : transactionList){
                 if(startingTimestamp == 0){
-                    startingTimestamp = transaction.getTimestamp();
+                    startingTimestamp = transaction.timestamp();
                 }
 
                 Candle candle = candleConstructor.processTradeEvent(transaction);
@@ -264,7 +262,7 @@ public class CandlestickChart extends JFrame {
         //updateInfoBox(infoBox3, "Porftolio value: " + String.format("%.2f", zigZagStrat.getPortfolio()) , 0.04);
 
         //FIXME: Current candle timestamp, add candles to candles
-        long currentTimestamp = candleConstructor.getLastCandle().getTimestamp();
+        long currentTimestamp = candleConstructor.getLastCandle().timestamp();
 
         LocalDateTime currentDateTime = Instant.ofEpochMilli(currentTimestamp)
             .atZone(ZoneId.systemDefault())
@@ -300,11 +298,11 @@ public class CandlestickChart extends JFrame {
 
         OHLCDataItem candle = new OHLCDataItem(
             calendar.getTime(),
-            tempCandle.getOpen(),
-            tempCandle.getHigh(),
-            tempCandle.getLow(),
-            tempCandle.getClose(),
-            Math.abs(tempCandle.getTick()) < distanceSet ? -tempCandle.getVolume() : tempCandle.getVolume()
+            tempCandle.open(),
+            tempCandle.high(),
+            tempCandle.low(),
+            tempCandle.close(),
+            Math.abs(tempCandle.tick()) < distanceSet ? -tempCandle.volume() : tempCandle.volume()
         );
         dataset.addCandle(candle);
         //currentIndex++;

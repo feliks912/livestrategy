@@ -1,4 +1,11 @@
-[IMPORTANT] test streaming aggregated trades. It might be those sudden walls are single orders which get filled through multiple transactions. [IMPORTANT]
+20.7.23 3:43
+    Instead of using transactions we must use states to run our program. States are dynamically added to a queue list and executed sequentially. One for Exchange and another for client. This replaces our latency data structures. Instead, if a request is made on t1, and it's latency is calculated to be t1', then if t1 + t1' < t2 where t2 might be the time of the next transaction, a new state of the exchange must be executed at time t1 + t1'. Same goes for the response.
+
+    2 priority queues, one for the exchange and another local. - QueueManager.java - PriorityQueue vs TreeMap
+        Each event will have it's time calculated, and inserted into the queue at the correct time
+        
+            This means we must introduce a new class Event, which will hold events that can happen
+                
 
 20.7.34 00:54
     Ruminating on latencies. It takes Binance the same amount of time to report on any processed request. User data stream, trade execution, transaction stream, and borrow report

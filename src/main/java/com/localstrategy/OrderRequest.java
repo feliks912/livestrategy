@@ -43,16 +43,16 @@ public class OrderRequest {
     }
 
     public Position newMarketPosition(SingleTransaction transaction, double stopLossPrice){
-        if(calculatePositionParameters(transaction.getPrice(), stopLossPrice)){
+        if(calculatePositionParameters(transaction.price(), stopLossPrice)){
             Position position = new Position(
-                transaction.getPrice(), 
+                transaction.price(),
                 stopLossPrice, 
                 positionSize, 
                 OrderType.MARKET,
                 requiredMargin, 
                 borrowedAmount, 
                 ++lastPositionId, 
-                transaction.getTimestamp()
+                transaction.timestamp()
             );
             pendingPositions.add(position);
             return position;
@@ -70,7 +70,7 @@ public class OrderRequest {
                 requiredMargin, 
                 borrowedAmount, 
                 ++lastPositionId, 
-                transaction.getTimestamp()
+                transaction.timestamp()
             );
             pendingPositions.add(position);
             return position;

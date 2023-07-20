@@ -6,7 +6,7 @@ import com.localstrategy.util.enums.RejectionReason;
 import com.localstrategy.util.helper.CandleConstructor;
 import com.localstrategy.util.types.Candle;
 import com.localstrategy.util.types.SingleTransaction;
-import com.localstrategy.util.types.UserDataResponse;
+import com.localstrategy.util.types.UserDataStream;
 
 import java.util.ArrayList;
 import java.util.Map;
@@ -63,17 +63,17 @@ public class LocalStrategy {
 
         latencyHandler.getDelayedTransaction(transaction.getTimestamp());
 
-        ArrayList<UserDataResponse> userDataResponses = latencyHandler.getDelayedUserDataStream(transaction.getTimestamp());
-        if(!userDataResponses.isEmpty()){
+        ArrayList<UserDataStream> userDataRespons = latencyHandler.getDelayedUserDataStream(transaction.getTimestamp());
+        if(!userDataRespons.isEmpty()){
 
             //We only look for the latest update
-            int lastIndex = userDataResponses.size() - 1;
+            int lastIndex = userDataRespons.size() - 1;
 
-            userAssets = userDataResponses.get(lastIndex).getUserAssets();
+            userAssets = userDataRespons.get(lastIndex).userAssets();
 
             //TODO: Add closed positions to previousPositions
 
-            ArrayList<Position> tempNewPositions = userDataResponses.get(lastIndex).getNewPositions();
+            ArrayList<Position> tempNewPositions = userDataRespons.get(lastIndex).getNewPositions();
             ArrayList<Position> newPositionDiff = findDifferences(tempNewPositions, newPositions);
             if(!newPositionDiff.isEmpty()){
                 for(Position position : newPositionDiff){
@@ -89,7 +89,7 @@ public class LocalStrategy {
                 }
             }
 
-            ArrayList<Position> tempFilledPositions = userDataResponses.get(lastIndex).getFilledPositions();
+            ArrayList<Position> tempFilledPositions = userDataRespons.get(lastIndex).getFilledPositions();
             ArrayList<Position> filledPositionDiff = findDifferences(tempFilledPositions, filledPositions);
             if(!filledPositionDiff.isEmpty()){
                 for(Position position : filledPositionDiff){
@@ -104,7 +104,7 @@ public class LocalStrategy {
                 }
             }
 
-            ArrayList<Position> tempCancelledPositions = userDataResponses.get(lastIndex).getCancelledPositions();
+            ArrayList<Position> tempCancelledPositions = userDataRespons.get(lastIndex).getCancelledPositions();
             ArrayList<Position> canceledPositionDiff = findDifferences(tempCancelledPositions, cancelledPositions);
             if(!canceledPositionDiff.isEmpty()){
                 for(Position position : canceledPositionDiff){
@@ -114,14 +114,14 @@ public class LocalStrategy {
                 }
             }
 
-            ArrayList<Position> tempRejectedOrders = userDataResponses.get(lastIndex).getRejectedPositions();
+            ArrayList<Position> tempRejectedOrders = userDataRespons.get(lastIndex).getRejectedPositions();
             /* ArrayList<Position> rejectedPositionsDiff = findDifferences(tempRejectedOrders, rejectedOrders);
             if(!rejectedPositionsDiff.isEmpty()){
                 //Handle new order rejections
 
             } */
 
-            ArrayList<Map<RejectionReason, Position>> rejectedActions = userDataResponses.get(lastIndex).getRejectedActions();
+            ArrayList<Map<RejectionReason, Position>> rejectedActions = userDataRespons.get(lastIndex).getRejectedActions();
             if(!rejectedActions.isEmpty()){
                 for(Map<RejectionReason, Position> rejection : rejectedActions){
                     Map.Entry<RejectionReason, Position> entry = rejection.entrySet().iterator().next();
