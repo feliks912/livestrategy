@@ -1,5 +1,6 @@
 package com.localstrategy;
 
+import com.localstrategy.util.enums.EventDestination;
 import com.localstrategy.util.enums.EventType;
 import com.localstrategy.util.types.Event;
 
@@ -11,39 +12,42 @@ public class EventScheduler {
         //  When there's no first element the LatencyHandler can produce any latency.
         //  The first event must be the first exchange transaction whose latency is 0.
 
-    private final PriorityQueue<Event> exchangeQueue;
-    private final PriorityQueue<Event> localQueue;
+    private final PriorityQueue<Event> eventQueue;
 
     private Event lastExchangeEvent;
     private Event lastLocalEvent;
 
 
-    public EventScheduler(LatencyHandler latencyHandler) {
-        exchangeQueue = new PriorityQueue<>();
-        localQueue = new PriorityQueue<>();
+    public EventScheduler() {
+        eventQueue = new PriorityQueue<>();
     }
 
 
-    public void addExchangeEvent(Event event){
-        event.setEventLatency(event.getEventType().equals(EventType.TRANSACTION) ? 0 : LatencyHandler.calculateLatency(event, lastExchangeEvent));
-        exchangeQueue.add(event);
+    public void addEvent(Event event) {
+        boolean isTransaction = event.getEventType().equals(EventType.TRANSACTION);
+        boolean isDestinationExchange = event.getDestination().equals(EventDestination.EXCHANGE);
 
-        lastExchangeEvent = event;
+        if (isDestinationExchange && isTransaction) {
+            event.setEventLatency(0);
+        } else {
+            Event lastEvent = isTransaction ? lastExchangeEvent : lastLocalEvent;
+            event.setEventLatency(LatencyHandler.calculateLatency(event, lastEvent));
+        }
+
+        eventQueue.add(event);
+
+        if(isDestinationExchange && !isTransaction){ //Exchange transactions don't get added to lastExchangeEvent so future events don't scan it when calculating latency. This is permitted since the exchange transaction is the origin event and all other events are a reaction to it. This way we can load the next transaction once we reach the current one.
+            lastExchangeEvent = event;
+        } else if(!isDestinationExchange){
+            lastLocalEvent = event;
+        }
     }
 
-    public void addLocalEvent(Event event){
-        event.setEventLatency(LatencyHandler.calculateLatency(event, lastLocalEvent));
-        localQueue.add(event);
-
-        lastLocalEvent = event;
+    public Event getNextEvent(){
+        return eventQueue.poll();
     }
 
-
-    public Event getNextExchangeEvent(){
-        return exchangeQueue.poll();
-    }
-
-    public Event getNextLocalEvent(){
-        return localQueue.poll();
+    public boolean isEmpty(){
+        return eventQueue.isEmpty();
     }
 }

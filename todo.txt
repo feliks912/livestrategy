@@ -1,43 +1,26 @@
 Todo:
-    Implement latency walls.
-    Test latencies.
-    Implement alternations over states, and adding new timestamps to the list.
-        Timestamps are fixed in time. We could load the at the start of the day if sorting wouldn't be too expensive.
-            We can always load the next one on reaching a transaction.
-
-    Test user data stream latencies - how long does it take us to receive a user data stream after we execute a trade? Assuming they both get processed at once, it *should* not be significantly higher than Trade Execution Report latency.
-        It's interesting how transaction streams take significantly longer than trade execution and response latencies - check thoroughly
-
-    LatencyHandler.java
-        Introduce transaction stream latency - binance operates on all transactions regardless of their latency, but our local client must lag behind in terms of transaction stream
-            That means our local strategy must have 2 'threads' - one for handling responses from the exchange which are unrelated to the latency of the transactions, and the other which process transactions as they are received. It must also understand when it's impossible to act on transactions due to them being reported too late.
-            Untrue, we call a local transaction processing method on every new transaction from the binance's side, meaning we still follow the same absolute time. Now we can just filter whether it gets the transaction data or not.
-
-    Fix using MARGIN_BUY when enough funds is in our account (Binance won't borrow then). Refer to changelog
+    Implement latency walls. Define what they mean first.
 
     Binance.java
-        Change from transaction-based to state-based
-        Add normally distributed latencies to latencyHandler
+        Fix using MARGIN_BUY when enough funds is in our account (Binance won't borrow then). Refer to changelog
         Replace linear orderbook model with a square root market impact (later)
         Check and complete Binance code for non-automatic borrowings (later)
             Implement order triggers on self-made slippage (later)
 
     LocalStrategy.java
-        Change from transaction-based to state-based
-        Locally map action responses with action type (OrderAction.java) so when we receive ACTION_REJECTED we know what action we sent
-        Position-specific interest calculation must be local for every case that is not automatic repay when cancelling a position
-            And we must keep track of how much interest we got for each order, so we can repay it manually. (A reverse market order and a repay comprise an exit)
-        Local position closing, profit calculation
-        Handling responses
-        A basic strategy framework
+        Map action responses with action request types so when we receive a response we know which action we sent.
+        Interest calculation based on position, except when using automatic repay on cancel, and we cancel the position.
+        Local position closing, filling, profit calculation, etc...
+        Handling all responses
 
-    Other
+    Order.java
         Change order IDs to use unique IDs instead of incremental numbers to simulate the fucked up nature of random IDs. (later)
 
 Done:
-    Implemented Events. Instead of iterating over transactions, both Exchange and Local have their own sorted PriorityQueues.
-        It seems, since all queues respect the latency rule, we can alternate over exchange and local states. Amazing.
-    Edited binance transaction latency testing to output all transactions to a file with a 'wall' flag - running on AWS Tokyo EC2
+    Next day now loads on the last transaction of the day
+    Edited TransactionLoader to process relative transaction values, lowering sizes of files by 33%
+    Implemented Events. Instead of iterating over transactions each event (action, request, transaction, and user data stream) is added to a queue and executed at the time of the event + the time it took to reach its destination (latency).
+    Edited binance transaction latency testing to output all transactions to a file with a 'wall' flag - running on AWS Tokyo EC2 - results gathered
     Matched Order and Position arguments (seems so)
     Converted Candle to record
     Edited CandleConstructor to handle record Candle (test profusely.)

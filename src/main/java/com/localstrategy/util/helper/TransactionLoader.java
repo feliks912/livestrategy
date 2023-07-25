@@ -9,19 +9,21 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.PriorityQueue;
-import java.util.Queue;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 public class TransactionLoader {
 
+    //FIXME: Mutliple edits, check before using
+
+    //NOTE: hardcoded value 10_000_000 because that was the chosen precision used during dataset size reduction. It results in 99.9999% precision of the original dataset
+
     private final Queue<Path> filesQueue;
-    private final int parallelism = Runtime.getRuntime().availableProcessors();
+    private final int processorCount = Runtime.getRuntime().availableProcessors();
 
     private String filename;
 
@@ -68,43 +70,71 @@ public class TransactionLoader {
 
 
     public List<SingleTransaction> loadNextDay() {
-        if (!filesQueue.isEmpty()) {
-            Path filePath = filesQueue.poll();
-            filename = filePath.getFileName().toString();
-            try (ForkJoinPool customThreadPool = new ForkJoinPool(parallelism)) {
-                return customThreadPool.submit(() -> {
-                    try (Stream<String> lines = Files.lines(filePath)) {
-                        return lines
-                                .parallel()
-                                .map(line -> line.split(","))
-                                .map(this::createTransaction)
-                                .collect(Collectors.toList());
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                        return new ArrayList<SingleTransaction>(); // Return an explicitly typed empty list
-                    }
+
+        if(filesQueue.isEmpty()) {
+            return null;
+        }
+
+        List<SingleTransaction> transactions = new ArrayList<>();
+
+        Path filePath = filesQueue.poll();
+        filename = filePath.getFileName().toString();
+
+        try (Stream<String> lines = Files.lines(filePath)) {
+            Iterator<String> lineIterator = lines.iterator();
+
+            if (!lineIterator.hasNext()) {
+                return null;
+            }
+
+            String[] firstTransactionData = lineIterator.next().split(",");
+            double firstPrice = Double.parseDouble(firstTransactionData[0]);
+            long firstTime = Long.parseLong(firstTransactionData[2]);
+
+            transactions.add(new SingleTransaction(
+                    firstPrice,
+                    firstPrice * Integer.parseInt(firstTransactionData[1]) / 10_000_000,
+                    firstTime
+            ));
+
+            try (ForkJoinPool customThreadPool = new ForkJoinPool(processorCount)) {
+                List<SingleTransaction> parallelTransactions = customThreadPool.submit(() -> {
+                    Stream<String> remainingLines = StreamSupport.stream(
+                            Spliterators.spliteratorUnknownSize(lineIterator, Spliterator.ORDERED),
+                            false
+                    );
+
+                    return remainingLines
+                            .parallel()
+                            .map(line -> line.split(","))
+                            .map(line -> createTransaction(line, firstPrice, firstTime))
+                            .collect(Collectors.toList());
                 }).get();
+
+                transactions.addAll(parallelTransactions);
             } catch (InterruptedException | ExecutionException ex) {
                 ex.printStackTrace();
             }
+        } catch (IOException ex) {
+            ex.printStackTrace();
         }
-        return new ArrayList<SingleTransaction>(); // Return an explicitly typed empty list
+        return transactions;
     }
 
 
-    private SingleTransaction createTransaction(String[] transactionData) {
+    private SingleTransaction createTransaction(String[] transactionData, double firstPrice, long firstTime) {
+
+        double price = Double.parseDouble(transactionData[0]) + firstPrice;
+
         return new SingleTransaction(
-                Double.parseDouble(transactionData[0]),
-                Double.parseDouble(transactionData[1]),
-                Long.parseLong(transactionData[2])
+                price,
+                price * Integer.parseInt(transactionData[1]) / 10_000_000,
+                Long.parseLong(transactionData[2]) + firstTime
         );
     }
 
+
     public int getTotalCsvFiles() {
         return filesQueue.size();
-    }
-
-    public String getLastFileName(){
-        return this.filename;
     }
 }

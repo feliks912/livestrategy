@@ -1,6 +1,7 @@
 package com.localstrategy;
 
 import com.localstrategy.util.enums.*;
+import com.localstrategy.util.types.Event;
 import com.localstrategy.util.types.SingleTransaction;
 import com.localstrategy.util.types.UserDataStream;
 
@@ -50,7 +51,6 @@ public class Binance {
     private final ArrayList<UserAssets> userAssetsList = new ArrayList<>();
     private final SlippageHandler slippageHandler = new SlippageHandler();
     private final TierManager tierManager = new TierManager();
-    private final LocalStrategy localStrategy;
 
     private SingleTransaction transaction;
 
@@ -59,36 +59,36 @@ public class Binance {
     private boolean userAssetsUpdated = false;
     private boolean ordersUpdated = false;
 
-    public Binance(Double initialUSDTPortfolio){
+    private final EventScheduler scheduler;
 
-        this.localStrategy = new LocalStrategy(this);
+    private Event currentEvent;
+
+    public Binance(Double initialUSDTPortfolio, EventScheduler scheduler){
+
+        this.scheduler = scheduler;
 
         this.userAssets.setFreeUSDT(initialUSDTPortfolio);
         this.userAssetsList.add(userAssets);
     }
 
+    public void onEvent(Event event){
+        currentEvent = event;
+    }
+
     public void onTransaction(SingleTransaction transaction, boolean isWall) {
         this.transaction = transaction;
-
-        latencyHandler.recalculateLatencies(transaction.timestamp());
         addInterest();
 
         checkFills();
         checkMarginLevel();
-        
-        handleUserActionRequest(latencyHandler.getDelayedActionRequests(transaction.timestamp()));
 
         updateUserDataStream();
-
-        localStrategy.onTransaction(transaction, isWall);
     }
 
     private void updateUserDataStream(){
         if(userAssetsUpdated || !updatedOrders.isEmpty()){
-            latencyHandler.addUserDataStream(
-                new UserDataStream(userAssets, updatedOrders),
-                transaction.timestamp()
-            );
+
+            scheduler.addEvent(new Event(currentEvent.getEventDelayedTimestamp(), EventDestination.LOCAL, new UserDataStream(userAssets, updatedOrders)));
 
             if(userAssetsUpdated){
                 userAssetsList.add(new UserAssets(userAssets));
@@ -124,7 +124,7 @@ public class Binance {
                     if (progOrdersReached) {
                         order.setStatus(OrderStatus.REJECTED);
                         order.setRejectionReason(RejectionReason.MAX_NUM_ALGO_ORDERS);
-                        respondToAction(ActionResponse.ACTION_REJECTED, order);
+                        createActionResponse(ActionResponse.ACTION_REJECTED, order);
                         continue;
                     }
 
@@ -139,7 +139,7 @@ public class Binance {
 
                         order.setStatus(OrderStatus.REJECTED);
                         order.setRejectionReason(RejectionReason.WOULD_TRIGGER_IMMEDIATELY);
-                        respondToAction(ActionResponse.ORDER_REJECTED, order);
+                        createActionResponse(ActionResponse.ORDER_REJECTED, order);
                         continue;
                     }
                     if (order.isAutomaticBorrow() && order.getOrderType().equals(OrderType.LIMIT)) { // "If you use MARGIN_BUY, the amount necessary to borrow in order to execute your order later will be borrowed at the creation time, regardless of the order type (whether it's limit or stop-limit)."
@@ -148,7 +148,7 @@ public class Binance {
                         if (rejectionReason != null) {
                             order.setStatus(OrderStatus.REJECTED);
                             order.setRejectionReason(rejectionReason);
-                            respondToAction(ActionResponse.ORDER_REJECTED, order);
+                            createActionResponse(ActionResponse.ORDER_REJECTED, order);
                             continue;
                         }
                     }
@@ -156,13 +156,13 @@ public class Binance {
                     order.setStatus(OrderStatus.NEW);
                     newOrders.add(order);
 
-                    respondToAction(ActionResponse.ORDER_CREATED, order);
+                    createActionResponse(ActionResponse.ORDER_CREATED, order);
                     updatedOrders.add(order);
                 }
                 case CANCEL_ORDER -> { //FIXME: Rejecting a cancel_order position will remove the position from new positions to rejected positions which isn't what we want.
                     if (!newOrders.contains(order) || !order.getOrderType().equals(OrderType.LIMIT)) {
                         order.setRejectionReason(RejectionReason.INVALID_ORDER_STATE);
-                        respondToAction(ActionResponse.ACTION_REJECTED, order);
+                        createActionResponse(ActionResponse.ACTION_REJECTED, order);
                         continue;
                     }
                     if (order.isAutoRepayAtCancel()) {
@@ -171,7 +171,7 @@ public class Binance {
 
                         if (rejectionReason != null) {
                             order.setRejectionReason(rejectionReason);
-                            respondToAction(ActionResponse.ACTION_REJECTED, order);
+                            createActionResponse(ActionResponse.ACTION_REJECTED, order);
                             continue;
                         }
                     }
@@ -180,17 +180,17 @@ public class Binance {
                     cancelledOrders.add(order);
                     newOrders.remove(order);
 
-                    respondToAction(ActionResponse.ORDER_CANCELLED, order);
+                    createActionResponse(ActionResponse.ORDER_CANCELLED, order);
                     updatedOrders.add(order);
                 }
                 case REPAY_FUNDS -> { //FIXME: User doesn't get a response from this, or for that matter any other action unless they manually loop through positions. Add some sort of response other than updating userDataStream
                     RejectionReason rejectionReason = repayFunds(order);
                     if (rejectionReason != null) {
                         order.setRejectionReason(rejectionReason);
-                        respondToAction(ActionResponse.ACTION_REJECTED, order);
+                        createActionResponse(ActionResponse.ACTION_REJECTED, order);
                         continue;
                     }
-                    respondToAction(ActionResponse.FUNDS_REPAYED, order);
+                    createActionResponse(ActionResponse.FUNDS_REPAYED, order);
                 }
                 default -> {
                 }
@@ -538,10 +538,12 @@ public class Binance {
         System.exit(1);
     }
 
-    private void respondToAction(ActionResponse response, Order order){
+    private void createActionResponse(ActionResponse response, Order order){
         Map<ActionResponse, Order> tempMap = new HashMap<>();
         tempMap.put(response, order);
         actionResponses.add(tempMap);
+
+        scheduler.addEvent(new Event(currentEvent.getEventDelayedTimestamp(), EventDestination.LOCAL, response, order));
     }
 
     private void rejectOrder(RejectionReason reason, Order order){

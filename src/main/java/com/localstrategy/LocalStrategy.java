@@ -1,12 +1,10 @@
 package com.localstrategy;
 
-import com.localstrategy.util.enums.OrderAction;
-import com.localstrategy.util.enums.OrderType;
 import com.localstrategy.util.enums.RejectionReason;
 import com.localstrategy.util.helper.CandleConstructor;
 import com.localstrategy.util.types.Candle;
+import com.localstrategy.util.types.Event;
 import com.localstrategy.util.types.SingleTransaction;
-import com.localstrategy.util.types.UserDataStream;
 
 import java.util.ArrayList;
 import java.util.Map;
@@ -36,136 +34,31 @@ public class LocalStrategy {
     private Binance exchangeHandler;
     private Candle lastCandle;
     private LatencyHandler latencyHandler;
-       
 
-    public LocalStrategy(Binance exchangeHandler){
+    private final EventScheduler scheduler;
+
+    public LocalStrategy(double initialFreeUSDT, EventScheduler scheduler){
+
+        this.scheduler = scheduler;
 
         //TODO: Any call to exchangeHandler has a response latency. Local variables are instant.
-        this.exchangeHandler = exchangeHandler;
-        this.latencyHandler = exchangeHandler.getLatencyHandler();
 
-        userAssets = exchangeHandler.getUserAssets();
+        userAssets.setFreeUSDT(initialFreeUSDT);
 
         orderRequest =  new OrderRequest(
             pendingPositions,
             newPositions,
             tierManager, 
             userAssets, 
-            LocalStrategy.RISK_PCT, 
+            RISK_PCT,
             Binance.ALGO_ORDER_LIMIT,
-            LocalStrategy.SLIPPAGE_PCT);
+            SLIPPAGE_PCT);
 
         //TODO: Print parameters on strategy start
     }
 
     
     private void priceUpdate(SingleTransaction transaction, boolean isWall){
-
-        latencyHandler.getDelayedTransaction(transaction.getTimestamp());
-
-        ArrayList<UserDataStream> userDataRespons = latencyHandler.getDelayedUserDataStream(transaction.getTimestamp());
-        if(!userDataRespons.isEmpty()){
-
-            //We only look for the latest update
-            int lastIndex = userDataRespons.size() - 1;
-
-            userAssets = userDataRespons.get(lastIndex).userAssets();
-
-            //TODO: Add closed positions to previousPositions
-
-            ArrayList<Position> tempNewPositions = userDataRespons.get(lastIndex).getNewPositions();
-            ArrayList<Position> newPositionDiff = findDifferences(tempNewPositions, newPositions);
-            if(!newPositionDiff.isEmpty()){
-                for(Position position : newPositionDiff){
-                    if(newPositions.contains(position)) {
-                        //Handle position removal
-                        System.out.println("Removed new position: " + position.getId());
-                        //Confirm new position
-                    } else {
-                        //Handle new position
-                        System.out.println("Added new position: " + position.getId());
-                        //Rejected new positions handled here
-                    }
-                }
-            }
-
-            ArrayList<Position> tempFilledPositions = userDataRespons.get(lastIndex).getFilledPositions();
-            ArrayList<Position> filledPositionDiff = findDifferences(tempFilledPositions, filledPositions);
-            if(!filledPositionDiff.isEmpty()){
-                for(Position position : filledPositionDiff){
-                    if(newPositions.contains(position)) {
-                        //Handle position removal
-                        System.out.println("Removed filled position: " + position.getId());
-                        //Confirm new position
-                    } else {
-                        //Handle new position
-                        System.out.println("Added filled position: " + position.getId());
-                    }
-                }
-            }
-
-            ArrayList<Position> tempCancelledPositions = userDataRespons.get(lastIndex).getCancelledPositions();
-            ArrayList<Position> canceledPositionDiff = findDifferences(tempCancelledPositions, cancelledPositions);
-            if(!canceledPositionDiff.isEmpty()){
-                for(Position position : canceledPositionDiff){
-                    //Handle new cancelled positions
-
-                    System.out.println("Added canceled position: " + position.getId());
-                }
-            }
-
-            ArrayList<Position> tempRejectedOrders = userDataRespons.get(lastIndex).getRejectedPositions();
-            /* ArrayList<Position> rejectedPositionsDiff = findDifferences(tempRejectedOrders, rejectedOrders);
-            if(!rejectedPositionsDiff.isEmpty()){
-                //Handle new order rejections
-
-            } */
-
-            ArrayList<Map<RejectionReason, Position>> rejectedActions = userDataRespons.get(lastIndex).getRejectedActions();
-            if(!rejectedActions.isEmpty()){
-                for(Map<RejectionReason, Position> rejection : rejectedActions){
-                    Map.Entry<RejectionReason, Position> entry = rejection.entrySet().iterator().next();
-
-                    RejectionReason reason = entry.getKey();
-                    Position position = entry.getValue();
-
-                    switch(reason){
-                        case INSUFFICIENT_MARGIN:
-                            //Handle insufficient margin
-                            //Repeat order with smaller size if limit
-                            //Discard?
-                            break;
-                        case WOULD_TRIGGER_IMMEDIATELY:
-                            if(position.isStopLoss()){ //Attempted to create a stop-loss but failed, price is now going away from the stop-loss
-                                //Create new market order for the opposite direction
-                                Position marketStopLoss = new Position(position);
-                                position.setOrderType(OrderType.MARKET);
-                                latencyHandler.addActionRequest(OrderAction.CREATE_ORDER, tempRejectedOrders, lastIndex);
-                            }
-                            break;
-                        case MAX_NUM_ALGO_ORDERS:
-                            if(position.isStopLoss()){ //For some reason could be we can't create a stop-loss due to programmatic position count despite we test it locally
-                                //Close the position if no other clear action is available
-                            }
-                            break;
-                        case EXCESS_BORROW:
-                            if(position.isStopLoss()){ //What could this be? Close position on market
-
-                            }
-                            break;
-                        case INSUFFICIENT_FUNDS:
-                            break;
-                        case INVALID_ORDER_STATE:
-                            break;
-                    }
-                }
-            }
-
-            newPositions = Position.deepCopyPositionList(tempNewPositions);
-            filledPositions = Position.deepCopyPositionList(filledPositionDiff);
-            cancelledPositions = Position.deepCopyPositionList(canceledPositionDiff);
-            rejectedOrders = Position.deepCopyPositionList(tempRejectedOrders);
-        }
     }
 
     private void newCandle(SingleTransaction transaction, ArrayList<Candle> candles){
@@ -173,6 +66,9 @@ public class LocalStrategy {
     }
     
 
+    public void onEvent(Event event){
+
+    }
 
     public void onTransaction(SingleTransaction transaction, boolean isWall){
         Candle candle = candleConstructor.processTradeEvent(transaction);
@@ -183,38 +79,5 @@ public class LocalStrategy {
             lastCandle = candle;
             newCandle(transaction, candleConstructor.getCandles());
         }
-    }
-
-    //Returns a list of Position objects in list2 but not in list1
-    public ArrayList<Position> findDifferences(ArrayList<Position> list1, ArrayList<Position> list2) {
-        ArrayList<Position> diff = new ArrayList<>();
-
-        for (Position pos1 : list1) {
-            boolean found = false;
-            for (Position pos2 : list2) {
-                if (pos1.getId() == pos2.getId()) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                diff.add(pos1);
-            }
-        }
-
-        for (Position pos2 : list2) {
-            boolean found = false;
-            for (Position pos1 : list1) {
-                if (pos1.getId() == pos2.getId()) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                diff.add(pos2);
-            }
-        }
-
-        return diff;
     }
 }

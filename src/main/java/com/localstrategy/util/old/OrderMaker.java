@@ -1,10 +1,9 @@
 package com.localstrategy.util.old;
 
-import java.util.ArrayList;
-
-import com.binance.api.client.domain.OrderSide;
 import com.localstrategy.Position;
 import com.localstrategy.TierManager;
+
+import java.util.ArrayList;
 
 public class OrderMaker {
 

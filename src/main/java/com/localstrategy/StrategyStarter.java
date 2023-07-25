@@ -1,27 +1,36 @@
 package com.localstrategy;
 
+import com.localstrategy.util.enums.EventDestination;
+import com.localstrategy.util.enums.EventType;
 import com.localstrategy.util.helper.TransactionLoader;
+import com.localstrategy.util.types.Event;
 import com.localstrategy.util.types.SingleTransaction;
 
 import java.util.ArrayList;
-import java.util.List;
 
 public class StrategyStarter {
 
     
     TransactionLoader transactionLoader;
-    private List<SingleTransaction> transactionList = new ArrayList<>();
+    private ArrayList<SingleTransaction> transactionList = new ArrayList<>();
 
     Binance exchangeHandler;
 
+    LocalStrategy localHandler;
+
     private final double initialUSDTPortfolio;
+
+    private final EventScheduler scheduler = new EventScheduler();
 
 
     public StrategyStarter(String inputDataFolderPath, String fromDate, String toDate, double initialUSDTPortfolio) {
 
         this.initialUSDTPortfolio = initialUSDTPortfolio;
 
-        this.exchangeHandler = new Binance(initialUSDTPortfolio);
+        this.exchangeHandler = new Binance(initialUSDTPortfolio, scheduler);
+        this.localHandler = new LocalStrategy(initialUSDTPortfolio, scheduler);
+
+
         this.transactionLoader = new TransactionLoader(inputDataFolderPath, fromDate, toDate);
     }
 
@@ -29,77 +38,54 @@ public class StrategyStarter {
     public void execute(String outputCSVPath){
 
         int fileCount = transactionLoader.getTotalCsvFiles();
+        int fileCounter = fileCount;
 
         double previousPortfolioValue = initialUSDTPortfolio;
         
         System.out.println("Total days: " + fileCount + ". Starting portfolio: $" + initialUSDTPortfolio);
 
-        for(int i = 1; i <= fileCount; i++){
+        int transactionCounter = 0;
 
-            int maxPositionCount = 0;
+        transactionList = new ArrayList<>(transactionLoader.loadNextDay());
 
-            boolean isWall = false;
+        addNextTransactionToQueue(scheduler, transactionList, transactionCounter++);
 
-            transactionList = transactionLoader.loadNextDay();
+        //FIXME: When to load the next day assuming we don't want to break the queue or finish a daily one and only then load the next day? We need continuity.
+        //Start loading next day when the final transaction of the day is reached
+        while(!scheduler.isEmpty()){
+            Event event = scheduler.getNextEvent();
 
-            for(SingleTransaction transaction : transactionList){
-
-                //Positive lookahead for the wall.
-                //  Wall is defines as a series of delayed transactions made in close time proximity one from another, which    significantly move the market price and wreck chaos on the orderbook
-
-                //FIXME: IndexOf seems to be **very** expensive. Change IndexOf in exchangeHandler to an alternative as well
-                /* int transactionIndex = transactionList.indexOf(transaction);
-
-                long pTTimestamp = transaction.getTimestamp();
-
-                if(!isWall){
-                    for(int w = 1; w < 6; w++){
-                        SingleTransaction pT = transactionList.get(transactionIndex + w);
-
-                        if(pT.getTimestamp() - pTTimestamp < 5){ //If 5 continuous transactions have a delta timestamp of less than 5 seconds we assume that is a wall and set the wall variable until the dt is larger than 5
-                            isWall = true;
-                        } else {
-                            isWall = false;
+            if(event.getDestination().equals(EventDestination.EXCHANGE)){
+                //  We can load the next transaction on the exchange side once we reach the previous transaction because we don't add transaction events as last event EventScheduler, therefore that event isn't considered during the chain rule check.
+                if(event.getEventType().equals(EventType.TRANSACTION)){
+                    addNextTransactionToQueue(scheduler, transactionList, transactionCounter++);
+                    if(transactionCounter == transactionList.size()){
+                        //Last transaction of the day is reached and loaded
+                        //Load the next day
+                        if(--fileCounter <= 0){
+                           //No more days to load, exit strategy
+                            //TODO: exit strategy
                         }
-
-                        pTTimestamp = pT.getTimestamp();
+                        transactionList = new ArrayList<>(transactionLoader.loadNextDay());
                     }
-                } else {
-                    if(transactionList.get(transactionIndex + 1).getTimestamp() - pTTimestamp > 5){
-                        isWall = false;
-                    }
-                } */
-
-                exchangeHandler.onTransaction(transaction, isWall);
-
-                int currentPositionCount = exchangeHandler.getOrderCount();
-                if(maxPositionCount > currentPositionCount){
-                    maxPositionCount = currentPositionCount;
                 }
+                exchangeHandler.onEvent(event);
+            } else {
+                //Run local handler
+                localHandler.onEvent(event);
             }
-
-            int totalDailyPositionCount = exchangeHandler.getRunningPositionCounter();
-            exchangeHandler.setRunningPositionCounter(0);
-
-            double currentFreePortfolio = exchangeHandler.getTotalAssetsValue();
-            //TODO: Format file name properly
-            System.out.printf("File %s done. Portfolio: $%.2f. Profit: $%.2f, change: %.2f%%, Maximum positions: %d, Total positions: %d\n", 
-                transactionLoader.getLastFileName(), 
-                currentFreePortfolio, 
-                currentFreePortfolio - previousPortfolioValue, 
-                (currentFreePortfolio - previousPortfolioValue) / previousPortfolioValue * 100, 
-                maxPositionCount, 
-                totalDailyPositionCount);
-
-            previousPortfolioValue = currentFreePortfolio;
         }
 
         //ArrayList<Double> portfolioList = exchangeHandler.terminateAndReport(outputCSVPath);
-
-        
     }
 
-    
+    private void addNextTransactionToQueue(EventScheduler scheduler, ArrayList<SingleTransaction> transactionList, int transactionCounter){
+        SingleTransaction transaction = transactionList.get(transactionCounter);
+
+        scheduler.addEvent(new Event(transaction.timestamp(), EventDestination.EXCHANGE, transaction));
+        scheduler.addEvent(new Event(transaction.timestamp(), EventDestination.LOCAL, transaction));
+    }
+
     /* public ArrayList<AssetHandler> terminateAndReport(ArrayList<Position> allPositions, String outputCSVPath, SingleTransaction transaction){
         //FIXME: Handle summing profit to portfolio correctly
         for(Position position : allPositions){
