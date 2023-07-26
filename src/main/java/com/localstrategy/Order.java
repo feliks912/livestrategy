@@ -29,7 +29,7 @@ public class Order {
     public Order(
             double openPrice,
             OrderSide direction,
-            boolean isStopLoss,
+            boolean automaticBorrow,
             double size,
             OrderType orderType,
             double margin,
@@ -37,8 +37,7 @@ public class Order {
             long openTimestamp) {
                 
         this.orderType = orderType;
-        this.isStopLoss = isStopLoss;
-        this.automaticBorrow = !isStopLoss; //Stop-losses don't borrow funds as the funds are already borrowed
+        this.automaticBorrow = automaticBorrow; //Stop-losses don't borrow funds as the funds are already borrowed
         this.status = OrderStatus.NEW;
         this.openPrice = openPrice;
         this.size = size;
@@ -110,7 +109,7 @@ public class Order {
         this.margin = margin;
     }
 
-    public OrderType getOrderType() {
+    public OrderType getType() {
         return this.orderType;
     }
 

@@ -69,19 +69,15 @@ public class Event implements Comparable<Event> {
         this.eventDelayedTimestamp = this.eventTimestamp + latency;
     }
 
-    public EventType getEventType() {
+    public EventType getType() {
         return eventType;
-    }
-
-    public long getEventId() {
-        return eventId;
     }
 
     public EventDestination getDestination() {
         return destination;
     }
 
-    public long getEventTimestamp() {
+    public long getTimestamp() {
         return eventTimestamp;
     }
 
@@ -89,7 +85,7 @@ public class Event implements Comparable<Event> {
         return eventLatency;
     }
 
-    public long getEventDelayedTimestamp() {
+    public long getDelayedTimestamp() {
         return eventDelayedTimestamp;
     }
 

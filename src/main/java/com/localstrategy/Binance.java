@@ -6,7 +6,6 @@ import com.localstrategy.util.types.SingleTransaction;
 import com.localstrategy.util.types.UserDataStream;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Map;
 
 
@@ -49,7 +48,6 @@ public class Binance {
 
     private final LatencyHandler latencyHandler = new LatencyHandler();
     private final ArrayList<UserAssets> userAssetsList = new ArrayList<>();
-    private final SlippageHandler slippageHandler = new SlippageHandler();
     private final TierManager tierManager = new TierManager();
 
     private SingleTransaction transaction;
@@ -72,64 +70,80 @@ public class Binance {
     }
 
     public void onEvent(Event event){
-        currentEvent = event;
-    }
 
-    public void onTransaction(SingleTransaction transaction, boolean isWall) {
-        this.transaction = transaction;
+        if(event == null){
+            System.out.println("Exchange Error - Null exchange event in onEvent.");
+        }
+
+        this.currentEvent = event;
+
+        switch(event.getType()){
+            case TRANSACTION -> {
+                this.transaction = event.getTransaction();
+                checkFills();
+            }
+            case ACTION_REQUEST -> {
+                handleUserActionRequest(event.getActionRequest());
+            }
+            default -> {
+                System.out.println("Exchange Error - Something other than transaction or action request ended up exchange's event stream.");
+            }
+        }
+
         addInterest();
-
-        checkFills();
         checkMarginLevel();
-
         updateUserDataStream();
     }
 
     private void updateUserDataStream(){
         if(userAssetsUpdated || !updatedOrders.isEmpty()){
 
-            scheduler.addEvent(new Event(currentEvent.getEventDelayedTimestamp(), EventDestination.LOCAL, new UserDataStream(userAssets, updatedOrders)));
+            scheduler.addEvent(new Event(currentEvent.getDelayedTimestamp(), EventDestination.LOCAL, new UserDataStream(userAssets, updatedOrders)));
 
             if(userAssetsUpdated){
                 userAssetsList.add(new UserAssets(userAssets));
             }
+
+            updatedOrders.clear();
 
             userAssetsUpdated = false;
             ordersUpdated = false;
         }
     }
     
-    private void handleUserActionRequest(ArrayList<Map<OrderAction, Order>> entryBlock){
+    private void handleUserActionRequest(Map<OrderAction, Order> entryBlock){
 
-        if(entryBlock.isEmpty()){
-            return;
+        if(entryBlock == null){
+            System.out.println("Exchange error - EntryBlock in handleUserActionRequest is NULL which shouldn't be.");
         }
 
-        for(Map<OrderAction, Order> entry : entryBlock){
+        if(entryBlock.isEmpty()){
+            System.out.println("Exchange Error - EntryBlock in handleUserActionRequest is empty which shouldn't be.");
+        }
 
-            Map.Entry<OrderAction, Order> tempMap = entry.entrySet().iterator().next();
+        for(Map.Entry<OrderAction, Order> actionRequest : entryBlock.entrySet()){
 
-            OrderAction orderAction = tempMap.getKey();
-            Order order = tempMap.getValue();
+            OrderAction orderAction = actionRequest.getKey();
+            Order order = actionRequest.getValue();
 
             switch (orderAction) {
                 case CREATE_ORDER -> {
-                    boolean progOrdersReached = order.getOrderType().equals(OrderType.LIMIT) &&
-                                    (newOrders.stream()
-                                            .filter(p -> p.getOrderType()
+                    boolean progOrdersReached = order.getType().equals(OrderType.LIMIT) &&
+                            (newOrders.stream()
+                                    .filter(p -> p.getType()
                                             .equals(OrderType.LIMIT))
-                                            .count()
-                                                >= Binance.ALGO_ORDER_LIMIT);
+                                    .count()
+                                    >= Binance.ALGO_ORDER_LIMIT);
 
                     if (progOrdersReached) {
                         order.setStatus(OrderStatus.REJECTED);
                         order.setRejectionReason(RejectionReason.MAX_NUM_ALGO_ORDERS);
-                        createActionResponse(ActionResponse.ACTION_REJECTED, order);
+                        createActionResponse(ActionResponse.ORDER_REJECTED, order);
                         continue;
                     }
 
                     // Immediate trigger?
-                    if (order.getOrderType().equals(OrderType.LIMIT) &&
+                    if (order.getType().equals(OrderType.LIMIT) &&
                             ((order.getDirection().equals(OrderSide.BUY) &&
                                     (order.isStopLoss() && transaction.price() >= order.getOpenPrice() ||
                                             !order.isStopLoss() && transaction.price() <= order.getOpenPrice())) ||
@@ -142,14 +156,29 @@ public class Binance {
                         createActionResponse(ActionResponse.ORDER_REJECTED, order);
                         continue;
                     }
-                    if (order.isAutomaticBorrow() && order.getOrderType().equals(OrderType.LIMIT)) { // "If you use MARGIN_BUY, the amount necessary to borrow in order to execute your order later will be borrowed at the creation time, regardless of the order type (whether it's limit or stop-limit)."
-                        RejectionReason rejectionReason = borrowFunds(order);
 
-                        if (rejectionReason != null) {
-                            order.setStatus(OrderStatus.REJECTED);
-                            order.setRejectionReason(rejectionReason);
-                            createActionResponse(ActionResponse.ORDER_REJECTED, order);
-                            continue;
+                    // "If you use MARGIN_BUY, the amount necessary to borrow in order to execute your order later will be borrowed at the creation time, regardless of the order type (whether it's limit or stop-limit)."
+                    if (order.isAutomaticBorrow() && order.getType().equals(OrderType.LIMIT)) {
+                        //We checked for already available funds in the checkFills method for market orders
+
+                        boolean isLong = order.getDirection().equals(OrderSide.BUY);
+
+                        //Hacky as hell here - binance usually borrows extra funds I already see we're going to have issues with automatic borrowings.
+                        double fillPrice = SlippageHandler.getSlippageFillPrice(
+                                order.getOpenPrice(),
+                                order.getSize(),
+                                order.getDirection()
+                        );
+
+                        if(userAssets.getFreeUSDT() < order.getSize() * fillPrice && (!isLong && userAssets.getFreeBTC() < order.getSize())) {//Unless we have enough funds.
+
+                            RejectionReason rejectionReason = borrowFunds(order);
+                            if (rejectionReason != null) {
+                                order.setStatus(OrderStatus.REJECTED);
+                                order.setRejectionReason(rejectionReason);
+                                createActionResponse(ActionResponse.ORDER_REJECTED, order);
+                                continue;
+                            }
                         }
                     }
 
@@ -159,8 +188,8 @@ public class Binance {
                     createActionResponse(ActionResponse.ORDER_CREATED, order);
                     updatedOrders.add(order);
                 }
-                case CANCEL_ORDER -> { //FIXME: Rejecting a cancel_order position will remove the position from new positions to rejected positions which isn't what we want.
-                    if (!newOrders.contains(order) || !order.getOrderType().equals(OrderType.LIMIT)) {
+                case CANCEL_ORDER -> {
+                    if (!newOrders.contains(order) || !order.getType().equals(OrderType.LIMIT)) {
                         order.setRejectionReason(RejectionReason.INVALID_ORDER_STATE);
                         createActionResponse(ActionResponse.ACTION_REJECTED, order);
                         continue;
@@ -183,7 +212,7 @@ public class Binance {
                     createActionResponse(ActionResponse.ORDER_CANCELLED, order);
                     updatedOrders.add(order);
                 }
-                case REPAY_FUNDS -> { //FIXME: User doesn't get a response from this, or for that matter any other action unless they manually loop through positions. Add some sort of response other than updating userDataStream
+                case REPAY_FUNDS -> {
                     RejectionReason rejectionReason = repayFunds(order);
                     if (rejectionReason != null) {
                         order.setRejectionReason(rejectionReason);
@@ -200,12 +229,12 @@ public class Binance {
 
     private void checkFills(){
         for(Order order : newOrders){
-            if(order.getStatus().equals(OrderStatus.NEW)){
+            if(order.getStatus().equals(OrderStatus.NEW)){ //FIXME: Status field is mutable by the client. We're not editing it too much but still not good practice
 
-                boolean isMarketOrder = order.getOrderType().equals(OrderType.MARKET);
+                boolean isMarketOrder = order.getType().equals(OrderType.MARKET);
                 boolean isLong = order.getDirection().equals(OrderSide.BUY);
 
-                double fillPrice = slippageHandler.getSlippageFillPrice(
+                double fillPrice = SlippageHandler.getSlippageFillPrice(
                     isMarketOrder ? transaction.price() : order.getOpenPrice(),
                     order.getSize(), 
                     order.getDirection()
@@ -220,16 +249,30 @@ public class Binance {
                             !order.isStopLoss() && transaction.price() <= order.getOpenPrice())))){
 
                     if(isMarketOrder && order.isAutomaticBorrow()){
-                        RejectionReason rejectionReason = borrowFunds(order);
 
-                        if(rejectionReason != null){
-                            rejectOrder(rejectionReason, order);
-                            continue;
+                        //FIXME: We still don't understand which asset Binance checks when deciding whether we have enough funds. We'll assume it only checks...?
+                        if(userAssets.getFreeUSDT() < order.getSize() * fillPrice && (!isLong && userAssets.getFreeBTC() < order.getSize())){
+
+                            RejectionReason rejectionReason = borrowFunds(order);
+                            if(rejectionReason != null){
+                                order.setStatus(OrderStatus.REJECTED);
+                                order.setRejectionReason(rejectionReason);
+                                createActionResponse(ActionResponse.ORDER_REJECTED, order);
+                                rejectedOrders.add(order); //For removal at the end of the method
+                                continue;
+                            }
                         }
                     }
                     if(isLong){
                         if(userAssets.getFreeUSDT() < order.getBorrowedAmount()){
-                            rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, order);
+                            if(isMarketOrder){
+                                order.setStatus(OrderStatus.REJECTED);
+                                order.setRejectionReason(RejectionReason.INSUFFICIENT_FUNDS);
+                                createActionResponse(ActionResponse.ORDER_REJECTED, order);
+                                rejectedOrders.add(order);
+                            } else {
+                                rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, order); //FIXME: This one for example, would report over an user stream.
+                            }
                             continue;
                         }
 
@@ -246,7 +289,14 @@ public class Binance {
 
                     } else { //Short
                         if(userAssets.getFreeBTC() < order.getSize()){
-                            rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, order);
+                            if(isMarketOrder){
+                                order.setStatus(OrderStatus.REJECTED);
+                                order.setRejectionReason(RejectionReason.INSUFFICIENT_FUNDS);
+                                createActionResponse(ActionResponse.ORDER_REJECTED, order);
+                                rejectedOrders.add(order);
+                            } else {
+                                rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, order); //FIXME: This one for example, would report over an user stream.
+                            }
                             continue;
                         }
                         //Sell BTC
@@ -285,9 +335,9 @@ public class Binance {
 
     private void addInterest(){
         if((!filledOrders.isEmpty() || !newOrders.isEmpty()) && 
-            transaction.timestamp() - previousInterestTimestamp > 1000 * 60 * 60){
+            currentEvent.getDelayedTimestamp() - previousInterestTimestamp > 1000 * 60 * 60){
 
-            previousInterestTimestamp = transaction.timestamp();
+            previousInterestTimestamp = currentEvent.getDelayedTimestamp();
 
             userAssets.setTotalUnpaidInterest(
                     userAssets.getTotalUnpaidInterest()
@@ -300,10 +350,10 @@ public class Binance {
 
     private RejectionReason borrowFunds(Order order){
 
-        boolean isMarketOrder = order.getOrderType().equals(OrderType.MARKET);
+        boolean isMarketOrder = order.getType().equals(OrderType.MARKET);
         boolean isLong = order.getDirection().equals(OrderSide.BUY);
 
-        double fillPrice = slippageHandler.getSlippageFillPrice(
+        double fillPrice = SlippageHandler.getSlippageFillPrice(
             isMarketOrder ? transaction.price() : order.getOpenPrice(),
             order.getSize(), 
             order.getDirection()
@@ -357,7 +407,7 @@ public class Binance {
             order.setMargin(requiredMargin);
             order.setBorrowedAmount(positionValue);
         
-        } else {
+        } else { //Short
 
             double positionSize = order.getSize();
 
@@ -409,8 +459,7 @@ public class Binance {
     }
 
     //TODO: Check and refactor
-
-    private RejectionReason repayFunds(Order order){
+    private RejectionReason repayFunds(Order order) {
         if(order.getBorrowedAmount() == 0){
             return RejectionReason.INVALID_ORDER_STATE;
         }
@@ -423,13 +472,11 @@ public class Binance {
             }
 
             if(userAssets.getLockedUSDT() < order.getMargin()){
-                System.out.println("Error at repayFunds side BUY - locked USDT has insufficient funds to unlock margin?");
-                System.exit(1);
+                System.out.println("Exchange Error at repayFunds side BUY - locked USDT has insufficient funds to unlock margin?");
             }
 
             if(userAssets.getTotalBorrowedUSDT() < order.getBorrowedAmount()){
-                System.out.println("Error at repayFunds side BUY - borrowed USDT would go negative if we were to exclude the borrowed amount?");
-                System.exit(1);
+                System.out.println("Exchange Error at repayFunds side BUY - borrowed USDT would go negative if we were to exclude the borrowed amount?");
             }
 
             userAssets.setFreeUSDT(
@@ -458,13 +505,11 @@ public class Binance {
             }
 
             if(userAssets.getLockedUSDT() < order.getMargin()){
-                System.out.println("Error at repayFunds side SELL - locked USDT has insufficient funds to unlock margin?");
-                System.exit(1);
+                System.out.println("Exchange Error at repayFunds side SELL - locked USDT has insufficient funds to unlock margin?");
             }
 
             if(userAssets.getTotalBorrowedBTC() < order.getBorrowedAmount()){
-                System.out.println("Error at repayFunds side SELL - borrowed BTC would go negative if we were to exclude the borrowed amount?");
-                System.exit(1);
+                System.out.println("Exchange Error at repayFunds side SELL - borrowed BTC would go negative if we were to exclude the borrowed amount?");
             }
 
             userAssets.setFreeBTC(
@@ -490,8 +535,7 @@ public class Binance {
         }
 
         if(userAssets.getTotalBorrowedBTC() < order.getBorrowedAmount()){
-            System.out.println("Error at repayFunds - unpaid interest would go negative?");
-            System.exit(1);
+            System.out.println("Exchange Error at repayFunds - unpaid interest would go negative?");
         }
 
         userAssets.setTotalUnpaidInterest(
@@ -539,11 +583,7 @@ public class Binance {
     }
 
     private void createActionResponse(ActionResponse response, Order order){
-        Map<ActionResponse, Order> tempMap = new HashMap<>();
-        tempMap.put(response, order);
-        actionResponses.add(tempMap);
-
-        scheduler.addEvent(new Event(currentEvent.getEventDelayedTimestamp(), EventDestination.LOCAL, response, order));
+        scheduler.addEvent(new Event(currentEvent.getDelayedTimestamp(), EventDestination.LOCAL, response, order));
     }
 
     private void rejectOrder(RejectionReason reason, Order order){

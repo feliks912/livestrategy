@@ -10,8 +10,6 @@ public class SlippageHandler {
     private static final double SQUARE_ROOT_MODEL_CONSTANT = 0.5;
     private static final long BTCUSDT_DAILY_VOLUME = 8_570_000_000L;
 
-    public SlippageHandler() {
-    }
 
     public static double getSlippageFillPrice(double price, double orderSize, OrderSide orderSide) {
         double direction = (orderSide.equals(OrderSide.BUY) ? 1 : -1);

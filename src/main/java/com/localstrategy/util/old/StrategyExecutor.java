@@ -1,17 +1,13 @@
 package com.localstrategy.util.misc;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-
-import org.apache.commons.math3.distribution.LogNormalDistribution;
-
-import com.binance.api.client.domain.OrderSide;
-import com.binance.api.client.domain.account.Order;
 import com.localstrategy.Position;
 import com.localstrategy.TierManager;
 import com.localstrategy.util.types.Candle;
 import com.localstrategy.util.types.SingleTransaction;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 
 public class StrategyExecutor {
 

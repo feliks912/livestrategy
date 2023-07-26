@@ -40,15 +40,12 @@ public class StrategyStarter {
         int fileCount = transactionLoader.getTotalCsvFiles();
         int fileCounter = fileCount;
 
-        double previousPortfolioValue = initialUSDTPortfolio;
-        
-        System.out.println("Total days: " + fileCount + ". Starting portfolio: $" + initialUSDTPortfolio);
-
         int transactionCounter = 0;
 
         transactionList = new ArrayList<>(transactionLoader.loadNextDay());
 
-        addNextTransactionToQueue(scheduler, transactionList, transactionCounter++);
+        SingleTransaction exchangeTransaction = transactionList.get(transactionCounter++);
+        scheduler.addEvent(new Event(exchangeTransaction.timestamp(), EventDestination.EXCHANGE, exchangeTransaction));
 
         //FIXME: When to load the next day assuming we don't want to break the queue or finish a daily one and only then load the next day? We need continuity.
         //Start loading next day when the final transaction of the day is reached
@@ -56,9 +53,22 @@ public class StrategyStarter {
             Event event = scheduler.getNextEvent();
 
             if(event.getDestination().equals(EventDestination.EXCHANGE)){
+
+                if(event.getType().equals(EventType.ACTION_RESPONSE) || event.getType().equals(EventType.USER_DATA_STREAM)){
+                    System.out.println("How did these get here? StrategyStarter.java. Exiting.");
+                    System.exit(1);
+                }
+
                 //  We can load the next transaction on the exchange side once we reach the previous transaction because we don't add transaction events as last event EventScheduler, therefore that event isn't considered during the chain rule check.
-                if(event.getEventType().equals(EventType.TRANSACTION)){
-                    addNextTransactionToQueue(scheduler, transactionList, transactionCounter++);
+                if(event.getType().equals(EventType.TRANSACTION)){
+
+                    //Add this transaction to a local event queue
+                    scheduler.addEvent(new Event(event.getTransaction().timestamp(), EventDestination.LOCAL, event.getTransaction()));
+
+                    //Add the next transaction to an exchange queue
+                    exchangeTransaction = transactionList.get(transactionCounter++);
+                    scheduler.addEvent(new Event(exchangeTransaction.timestamp(), EventDestination.EXCHANGE, exchangeTransaction));
+
                     if(transactionCounter == transactionList.size()){
                         //Last transaction of the day is reached and loaded
                         //Load the next day
@@ -77,13 +87,6 @@ public class StrategyStarter {
         }
 
         //ArrayList<Double> portfolioList = exchangeHandler.terminateAndReport(outputCSVPath);
-    }
-
-    private void addNextTransactionToQueue(EventScheduler scheduler, ArrayList<SingleTransaction> transactionList, int transactionCounter){
-        SingleTransaction transaction = transactionList.get(transactionCounter);
-
-        scheduler.addEvent(new Event(transaction.timestamp(), EventDestination.EXCHANGE, transaction));
-        scheduler.addEvent(new Event(transaction.timestamp(), EventDestination.LOCAL, transaction));
     }
 
     /* public ArrayList<AssetHandler> terminateAndReport(ArrayList<Position> allPositions, String outputCSVPath, SingleTransaction transaction){

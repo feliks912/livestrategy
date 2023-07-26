@@ -8,29 +8,20 @@ import java.util.PriorityQueue;
 
 public class EventScheduler {
 
-    //FIXME: Might be issues when adding the first element.
-        //  When there's no first element the LatencyHandler can produce any latency.
-        //  The first event must be the first exchange transaction whose latency is 0.
-
-    private final PriorityQueue<Event> eventQueue;
+    private final PriorityQueue<Event> eventQueue = new PriorityQueue<>();
 
     private Event lastExchangeEvent;
     private Event lastLocalEvent;
 
-
-    public EventScheduler() {
-        eventQueue = new PriorityQueue<>();
-    }
-
-
     public void addEvent(Event event) {
-        boolean isTransaction = event.getEventType().equals(EventType.TRANSACTION);
+
+        boolean isTransaction = event.getType().equals(EventType.TRANSACTION);
         boolean isDestinationExchange = event.getDestination().equals(EventDestination.EXCHANGE);
 
         if (isDestinationExchange && isTransaction) {
-            event.setEventLatency(0);
+            event.setEventLatency(0); //Exchange transaction
         } else {
-            Event lastEvent = isTransaction ? lastExchangeEvent : lastLocalEvent;
+            Event lastEvent = isDestinationExchange ? lastExchangeEvent : lastLocalEvent;
             event.setEventLatency(LatencyHandler.calculateLatency(event, lastEvent));
         }
 

@@ -6,6 +6,9 @@ import java.util.Random;
 
 public class LatencyHandler {
 
+    //TODO:
+
+
     //TODO: Implement latency walls. That one will be fun because we probably won't end up using this individualistic, one-by-one implementation. Rather the latencies will be calculated for the entire day up-front, and all events will draw from those
     //FIXME: Add static Exchange processing time to all action requests, but include it before calculating the latency rule (or after, does it matter?)
 

@@ -1,3 +1,7 @@
+25.7.23 21:33
+    Implementing responses which carry action requests or something, so we know what we asked to get such a response.
+    Binance doesn't do that, but irl we use a callback. Using callbacks ensures we know what we sent, and handle the request appropriately.
+
 20.7.23 3:43
     Instead of using transactions we must use states to run our program. States are dynamically added to a queue list and executed sequentially. One for Exchange and another for client. This replaces our latency data structures. Instead, if a request is made on t1, and it's latency is calculated to be t1', then if t1 + t1' < t2 where t2 might be the time of the next transaction, a new state of the exchange must be executed at time t1 + t1'. Same goes for the response.
 

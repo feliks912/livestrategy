@@ -1,6 +1,7 @@
 package com.localstrategy;
 
 import com.localstrategy.util.enums.OrderSide;
+import com.localstrategy.util.enums.OrderStatus;
 import com.localstrategy.util.enums.OrderType;
 import com.localstrategy.util.enums.RejectionReason;
 
@@ -37,6 +38,8 @@ public class Position {
     private boolean automaticBorrow;
     private boolean autoRepayAtCancel = true;
 
+    private boolean cancelled = false;
+
     private Order entryOrder;
     private Order stopLossOrder;
 
@@ -66,7 +69,7 @@ public class Position {
         this.entryOrder = new Order(
             openPrice,
             direction,
-            false, 
+            true,
             size, 
             orderType, 
             margin, 
@@ -77,7 +80,7 @@ public class Position {
         this.stopLossOrder = new Order(
             stopLossPrice, 
             direction == OrderSide.BUY ? OrderSide.SELL : OrderSide.BUY, 
-            true, 
+            false,
             size, 
             OrderType.LIMIT, 
             margin, 
@@ -119,6 +122,31 @@ public class Position {
         this.entryOrder = new Order(other.entryOrder);
         this.stopLossOrder = new Order(other.stopLossOrder);
         this.closeOrder = new Order(other.closeOrder);
+        this.cancelled = other.cancelled;
+    }
+
+    public double closePosition(long closeTimestamp){
+        if(closed || !filled || !entryOrder.getStatus().equals(OrderStatus.FILLED)){
+            return 0;
+        }
+
+        if(stopLossOrder.getStatus().equals(OrderStatus.FILLED)){
+            this.profit = (stopLossOrder.getFillPrice() - entryOrder.getFillPrice()) * size * (direction.equals(OrderSide.BUY) ? 1 : -1);
+        } else if(closeOrder.getStatus().equals(OrderStatus.FILLED)) {
+            this.profit = (closeOrder.getFillPrice() - entryOrder.getFillPrice()) * size * (direction.equals(OrderSide.BUY) ? 1 : -1);
+        }
+        closed = true;
+
+        this.closeTimestamp = closeTimestamp;
+        return profit;
+    }
+
+    public boolean isCancelled(){
+        return this.cancelled;
+    }
+
+    public void setCancelled(boolean cancelled){
+        this.cancelled = cancelled;
     }
 
     public double calculateProfit(double closePrice) {
@@ -374,11 +402,11 @@ public class Position {
         this.entryOrder = entryOrder;
     }
 
-    public Order getStopLossOrder() {
+    public Order getStopOrder() {
         return this.stopLossOrder;
     }
 
-    public void setStopLossOrder(Order stopLossOrder) {
+    public void setStopOrder(Order stopLossOrder) {
         this.stopLossOrder = stopLossOrder;
     }
 
