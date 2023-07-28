@@ -443,7 +443,7 @@ public class CandlestickChart extends JFrame {
 
 
 class CustomOHLCDataset extends DefaultOHLCDataset {
-    private List<OHLCDataItem> candles;
+    private final List<OHLCDataItem> candles;
 
     public CustomOHLCDataset(String seriesKey, int distance) {
         super(seriesKey, new OHLCDataItem[0]);

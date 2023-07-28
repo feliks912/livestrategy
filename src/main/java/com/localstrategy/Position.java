@@ -31,7 +31,6 @@ public class Position {
     private boolean activeStopLoss;
     private boolean closedBeforeStopLoss;
     private double totalUnpaidInterest;
-    private long closeRequestTimestamp;
     private boolean reversed;
     private boolean isStopLoss;
     private RejectionReason rejectionReason;
@@ -113,7 +112,6 @@ public class Position {
         this.activeStopLoss = other.activeStopLoss;
         this.closedBeforeStopLoss = other.closedBeforeStopLoss;
         this.totalUnpaidInterest = other.totalUnpaidInterest;
-        this.closeRequestTimestamp = other.closeRequestTimestamp;
         this.reversed = other.reversed;
         this.isStopLoss = other.isStopLoss;
         this.automaticBorrow = other.automaticBorrow;
@@ -348,14 +346,6 @@ public class Position {
 
     public void setTotalUnpaidInterest(double totalUnpaidInterest) {
         this.totalUnpaidInterest = totalUnpaidInterest;
-    }
-
-    public long getCloseRequestTimestamp() {
-        return this.closeRequestTimestamp;
-    }
-
-    public void setCloseRequestTimestamp(long closeRequestTimestamp) {
-        this.closeRequestTimestamp = closeRequestTimestamp;
     }
 
     public boolean isReversed() {

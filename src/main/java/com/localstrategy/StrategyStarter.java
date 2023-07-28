@@ -9,79 +9,55 @@ import com.localstrategy.util.types.SingleTransaction;
 import java.util.ArrayList;
 
 public class StrategyStarter {
-
-    
     TransactionLoader transactionLoader;
-    private ArrayList<SingleTransaction> transactionList = new ArrayList<>();
-
     Binance exchangeHandler;
-
     LocalStrategy localHandler;
-
-    private final double initialUSDTPortfolio;
-
     private final EventScheduler scheduler = new EventScheduler();
 
-
     public StrategyStarter(String inputDataFolderPath, String fromDate, String toDate, double initialUSDTPortfolio) {
-
-        this.initialUSDTPortfolio = initialUSDTPortfolio;
 
         this.exchangeHandler = new Binance(initialUSDTPortfolio, scheduler);
         this.localHandler = new LocalStrategy(initialUSDTPortfolio, scheduler);
 
-
         this.transactionLoader = new TransactionLoader(inputDataFolderPath, fromDate, toDate);
+
+        LatencyProcessor.instantiateLatencies("tempholderPath");
     }
 
 
     public void execute(String outputCSVPath){
 
-        int fileCount = transactionLoader.getTotalCsvFiles();
-        int fileCounter = fileCount;
+        int fileCounter = transactionLoader.getTotalCsvFiles();;
 
         int transactionCounter = 0;
 
-        transactionList = new ArrayList<>(transactionLoader.loadNextDay());
+        ArrayList<SingleTransaction> transactionList = new ArrayList<>(transactionLoader.loadNextDay());
 
         SingleTransaction exchangeTransaction = transactionList.get(transactionCounter++);
         scheduler.addEvent(new Event(exchangeTransaction.timestamp(), EventDestination.EXCHANGE, exchangeTransaction));
 
-        //FIXME: When to load the next day assuming we don't want to break the queue or finish a daily one and only then load the next day? We need continuity.
-        //Start loading next day when the final transaction of the day is reached
-        while(!scheduler.isEmpty()){
+        while(true){
             Event event = scheduler.getNextEvent();
 
             if(event.getDestination().equals(EventDestination.EXCHANGE)){
-
-                if(event.getType().equals(EventType.ACTION_RESPONSE) || event.getType().equals(EventType.USER_DATA_STREAM)){
-                    System.out.println("How did these get here? StrategyStarter.java. Exiting.");
-                    System.exit(1);
-                }
-
-                //  We can load the next transaction on the exchange side once we reach the previous transaction because we don't add transaction events as last event EventScheduler, therefore that event isn't considered during the chain rule check.
                 if(event.getType().equals(EventType.TRANSACTION)){
+                    LatencyProcessor.calculateLatency(event); // Calculate next latency
 
-                    //Add this transaction to a local event queue
                     scheduler.addEvent(new Event(event.getTransaction().timestamp(), EventDestination.LOCAL, event.getTransaction()));
 
-                    //Add the next transaction to an exchange queue
                     exchangeTransaction = transactionList.get(transactionCounter++);
                     scheduler.addEvent(new Event(exchangeTransaction.timestamp(), EventDestination.EXCHANGE, exchangeTransaction));
 
-                    if(transactionCounter == transactionList.size()){
-                        //Last transaction of the day is reached and loaded
-                        //Load the next day
+                    if(transactionCounter >= transactionList.size()){
                         if(--fileCounter <= 0){
-                           //No more days to load, exit strategy
-                            //TODO: exit strategy
+                            //TODO: No more days to load, exit strategy
+                            break;
                         }
                         transactionList = new ArrayList<>(transactionLoader.loadNextDay());
                     }
                 }
                 exchangeHandler.onEvent(event);
             } else {
-                //Run local handler
                 localHandler.onEvent(event);
             }
         }

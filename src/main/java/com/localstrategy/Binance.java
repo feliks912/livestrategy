@@ -42,11 +42,7 @@ public class Binance {
 
     private final ArrayList<Order> updatedOrders = new ArrayList<>();
 
-    private final ArrayList<Map<ActionResponse, Order>> actionResponses = new ArrayList<>();
-
     private final UserAssets userAssets = new UserAssets();
-
-    private final LatencyHandler latencyHandler = new LatencyHandler();
     private final ArrayList<UserAssets> userAssetsList = new ArrayList<>();
     private final TierManager tierManager = new TierManager();
 
@@ -73,6 +69,7 @@ public class Binance {
 
         if(event == null){
             System.out.println("Exchange Error - Null exchange event in onEvent.");
+            return;
         }
 
         this.currentEvent = event;
@@ -85,9 +82,7 @@ public class Binance {
             case ACTION_REQUEST -> {
                 handleUserActionRequest(event.getActionRequest());
             }
-            default -> {
-                System.out.println("Exchange Error - Something other than transaction or action request ended up exchange's event stream.");
-            }
+            default -> System.out.println("Exchange Error - Something other than transaction or action request ended up exchange's event stream.");
         }
 
         addInterest();
@@ -219,7 +214,7 @@ public class Binance {
                         createActionResponse(ActionResponse.ACTION_REJECTED, order);
                         continue;
                     }
-                    createActionResponse(ActionResponse.FUNDS_REPAYED, order);
+                    createActionResponse(ActionResponse.FUNDS_REPAID, order);
                 }
                 default -> {
                 }
@@ -271,7 +266,7 @@ public class Binance {
                                 createActionResponse(ActionResponse.ORDER_REJECTED, order);
                                 rejectedOrders.add(order);
                             } else {
-                                rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, order); //FIXME: This one for example, would report over an user stream.
+                                rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, order); //This one for example, reports over a user stream.
                             }
                             continue;
                         }
@@ -295,7 +290,7 @@ public class Binance {
                                 createActionResponse(ActionResponse.ORDER_REJECTED, order);
                                 rejectedOrders.add(order);
                             } else {
-                                rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, order); //FIXME: This one for example, would report over an user stream.
+                                rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, order); //FIXME: This one for example, would report over a user stream.
                             }
                             continue;
                         }
@@ -459,6 +454,9 @@ public class Binance {
     }
 
     //TODO: Check and refactor
+    //TODO: Fixme: Binance isn't calculating our order interest for us, we must do so locally.
+    // Currently the repay amount is saved in an order, but we must locally add the unpaid interest amount to that which would offset other calculations.
+    //FIXME: Convert the repayFunds so an amount is sent, not an order? Or an order along with the amount?
     private RejectionReason repayFunds(Order order) {
         if(order.getBorrowedAmount() == 0){
             return RejectionReason.INVALID_ORDER_STATE;
@@ -598,10 +596,6 @@ public class Binance {
             return userAssets.getTotalAssetValue(transaction.price());
         }
         return 0.0;
-    }
-
-    public LatencyHandler getLatencyHandler(){
-        return this.latencyHandler;
     }
 
     public void addToUserAssetList(UserAssets userAsset){

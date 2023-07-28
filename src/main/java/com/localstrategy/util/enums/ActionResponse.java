@@ -8,7 +8,7 @@ public enum ActionResponse {
     ORDER_CREATED,
     ORDER_CANCELLED,
     ORDER_REJECTED, //Rejection reason is written to the Order
-    FUNDS_REPAYED,
+    FUNDS_REPAID,
 
     ACTION_REJECTED //Rejection reason is not written to the Order
 }

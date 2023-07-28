@@ -5,7 +5,7 @@
         Linear orderbook slippage model
         Automatic fund borrowing and repay on order cancel
         Asset handling
-        User data streaming
+        User data stream
 
     Latency simulation
         Normally distributed latency based on real life measurements from AWS Tokyo using 5 Gbps networking
@@ -13,7 +13,8 @@
             binance -> user user data streaming and order response (packed together)
 
     Transaction-level tick data
-        'wall' detection
+    Realistic request handling
+    
 
     
 
