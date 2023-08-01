@@ -1,10 +1,5 @@
 package com.localstrategy.util.misc;
 
-import java.awt.Color;
-import java.awt.Graphics2D;
-import java.awt.Paint;
-import java.awt.geom.Rectangle2D;
-
 import org.jfree.chart.axis.ValueAxis;
 import org.jfree.chart.plot.CrosshairState;
 import org.jfree.chart.plot.PlotRenderingInfo;
@@ -12,6 +7,9 @@ import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.renderer.xy.CandlestickRenderer;
 import org.jfree.chart.renderer.xy.XYItemRendererState;
 import org.jfree.data.xy.XYDataset;
+
+import java.awt.*;
+import java.awt.geom.Rectangle2D;
 
 public class CustomCandlestickRenderer extends CandlestickRenderer {
 
@@ -37,10 +35,7 @@ public class CustomCandlestickRenderer extends CandlestickRenderer {
         Paint originalUpPaint = getUpPaint();
         Paint originalDownPaint = getDownPaint();
 
-        int alphaChannel = mapInputToStandardDeviation(
-            true ? (long) volume : (volume < 0 ? 1e6 : volume),
-            volumeStats.getMean(), 
-            volumeStats.getStandardDeviation());               
+        int alphaChannel = volume == -1 ? 0 : 255;
 
         // Create semi-transparent colors with alpha = 128
         if (open > close) {

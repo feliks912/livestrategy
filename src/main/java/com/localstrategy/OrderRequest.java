@@ -1,6 +1,7 @@
 package com.localstrategy;
 
 import com.localstrategy.util.enums.OrderSide;
+import com.localstrategy.util.enums.OrderStatus;
 import com.localstrategy.util.enums.OrderType;
 import com.localstrategy.util.types.SingleTransaction;
 
@@ -16,6 +17,7 @@ public class OrderRequest {
 
     private final ArrayList<Position> pendingPositions;
     private final ArrayList<Position> newPositions;
+    private final ArrayList<Position> filledPositions;
     private final UserAssets userAssets;
     private final double risk;
     private final TierManager riskManager;
@@ -27,6 +29,7 @@ public class OrderRequest {
     public OrderRequest(
         ArrayList<Position> pendingPositions,
         ArrayList<Position> newPositions,
+        ArrayList<Position> filledPositions,
         TierManager riskManager,
         UserAssets userAssets,
         double risk, 
@@ -35,6 +38,7 @@ public class OrderRequest {
 
             this.pendingPositions = pendingPositions;
             this.newPositions = newPositions;
+            this.filledPositions = filledPositions;
             this.riskManager = riskManager;
             this.userAssets = userAssets;
             this.risk = risk;
@@ -119,9 +123,28 @@ public class OrderRequest {
 
             requiredMargin = positionSize * entryPrice / riskManager.getCurrentLeverage();
 
+            int programmaticCounter = 0;
+            for(Position position : pendingPositions){
+                if(position.getEntryOrder().getType().equals(OrderType.LIMIT) && position.getEntryOrder().getStatus() == OrderStatus.NEW){
+                    programmaticCounter++;
+                }
+            }
+            for(Position position : newPositions){
+                if(position.getEntryOrder().getType().equals(OrderType.LIMIT) && position.getEntryOrder().getStatus() == OrderStatus.NEW){
+                    programmaticCounter++;
+                }
+                if(position.isActiveStopLoss()){
+                    programmaticCounter++;
+                }
+            }
+            for(Position position : filledPositions){
+                if(position.isActiveStopLoss()){
+                    programmaticCounter++;
+                }
+            }
+
             return userAssets.getFreeUSDT() > requiredMargin &&
-                    pendingPositions.size()
-                            + newPositions.size() < totalProgrammaticOrderLimit;
+                    programmaticCounter < totalProgrammaticOrderLimit;
         }
         return false;
     }

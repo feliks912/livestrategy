@@ -97,7 +97,9 @@ public class TransactionLoader {
                     firstTime
             ));
 
-            try (ForkJoinPool customThreadPool = new ForkJoinPool(processorCount)) {
+            ForkJoinPool customThreadPool = new ForkJoinPool(processorCount);
+
+            try{
                 List<SingleTransaction> parallelTransactions = customThreadPool.submit(() -> {
                     Stream<String> remainingLines = StreamSupport.stream(
                             Spliterators.spliteratorUnknownSize(lineIterator, Spliterator.ORDERED),

@@ -14,14 +14,14 @@ public class StrategyStarter {
     LocalStrategy localHandler;
     private final EventScheduler scheduler = new EventScheduler();
 
-    public StrategyStarter(String inputDataFolderPath, String fromDate, String toDate, double initialUSDTPortfolio) {
+    public StrategyStarter(String inputDataFolderPath, String inputLatencyFilePath, String fromDate, String toDate, double initialUSDTPortfolio) {
 
         this.exchangeHandler = new Binance(initialUSDTPortfolio, scheduler);
         this.localHandler = new LocalStrategy(initialUSDTPortfolio, scheduler);
 
         this.transactionLoader = new TransactionLoader(inputDataFolderPath, fromDate, toDate);
 
-        LatencyProcessor.instantiateLatencies("tempholderPath");
+        LatencyProcessor.instantiateLatencies(inputLatencyFilePath);
     }
 
 
@@ -54,6 +54,7 @@ public class StrategyStarter {
                             break;
                         }
                         transactionList = new ArrayList<>(transactionLoader.loadNextDay());
+                        transactionCounter = 0;
                     }
                 }
                 exchangeHandler.onEvent(event);

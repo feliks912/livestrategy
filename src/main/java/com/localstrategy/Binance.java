@@ -93,6 +93,8 @@ public class Binance {
     private void updateUserDataStream(){
         if(userAssetsUpdated || !updatedOrders.isEmpty()){
 
+            userAssets.setTimestamp(currentEvent.getDelayedTimestamp());
+
             scheduler.addEvent(new Event(currentEvent.getDelayedTimestamp(), EventDestination.LOCAL, new UserDataStream(userAssets, updatedOrders)));
 
             if(userAssetsUpdated){
@@ -563,7 +565,7 @@ public class Binance {
 
         userAssets.setMarginLevel(marginLevel);
 
-        if(marginLevel < 1.05){
+        if(marginLevel <= 1.05){
             System.out.println("marginLevel = " + marginLevel);
 
             for(Order order : filledOrders){

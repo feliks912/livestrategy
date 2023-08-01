@@ -49,7 +49,7 @@ public class CandlestickChart extends JFrame {
     private PositionsTable positionsTable;
     boolean isButtonPressed = false;
     CandleConstructor candleConstructor;
-    private int distanceSet;
+    private int distanceSet = 200;
     private String startDate;
     private String endDate;
 
@@ -120,8 +120,8 @@ public class CandlestickChart extends JFrame {
                 false
         ); */
 
-        //CandlestickRenderer customRenderer = new CustomCandlestickRenderer();
-        CandlestickRenderer customRenderer = new CandlestickRenderer();
+        CandlestickRenderer customRenderer = new CustomCandlestickRenderer();
+        //CandlestickRenderer customRenderer = new CandlestickRenderer();
         XYPlot customPlot = new XYPlot(dataset, new DateAxis("Date"), new NumberAxis("Price"), customRenderer);
         JFreeChart chart = new JFreeChart("Candlestick Demo", JFreeChart.DEFAULT_TITLE_FONT, customPlot, false);
 
@@ -302,7 +302,7 @@ public class CandlestickChart extends JFrame {
             tempCandle.high(),
             tempCandle.low(),
             tempCandle.close(),
-            Math.abs(tempCandle.tick()) < distanceSet ? -tempCandle.volume() : tempCandle.volume()
+            Math.abs(tempCandle.tick()) < distanceSet ? -1 : 1
         );
         dataset.addCandle(candle);
         //currentIndex++;
@@ -342,8 +342,8 @@ public class CandlestickChart extends JFrame {
         for (Position position : positions) {
             double priceEntry = position.getOpenPrice();
             double stopLossPrice = position.getStopLossPrice();
-            int entryIndex = position.getEntryPriceIndex();
-            int stopLossIndex = position.getInitialStopLossIndex();
+            int entryIndex = 0; // position.getEntryPriceIndex();
+            int stopLossIndex = 0; // position.getInitialStopLossIndex();
 
             if(currentIndex - entryIndex < MAX_CANDLES - 6){ // margin 3 on both sides
                 // Create and add ray for entry price

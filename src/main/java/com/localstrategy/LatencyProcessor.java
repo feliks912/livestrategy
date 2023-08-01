@@ -45,7 +45,7 @@ public class LatencyProcessor {
         try (BufferedReader reader = new BufferedReader(new FileReader(filePath.toFile()))) {
             String firstLine = reader.readLine();
             if (firstLine != null) {
-                String[] parts = firstLine.split(",");
+                String[] parts = firstLine.split(";");
                 if (parts.length >= 1) {
                     startingTimestamp = Long.parseLong(parts[0]);
                 }
@@ -59,9 +59,9 @@ public class LatencyProcessor {
             long finalStartingTimestamp = startingTimestamp;
 
             latencyList = lines
-                    .map(line -> line.split(","))
+                    .map(line -> line.split(";"))
                     .filter(pair -> pair.length == 2)
-                    .map(pair -> new Latency(Integer.parseInt(pair[0]), Long.parseLong(pair[1]) - finalStartingTimestamp))
+                    .map(pair -> new Latency(Integer.parseInt(pair[1]), Long.parseLong(pair[0]) - finalStartingTimestamp))
                     .collect(Collectors.groupingBy(
                             (Latency latency) -> (int) (latency.timestamp() / MILLISECONDS_IN_DAY),
                             HashMap::new,
@@ -75,6 +75,8 @@ public class LatencyProcessor {
                                     }
                             )
                     )); //Damn cool, hard to debug. Hope it works.
+
+            System.out.println(latencyList.keySet().size());
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -94,9 +96,10 @@ public class LatencyProcessor {
 
         if (firstWeeklyTimestamp == 0) {
             firstWeeklyTimestamp = event.getTimestamp();
-            dailyLatencyList = latencyList.get(0);
+            firstDailyTimestamp = firstWeeklyTimestamp;
+            dailyLatencyList = latencyList.get(0); // Get by key
         } else if (event.getTimestamp() - firstWeeklyTimestamp > (long) (currentDay + 1) * MILLISECONDS_IN_DAY) { //It's the next day oh boyah
-            if (++currentDay >= 7) {
+            if (++currentDay > 6) {
                 currentDay = 0;
                 firstWeeklyTimestamp = event.getTimestamp();
             }
@@ -105,8 +108,9 @@ public class LatencyProcessor {
             currentLatencyIndex = 0;
         }
 
-        while (dailyLatencyList.get(currentLatencyIndex).timestamp() < event.getTimestamp() - firstDailyTimestamp && currentLatencyIndex < dailyLatencyList.size()) {
-            currentLatency = dailyLatencyList.get(currentLatencyIndex++).latency();
+        //Fix this by implementing the scaling thingy
+        while (currentLatencyIndex < dailyLatencyList.size() - 1 && dailyLatencyList.get(currentLatencyIndex).timestamp() <= event.getTimestamp() - firstDailyTimestamp) {
+            currentLatency = dailyLatencyList.get(++currentLatencyIndex).latency();
         }
     }
 

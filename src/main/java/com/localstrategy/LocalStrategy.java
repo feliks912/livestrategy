@@ -46,6 +46,7 @@ public class LocalStrategy {
         orderRequest = new OrderRequest(
                 pendingPositions,
                 newPositions,
+                filledPositions,
                 new TierManager(),
                 userAssets,
                 RISK_PCT,
@@ -57,11 +58,55 @@ public class LocalStrategy {
 
 
     private void priceUpdate(SingleTransaction transaction) {
-
+        for (Position position : filledPositions) {
+            if (position.getEntryOrder().getStatus().equals(OrderStatus.FILLED)) {
+                if (!position.isStopLossRequestSent()) {
+                    scheduler.addEvent(new Event(
+                            currentEvent.getDelayedTimestamp(),
+                            EventDestination.EXCHANGE,
+                            OrderAction.CREATE_ORDER,
+                            position.getStopOrder()
+                    ));
+                    position.setStopLossRequestSent(true);
+                }
+            }
+        }
     }
 
     private void candleUpdate(SingleTransaction transaction, ArrayList<Candle> candles) {
 
+        if (candles.size() > 1) {
+            Candle currentCandle = candles.get(candles.size() - 1);
+            Candle previousCandle = candles.get(candles.size() - 2);
+
+            if (currentCandle.open() != previousCandle.close()) {
+                orderRequest.newMarketPosition(transaction, transaction.price() - 100);
+                scheduler.addEvent(new Event(
+                        currentEvent.getDelayedTimestamp(),
+                        EventDestination.EXCHANGE,
+                        OrderAction.CREATE_ORDER,
+                        pendingPositions.get(pendingPositions.size() - 1).getEntryOrder()
+                ));
+
+                for (Position position : filledPositions) {
+                    if (!position.isClosed()) {
+                        Order closeOrder = new Order(position.getEntryOrder());
+
+                        closeOrder.setDirection(closeOrder.getDirection() == OrderSide.BUY ? OrderSide.SELL : OrderSide.BUY);
+                        closeOrder.setType(OrderType.MARKET);
+
+                        position.setCloseOrder(closeOrder);
+
+                        scheduler.addEvent(new Event(
+                                currentEvent.getDelayedTimestamp(),
+                                EventDestination.EXCHANGE,
+                                OrderAction.CREATE_ORDER,
+                                closeOrder
+                        ));
+                    }
+                }
+            }
+        }
     }
 
 
@@ -97,22 +142,22 @@ public class LocalStrategy {
                                     boolean isInNewPositions = false;
                                     //This market order should be in new positions since it's put there by an action response.
                                     for (Position position : newPositions) { //Update order in respective position - would be cool if we could iterate.
-                                        if (position.getEntryOrder().equals(order)) {
+                                        if (position.getEntryOrder().getId() == order.getId()) {
                                             position.setEntryOrder(new Order(order));
                                             isInNewPositions = true;
                                             break;
-                                        } else if (position.getStopOrder().equals(order)) { // Might focus on this as it's handling stoplosses
+                                        } else if (position.getStopOrder().getId() == order.getId()) { // Might focus on this as it's handling stoplosses
                                             position.setStopOrder(new Order(order));
                                             isInNewPositions = true;
                                             break;
-                                        } else if (position.getCloseOrder().equals(order)) {
+                                        } else if (position.getCloseOrder() != null && position.getCloseOrder().getId() == order.getId()) {
                                             position.setCloseOrder(new Order(order));
                                             isInNewPositions = true;
                                             break;
                                         }
                                     }
 
-                                    if(!isInNewPositions){
+                                    if (!isInNewPositions) {
                                         System.out.println("Local Error - it's not even in new positions.");
                                     }
                                 }
@@ -124,22 +169,22 @@ public class LocalStrategy {
                                     boolean isInNewPositions = false;
                                     //This limit order should be in new positions since it's put there by an action response.
                                     for (Position position : newPositions) { //Update order in respective position - would be cool if we could iterate.
-                                        if (position.getEntryOrder().equals(order)) {
+                                        if (position.getEntryOrder().getId() == order.getId()) {
                                             position.setEntryOrder(new Order(order));
                                             isInNewPositions = true;
                                             break;
-                                        } else if (position.getStopOrder().equals(order)) { // Might focus on this as it's handling stoplosses
+                                        } else if (position.getStopOrder().getId() == order.getId()) { // Might focus on this as it's handling stoplosses
                                             position.setStopOrder(new Order(order));
                                             isInNewPositions = true;
                                             break;
-                                        } else if (position.getCloseOrder().equals(order)) {
+                                        } else if (position.getCloseOrder() != null && position.getCloseOrder().getId() == order.getId()) {
                                             position.setCloseOrder(new Order(order));
                                             isInNewPositions = true;
                                             break;
                                         }
                                     }
 
-                                    if(!isInNewPositions){
+                                    if (!isInNewPositions) {
                                         System.out.println("Local Error - it's not even in new positions.");
                                     }
                                 }
@@ -156,24 +201,27 @@ public class LocalStrategy {
                         case FILLED -> { // New filled order (market or limit)
                             Position tempPosition = null; //Something other than null pls?
                             for (Position position : pendingPositions) {
-                                if (position.getEntryOrder().equals(order)) {
+                                if (position.getEntryOrder().getId() == order.getId()) {
                                     position.setEntryOrder(new Order(order));
                                     tempPosition = position;
 
-                                } else if (position.getStopOrder().equals(order)) {
+                                } else if (position.getStopOrder().getId() == order.getId()) {
                                     position.setStopOrder(new Order(order));
 
                                     //Shouldn't be here because the stop order shouldn't be set until the position is filled (for our specific algorithm)
                                     System.out.println("Local Error - Stop Order triggered for an unfilled position.");
-                                } else if (position.getCloseOrder().equals(order)){
+                                } else if (position.getCloseOrder() != null && position.getCloseOrder().getId() == order.getId()) {
                                     //Shouldn't be here because the close order shouldn't be sent!
                                     System.out.println("Local Error - Sent close request for an order which wasn't filled!");
                                 }
                             }
-                            if(tempPosition == null){
+                            if (tempPosition == null) {
                                 boolean isInFilledPositions = false;
-                                for(Position position : filledPositions){
-                                    if(position.getStopOrder().equals(order)){
+                                for (Position position : filledPositions) {
+                                    if (position.getEntryOrder().getId() == order.getId()) {
+                                        isInFilledPositions = true;
+                                    } else if (position.getStopOrder().getId() == order.getId()) {
+                                        isInFilledPositions = true;
                                         position.setStopOrder(new Order(order));
 
                                         if (order.getType().equals(OrderType.MARKET) && position.isClosedBeforeStopLoss()) {
@@ -187,14 +235,15 @@ public class LocalStrategy {
                                                 OrderAction.REPAY_FUNDS, position.getEntryOrder()));
 
                                         break;
-                                    } else if(position.getCloseOrder().equals(order)){
+                                    } else if (position.getCloseOrder() != null && position.getCloseOrder().getId() == order.getId()) {
+                                        isInFilledPositions = true;
                                         position.setCloseOrder(new Order(order));
                                         // Position is closed - repay the funds and set it as closed with profit in funds repaid action response
                                         scheduler.addEvent(new Event(currentEvent.getDelayedTimestamp(), EventDestination.EXCHANGE, OrderAction.REPAY_FUNDS, position.getEntryOrder()));
                                         break;
                                     }
                                 }
-                                if(!isInFilledPositions){
+                                if (!isInFilledPositions) {
                                     System.out.println("Local Error - filled order not in new or filled positions?");
                                 }
                             } else {
@@ -202,7 +251,8 @@ public class LocalStrategy {
                                 newPositions.add(tempPosition);
                             }
                         }
-                        case NEW -> {} // Gets handled in action response
+                        case NEW -> {
+                        } // Gets handled in action response
                     }
                 }
             }
@@ -222,13 +272,13 @@ public class LocalStrategy {
                                 //Check filled positions for this order
 
                                 for (Position position : filledPositions) { //Because we send a stop-loss order when the position is filled, and is transferred into the filled position group.
-                                    if (position.getStopOrder().equals(order)) {
+                                    if (position.getStopOrder().getId() == order.getId()) {
                                         //It's a rejected stop order! Create a market exit order.
                                         //TODO: Then repay the funds on a response if we used automatic borrowings (so far we must always use it)
 
                                         //TODO: Check if this is correct
                                         Order immediateOrder = new Order(order);
-                                        immediateOrder.setOrderType(OrderType.MARKET);
+                                        immediateOrder.setType(OrderType.MARKET);
                                         immediateOrder.setOpenPrice(transaction.price());
                                         immediateOrder.setOpenTimestamp(currentEvent.getTimestamp());
                                         immediateOrder.setStatus(OrderStatus.NEW); //Bad practice to change values only exchange can change
@@ -249,10 +299,14 @@ public class LocalStrategy {
                             }
                             case INSUFFICIENT_MARGIN -> //Insufficient margin during borrowing - discard the position
                                     System.out.println("Local Error - insufficient margin action rejection - should be tested during production.");
-                            case INSUFFICIENT_FUNDS -> System.out.println("Local Error - insufficient funds action rejection - pls fix");
-                            case EXCESS_BORROW -> System.out.println("Local Error - excess borrow action rejection - should have been tested during order creation.");
-                            case MAX_NUM_ALGO_ORDERS -> System.out.println("Local Error - maximum number of algo orders action rejection - should have been tested during order creation.");
-                            case INVALID_ORDER_STATE -> System.out.println("Local Error - invalid order state action rejection - repaying for 0 borrow? Impossible.");
+                            case INSUFFICIENT_FUNDS ->
+                                    System.out.println("Local Error - insufficient funds action rejection - pls fix");
+                            case EXCESS_BORROW ->
+                                    System.out.println("Local Error - excess borrow action rejection - should have been tested during order creation.");
+                            case MAX_NUM_ALGO_ORDERS ->
+                                    System.out.println("Local Error - maximum number of algo orders action rejection - should have been tested during order creation.");
+                            case INVALID_ORDER_STATE ->
+                                    System.out.println("Local Error - invalid order state action rejection - repaying for 0 borrow? Impossible.");
                         }
                     } // "Done"
                     case ACTION_REJECTED -> { // Cancel order or repay funds - invalid order state (non-existent order), or general repay rejection reasons
@@ -268,7 +322,7 @@ public class LocalStrategy {
                         Position newCancelledPosition = null;
                         //Can be a filled order (closing the position) or a new order (cancelling a position)
                         for (Position position : filledPositions) {
-                            if (position.getEntryOrder().equals(order)) {
+                            if (position.getEntryOrder().getId() == order.getId()) {
                                 position.setEntryOrder(new Order(order));
 
                                 if (position.getStopOrder().getStatus().equals(OrderStatus.FILLED)) {
@@ -279,14 +333,14 @@ public class LocalStrategy {
                                 newClosedPosition = position;
                             }
                         }
-                        if(newClosedPosition == null){
-                            for(Position position : newPositions){
-                                if(position.getEntryOrder().equals(order)){
+                        if (newClosedPosition == null) {
+                            for (Position position : newPositions) {
+                                if (position.getEntryOrder().getId() == order.getId()) {
                                     position.setEntryOrder(new Order(order));
                                     newCancelledPosition = position;
                                 }
                             }
-                            if(newCancelledPosition != null){
+                            if (newCancelledPosition != null) {
                                 cancelledPositions.add(newCancelledPosition);
                                 newPositions.remove(newCancelledPosition);
                             } else {
@@ -308,7 +362,7 @@ public class LocalStrategy {
 
                         for (Position position : newPositions) {
                             //FIXME: There are bugs here regarding checking which order is closed first
-                            if (position.getEntryOrder().equals(order)) { // We cancelled a complete limit order
+                            if (position.getEntryOrder().getId() == order.getId()) { // We cancelled a complete limit order
                                 position.setEntryOrder(new Order(order));
                                 isInNewPositions = true;
 
@@ -321,7 +375,7 @@ public class LocalStrategy {
                                     System.out.println("Local Error - cancelling a position without auto repay at cancel.");
                                 }
 
-                            } else if (position.getStopOrder().equals(order)) { // Cancelled stoploss - could be the whole position or just the stoploss (for BE for example)
+                            } else if (position.getStopOrder().getId() == order.getId()) { // Cancelled stoploss - could be the whole position or just the stoploss (for BE for example)
                                 position.setStopOrder(new Order(order));
                                 isInNewPositions = true;
 
@@ -334,18 +388,18 @@ public class LocalStrategy {
                                 } else {
                                     //We cancelled only the stop position (entry is filled)
                                 }
-                            } else if (position.getCloseOrder().equals(order)) { //FIXME: closeOrder is null at the beginning could be an issue
+                            } else if (position.getCloseOrder() != null && position.getCloseOrder().getId() == order.getId()) { //FIXME: closeOrder is null at the beginning could be an issue
                                 System.out.println("Local Error - cancelling an order which isn't entry nor stop.");
                             }
                         }
-                        if(newCancelledPosition == null){
+                        if (newCancelledPosition == null) {
                             boolean isInFilledPositions = false;
-                            for(Position position : filledPositions){
-                                if(position.getStopOrder().equals(order)){ // We're moving the stoploss
+                            for (Position position : filledPositions) {
+                                if (position.getStopOrder().getId() == order.getId()) { // We're moving the stoploss
                                     position.setStopOrder(new Order(order));
                                 } //TODO: Add checks for entry and close orders here
                             }
-                            if(!isInFilledPositions){
+                            if (!isInFilledPositions) {
                                 System.out.println("Local Error - cancelled order isn't in new or filled positions");
                             }
                         } else {
@@ -361,15 +415,15 @@ public class LocalStrategy {
                         //Means no errors in order creation. Filled orders get updated in UserStream response
                         Position newPosition = null;
                         for (Position position : pendingPositions) { //DISGUSTIN
-                            if (position.getEntryOrder().equals(order)) {
+                            if (position.getEntryOrder().getId() == order.getId()) {
                                 position.setEntryOrder(new Order(order));
                                 newPosition = new Position(position);
                                 break;
-                            } else if (position.getStopOrder().equals(order)) { // Might focus on this as it's handling stoplosses
+                            } else if (position.getStopOrder().getId() == order.getId()) { // Might focus on this as it's handling stoplosses
                                 position.setStopOrder(new Order(order));
                                 newPosition = new Position(position);
                                 break;
-                            } else if (position.getCloseOrder().equals(order)) {
+                            } else if (position.getCloseOrder() != null && position.getCloseOrder().getId() == order.getId()) {
                                 position.setCloseOrder(new Order(order));
                                 newPosition = new Position(position);
                                 break;

@@ -8,7 +8,9 @@ import com.localstrategy.util.enums.RejectionReason;
 import java.util.ArrayList;
 
 public class Order {
-    private int id;
+
+    private static long lastId = 0;
+    private long id;
     private double openPrice;
     private double size;
     private OrderSide direction;
@@ -35,7 +37,8 @@ public class Order {
             double margin,
             double borrowedAmount,
             long openTimestamp) {
-                
+
+        this.id = lastId++;
         this.orderType = orderType;
         this.automaticBorrow = automaticBorrow; //Stop-losses don't borrow funds as the funds are already borrowed
         this.status = OrderStatus.NEW;
@@ -69,7 +72,7 @@ public class Order {
         this.rejectionReason = other.rejectionReason;
     }
 
-    public int getId() {
+    public long getId() {
         return this.id;
     }
 
@@ -113,7 +116,7 @@ public class Order {
         return this.orderType;
     }
 
-    public void setOrderType(OrderType orderType) {
+    public void setType(OrderType orderType) {
         this.orderType = orderType;
     }
 

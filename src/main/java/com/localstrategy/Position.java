@@ -34,6 +34,7 @@ public class Position {
     private boolean reversed;
     private boolean isStopLoss;
     private RejectionReason rejectionReason;
+    private boolean stopLossRequestSent = false;
     private boolean automaticBorrow;
     private boolean autoRepayAtCancel = true;
 
@@ -119,9 +120,12 @@ public class Position {
         this.rejectionReason = other.rejectionReason;
         this.entryOrder = new Order(other.entryOrder);
         this.stopLossOrder = new Order(other.stopLossOrder);
-        this.closeOrder = new Order(other.closeOrder);
+        this.closeOrder = other.closeOrder == null ? null : other.getCloseOrder();
         this.cancelled = other.cancelled;
+        this.stopLossRequestSent = other.stopLossRequestSent;
     }
+
+
 
     public double closePosition(long closeTimestamp){
         if(closed || !filled || !entryOrder.getStatus().equals(OrderStatus.FILLED)){
@@ -137,6 +141,14 @@ public class Position {
 
         this.closeTimestamp = closeTimestamp;
         return profit;
+    }
+
+    public boolean isStopLossRequestSent(){
+        return this.stopLossRequestSent;
+    }
+
+    public void setStopLossRequestSent(boolean sent){
+        this.stopLossRequestSent = sent;
     }
 
     public boolean isCancelled(){
