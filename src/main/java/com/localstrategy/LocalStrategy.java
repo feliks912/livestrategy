@@ -73,7 +73,7 @@ public class LocalStrategy {
         }
     }
 
-    private void candleUpdate(SingleTransaction transaction, ArrayList<Candle> candles) {
+    private void newCandle(SingleTransaction transaction, ArrayList<Candle> candles) {
 
         if (candles.size() > 1) {
             Candle currentCandle = candles.get(candles.size() - 1);
@@ -448,7 +448,7 @@ public class LocalStrategy {
 
         if (candle != null) { // New candle
             lastCandle = candle;
-            candleUpdate(transaction, candleConstructor.getCandles());
+            newCandle(transaction, candleConstructor.getCandles());
         }
 
         priceUpdate(transaction);

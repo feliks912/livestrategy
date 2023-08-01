@@ -74,9 +74,7 @@ public class LatencyProcessor {
                                                 .collect(Collectors.toCollection(ArrayList::new));
                                     }
                             )
-                    )); //Damn cool, hard to debug. Hope it works.
-
-            System.out.println(latencyList.keySet().size());
+                    ));
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -84,15 +82,6 @@ public class LatencyProcessor {
     }
 
     public static void calculateLatency(Event event) {
-
-        // Load all latencies and group them by day
-        // For each file date calculate the day in the week
-        // Count all timestamps from zero from both the transaction and latency file.
-        // For each transaction find the first timestamp instance which is larger than the current timestamp
-        // Use that latency
-        // Since all days have 24 hours we don't have scale it.
-        // Keep the last latency index in memory, and if the current event timestamp is larger than that of the current latency, loop until we satisfy the upper condition.
-        // We can categorize them by day (enables shuffling) or categorize them by timestamp in a week. I prefer the former.
 
         if (firstWeeklyTimestamp == 0) {
             firstWeeklyTimestamp = event.getTimestamp();
@@ -108,9 +97,36 @@ public class LatencyProcessor {
             currentLatencyIndex = 0;
         }
 
-        //Fix this by implementing the scaling thingy
-        while (currentLatencyIndex < dailyLatencyList.size() - 1 && dailyLatencyList.get(currentLatencyIndex).timestamp() <= event.getTimestamp() - firstDailyTimestamp) {
-            currentLatency = dailyLatencyList.get(++currentLatencyIndex).latency();
+        while (currentLatencyIndex < dailyLatencyList.size() - 1 && event.getTimestamp() - firstDailyTimestamp >= dailyLatencyList.get(currentLatencyIndex + 1).timestamp()) {
+            currentLatencyIndex++;
+        }
+
+        double t1 = dailyLatencyList.get(currentLatencyIndex).timestamp();
+        double l1 = dailyLatencyList.get(currentLatencyIndex).latency();
+
+        double t2;
+        double l2;
+
+        if(currentLatencyIndex >= dailyLatencyList.size() - 1){
+            if(currentDay != 6){
+                t2 = latencyList.get(currentDay + 1).get(0).timestamp() + firstDailyTimestamp;
+                l2 = latencyList.get(currentDay + 1).get(0).latency();
+            } else {
+                t2 = latencyList.get(0).get(0).timestamp() + firstDailyTimestamp;
+                l2 = latencyList.get(0).get(0).latency();
+            }
+        } else {
+            t2 = dailyLatencyList.get(currentLatencyIndex + 1).timestamp();
+            l2 = dailyLatencyList.get(currentLatencyIndex + 1).latency();
+        }
+
+        //Scale latency to timestamp difference
+        if(t1 != t2){
+            double tn = event.getTimestamp() - firstDailyTimestamp;
+
+            currentLatency = (int) (((tn - t1) / (t2 - t1) * (t2 + l2 - (t1 + l1))) + t1 + l1 - tn);
+        } else {
+            currentLatency = (int) (l1 + l2) / 2;
         }
     }
 

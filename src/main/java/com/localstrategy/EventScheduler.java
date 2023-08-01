@@ -21,8 +21,6 @@ public class EventScheduler {
             event.setEventLatency(LatencyProcessor.getCurrentLatency());
         }
 
-
-
         eventQueue.add(event);
     }
 

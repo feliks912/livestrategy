@@ -557,11 +557,12 @@ public class Binance {
             userAssets.getTotalBorrowedUSDT() + 
             userAssets.getTotalBorrowedBTC() * transaction.price();
 
+        double marginLevel;
         if(totalBorrowedAssetValue + userAssets.getTotalUnpaidInterest() == 0){
-            return 999;
+            marginLevel = 999;
+        } else {
+            marginLevel = totalAssetValue / (totalBorrowedAssetValue + userAssets.getTotalUnpaidInterest());
         }
-
-        double marginLevel = totalAssetValue / (totalBorrowedAssetValue + userAssets.getTotalUnpaidInterest());
 
         userAssets.setMarginLevel(marginLevel);
 
