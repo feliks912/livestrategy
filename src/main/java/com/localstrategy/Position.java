@@ -1,14 +1,11 @@
 package com.localstrategy;
 
-import com.localstrategy.util.enums.OrderSide;
-import com.localstrategy.util.enums.OrderStatus;
-import com.localstrategy.util.enums.OrderType;
-import com.localstrategy.util.enums.RejectionReason;
+import com.localstrategy.util.enums.*;
 
 import java.util.ArrayList;
 
 public class Position {
-    private int id;
+    private long id;
     private double openPrice;
     private double stopLossPrice;
     private double initialStopLossPrice;
@@ -45,6 +42,10 @@ public class Position {
 
     private Order closeOrder;
 
+    private PositionGroup group = PositionGroup.NEW;
+
+    private static long positionId = 0;
+
     public Position(
             double openPrice,
             double initialStopLossPrice,
@@ -52,10 +53,9 @@ public class Position {
             OrderType orderType,
             double margin,
             double borrowedAmount,
-            int positionId,
             long openTimestamp) {
 
-        this.id = positionId;
+        this.id = positionId++;
         this.orderType = orderType;
         this.stopLossPrice = initialStopLossPrice;
         this.initialStopLossPrice = initialStopLossPrice;
@@ -143,6 +143,14 @@ public class Position {
         return profit;
     }
 
+    public PositionGroup getGroup() {
+        return group;
+    }
+
+    public void setGroup(PositionGroup group) {
+        this.group = group;
+    }
+
     public boolean isStopLossRequestSent(){
         return this.stopLossRequestSent;
     }
@@ -172,7 +180,7 @@ public class Position {
     }
 
 
-    public int getId() {
+    public long getId() {
         return this.id;
     }
 

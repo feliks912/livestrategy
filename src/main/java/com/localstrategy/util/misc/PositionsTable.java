@@ -1,11 +1,10 @@
 package com.localstrategy.util.misc;
 
-import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
-
 import com.localstrategy.Position;
 import com.localstrategy.util.enums.OrderSide;
 
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.Collections;
 import java.util.Comparator;
@@ -39,7 +38,7 @@ public class PositionsTable extends JFrame {
             return;
         }
 
-        Collections.sort(closedPositions, Comparator.comparingInt(Position::getId).reversed());
+        Collections.sort(closedPositions, Comparator.comparingLong(Position::getId).reversed());
 
         for (Position position : closedPositions) {
             Object[] rowData = {

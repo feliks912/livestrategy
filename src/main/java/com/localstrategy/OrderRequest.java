@@ -10,7 +10,6 @@ import java.util.ArrayList;
 public class OrderRequest {
 
     public int totalProgrammaticOrderLimit;
-    public int lastPositionId = 0;
 
     private double positionSize;
     private double requiredMargin;
@@ -54,8 +53,7 @@ public class OrderRequest {
                 positionSize, 
                 OrderType.MARKET,
                 requiredMargin, 
-                borrowedAmount, 
-                ++lastPositionId, 
+                borrowedAmount,
                 transaction.timestamp()
             );
             pendingPositions.add(position);
@@ -72,8 +70,7 @@ public class OrderRequest {
                 positionSize, 
                 OrderType.LIMIT, 
                 requiredMargin, 
-                borrowedAmount, 
-                ++lastPositionId, 
+                borrowedAmount,
                 transaction.timestamp()
             );
             pendingPositions.add(position);
