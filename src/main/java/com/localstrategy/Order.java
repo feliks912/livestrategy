@@ -7,7 +7,7 @@ import com.localstrategy.util.enums.RejectionReason;
 
 import java.util.ArrayList;
 
-public class Order {
+public class Order implements Cloneable{
 
     private static long lastId = 0;
     private long id;
@@ -26,12 +26,18 @@ public class Order {
     private RejectionReason rejectionReason;
     private OrderStatus status;
     private boolean automaticBorrow;
+    private double marginBuyBorrowAmount = 0;
     private boolean autoRepayAtCancel = true;
+
+    public Order(){
+        this.id = lastId++;
+    }
 
     public Order(
             double openPrice,
             OrderSide direction,
             boolean automaticBorrow,
+            boolean isStopLoss,
             double size,
             OrderType orderType,
             double margin,
@@ -41,6 +47,7 @@ public class Order {
         this.id = lastId++;
         this.orderType = orderType;
         this.automaticBorrow = automaticBorrow; //Stop-losses don't borrow funds as the funds are already borrowed
+        this.isStopLoss = isStopLoss;
         this.status = OrderStatus.NEW;
         this.openPrice = openPrice;
         this.size = size;
@@ -52,31 +59,31 @@ public class Order {
         this.totalUnpaidInterest = borrowedAmount * hourlyInterestRate * (direction.equals(OrderSide.BUY) ? 1 : openPrice);
     }
 
-    public Order(Order other) {
-        this.id = other.id;
-        this.openPrice = other.openPrice;
-        this.size = other.size;
-        this.direction = other.direction;
-        this.margin = other.margin;
-        this.orderType = other.orderType;
-        this.openTimestamp = other.openTimestamp;
-        this.hourlyInterestRate = other.hourlyInterestRate;
-        this.borrowedAmount = other.borrowedAmount;
-        this.fillPrice = other.fillPrice;
-        this.fillTimestamp = other.fillTimestamp;
-        this.totalUnpaidInterest = other.totalUnpaidInterest;
-        this.isStopLoss = other.isStopLoss;
-        this.status = other.status;
-        this.automaticBorrow = other.automaticBorrow;
-        this.autoRepayAtCancel = other.autoRepayAtCancel;
-        this.rejectionReason = other.rejectionReason;
+    @Override
+    protected Order clone() {
+        try {
+            return (Order) super.clone();
+        } catch (CloneNotSupportedException e) {
+            e.printStackTrace();
+            return null;
+        }
     }
+
+    public double getMarginBuyBorrowAmount() {
+        return marginBuyBorrowAmount;
+    }
+
+    public void setMarginBuyBorrowAmount(double marginBuyBorrowAmount) {
+        this.marginBuyBorrowAmount = marginBuyBorrowAmount;
+    }
+
+
 
     public long getId() {
         return this.id;
     }
 
-    public void setId(int id) {
+    public void setId(long id) {
         this.id = id;
     }
 
@@ -222,7 +229,7 @@ public class Order {
         ArrayList<Order> newList = new ArrayList<>();
 
         for (Order pos : originalList) {
-            Order newPos = new Order(pos);
+            Order newPos = pos.clone();
             newList.add(newPos);
         }
         return newList;

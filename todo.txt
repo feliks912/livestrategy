@@ -1,3 +1,11 @@
+Testing:
+    Solved opening a market order, closing it on stoploss, and market exit. Also repaying.
+    Solved opening a limit order, cancelling a limit order right after opening (and paying interest)
+    Solved opening a limit order, filling it and TP'ing it
+    Solved opening a limit order and SL'ing on BE + some, with profit
+
+    TODO: Position counts profit correctly but userAssets are still fucked.
+
 Todo:
     Add closed before stoploss in an action response. Make sure that on repay we actually repay the extra we lost, not just original position value
 

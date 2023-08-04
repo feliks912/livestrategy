@@ -21,18 +21,6 @@ public class LocalStrategy {
 
     private final ArrayList<Position> activePositions = new ArrayList<>();
     private final ArrayList<Position> inactivePositions = new ArrayList<>();
-    private final ArrayList<Position> tempPositions = new ArrayList<>();
-
-    private final ArrayList<Position> pendingPositions = new ArrayList<>();
-    private final ArrayList<Position> newPositions = new ArrayList<>();
-    private final ArrayList<Position> filledPositions = new ArrayList<>();
-    private final ArrayList<Position> cancelledPositions = new ArrayList<>();
-    private final ArrayList<Position> closedPositions = new ArrayList<>();
-
-
-    private final ArrayList<Position> rejectedOrders = new ArrayList<>();
-
-    private final ArrayList<Map<RejectionReason, Position>> rejectedActions = new ArrayList<>();
 
     private UserAssets userAssets = new UserAssets();
     private final OrderRequest orderRequest;
@@ -41,6 +29,8 @@ public class LocalStrategy {
     private Event currentEvent;
     private SingleTransaction transaction;
 
+    private boolean closeRequestSent = false;
+
     public LocalStrategy(double initialFreeUSDT, EventScheduler scheduler) {
 
         this.scheduler = scheduler;
@@ -48,9 +38,7 @@ public class LocalStrategy {
         userAssets.setFreeUSDT(initialFreeUSDT);
 
         orderRequest = new OrderRequest(
-                pendingPositions,
-                newPositions,
-                filledPositions,
+                activePositions,
                 new TierManager(),
                 userAssets,
                 RISK_PCT,
@@ -61,34 +49,226 @@ public class LocalStrategy {
     }
 
 
+    boolean printedInactivePositions = false;
+
+
     private void priceUpdate(SingleTransaction transaction) {
-        if(pendingPositions.isEmpty() && newPositions.isEmpty() && filledPositions.isEmpty()){
-            //Open position
-            Position newPosition = orderRequest.newMarketPosition(transaction, transaction.price() - 50);
-            scheduler.addEvent(new Event(currentEvent.getDelayedTimestamp(), EventDestination.EXCHANGE, OrderAction.CREATE_ORDER, newPosition.getEntryOrder()));
-            scheduler.addEvent(new Event(currentEvent.getDelayedTimestamp(), EventDestination.EXCHANGE, OrderAction.CREATE_ORDER, newPosition.getStopOrder()));
+        test4();
+    }
+    private void test4(){
+        if (activePositions.isEmpty()) {
+            Position newMarketPosition = orderRequest.newLimitPosition(45000, 44900, transaction);
+
+            if (newMarketPosition != null) {
+                scheduler.addEvent(new Event(
+                        currentEvent.getDelayedTimestamp(),
+                        EventDestination.EXCHANGE,
+                        OrderAction.CREATE_ORDER,
+                        newMarketPosition.getEntryOrder().clone()
+                ));
+            }
         } else {
-            if(closedPositions.isEmpty()){
-                if(!filledPositions.isEmpty()){
-                    if(transaction.price() > filledPositions.get(0).getOpenPrice() + 100){
-                        if(filledPositions.get(0).getCloseOrder() == null){
-                            Order closeOrder = new Order(filledPositions.get(0).getEntryOrder());
+            for (Position position : activePositions) {
+                switch (position.getGroup()){
+                    case NEW -> {
+                        if (!position.isStopLossRequestSent()) {
+                            scheduler.addEvent(new Event(
+                                    currentEvent.getDelayedTimestamp(),
+                                    EventDestination.EXCHANGE,
+                                    OrderAction.CREATE_ORDER,
+                                    position.getStopOrder().clone()
+                            ));
+                            position.setStopLossRequestSent(true);
+                        }
+                    }
+                    case FILLED -> {
+                        if (!position.isBreakEven() && position.isActiveStopLoss() && transaction.price() >= 46550) { //Must be a better way
 
-                            closeOrder.setStatus(OrderStatus.NEW);
-                            closeOrder.setDirection(closeOrder.getDirection().equals(OrderSide.BUY) ? OrderSide.SELL : OrderSide.BUY);
-                            closeOrder.setType(OrderType.MARKET);
+                            scheduler.addEvent(new Event(
+                                    currentEvent.getDelayedTimestamp(),
+                                    EventDestination.EXCHANGE,
+                                    OrderAction.CANCEL_ORDER,
+                                    position.getStopOrder().clone()
+                            ));
 
-                            filledPositions.get(0).setCloseOrder(closeOrder);
+                            position.getStopOrder().setOpenPrice(46150);
+                            position.setOpenTimestamp(currentEvent.getDelayedTimestamp());
 
-                            scheduler.addEvent(new Event(currentEvent.getDelayedTimestamp(), EventDestination.EXCHANGE, OrderAction.CREATE_ORDER, closeOrder));
+                            scheduler.addEvent(new Event(
+                                    currentEvent.getDelayedTimestamp(),
+                                    EventDestination.EXCHANGE,
+                                    OrderAction.CREATE_ORDER,
+                                    position.getStopOrder().clone()
+                            ));
+
+                            position.setBreakEven(true);
                         }
                     }
                 }
-            } else {
-                if(closedPositions.get(0).getStopOrder().getStatus().equals(OrderStatus.FILLED)){ //Stoplossed
-                    System.out.println("Stoplossed");
-                } else { //Closed
-                    System.out.println("closed");
+            }
+        }
+        if (!inactivePositions.isEmpty() && !printedInactivePositions) {
+            for (Position position : inactivePositions) {
+                if (position.getGroup().equals(PositionGroup.CLOSED)) {
+                    System.out.printf("Position SL'd successfully with a profit is $%.2f\n", position.getProfit());
+
+                    printedInactivePositions = true;
+                }
+            }
+        }
+    }
+
+    private void test3(){
+        if (activePositions.isEmpty()) {
+            Position newMarketPosition = orderRequest.newLimitPosition(45000, 44900, transaction);
+
+            if (newMarketPosition != null) {
+                scheduler.addEvent(new Event(
+                        currentEvent.getDelayedTimestamp(),
+                        EventDestination.EXCHANGE,
+                        OrderAction.CREATE_ORDER,
+                        newMarketPosition.getEntryOrder().clone()
+                ));
+            }
+        } else {
+            for (Position position : activePositions) {
+                switch (position.getGroup()){
+                    case NEW -> {
+                        if (!position.isStopLossRequestSent()) {
+                            scheduler.addEvent(new Event(
+                                    currentEvent.getDelayedTimestamp(),
+                                    EventDestination.EXCHANGE,
+                                    OrderAction.CREATE_ORDER,
+                                    position.getStopOrder().clone()
+                            ));
+                            position.setStopLossRequestSent(true);
+                        }
+                    }
+                    case FILLED -> {
+                        if (position.getCloseOrder() == null && position.isActiveStopLoss() && transaction.price() >= 46200) { //Must be a better way
+
+                            Order closeOrder = position.createCloseOrder(transaction);
+
+                            scheduler.addEvent(new Event(
+                                    currentEvent.getDelayedTimestamp(),
+                                    EventDestination.EXCHANGE,
+                                    OrderAction.CREATE_ORDER,
+                                    closeOrder.clone()
+                            ));
+
+                            position.setCloseOrder(closeOrder);
+                        }
+                    }
+                }
+            }
+        }
+        if (!inactivePositions.isEmpty() && !printedInactivePositions) {
+            for (Position position : inactivePositions) {
+                if (position.getGroup().equals(PositionGroup.CLOSED)) {
+                    System.out.printf("Position TP'd successfully. Profit is $%.2f\n", position.getProfit());
+
+                    printedInactivePositions = true;
+                }
+            }
+        }
+    }
+
+    private void test2(){
+        if (activePositions.isEmpty()) {
+            Position newMarketPosition = orderRequest.newLimitPosition(transaction.price() + 100, transaction.price() + 110, transaction);
+
+            if (newMarketPosition != null) {
+                scheduler.addEvent(new Event(
+                        currentEvent.getDelayedTimestamp(),
+                        EventDestination.EXCHANGE,
+                        OrderAction.CREATE_ORDER,
+                        newMarketPosition.getEntryOrder().clone()
+                ));
+            }
+        } else {
+            for (Position position : activePositions) {
+                if (position.getGroup().equals(PositionGroup.NEW)) {
+                    if (!position.isStopLossRequestSent()) {
+                        scheduler.addEvent(new Event(
+                                currentEvent.getDelayedTimestamp(),
+                                EventDestination.EXCHANGE,
+                                OrderAction.CREATE_ORDER,
+                                position.getStopOrder().clone()
+                        ));
+                        position.setStopLossRequestSent(true);
+                    } else if (!closeRequestSent && position.isActiveStopLoss()) { //Must be a better way
+                        scheduler.addEvent(new Event(
+                                currentEvent.getDelayedTimestamp(),
+                                EventDestination.EXCHANGE,
+                                OrderAction.CANCEL_ORDER,
+                                position.getEntryOrder().clone()
+                        ));
+                        closeRequestSent = true;
+                    }
+                }
+            }
+        }
+        if (!inactivePositions.isEmpty() && !printedInactivePositions) {
+            for (Position position : inactivePositions) {
+                if (position.getGroup().equals(PositionGroup.CANCELLED)) {
+                    System.out.println("Position cancelled successfully.");
+
+                    printedInactivePositions = true;
+                }
+            }
+        }
+    }
+
+    private void test1() {
+        if (activePositions.isEmpty() && inactivePositions.isEmpty()) {
+            Position newMarketPosition = orderRequest.newMarketPosition(transaction, transaction.price() + 100);
+
+            if (newMarketPosition != null) {
+                scheduler.addEvent(new Event(
+                        currentEvent.getDelayedTimestamp(),
+                        EventDestination.EXCHANGE,
+                        OrderAction.CREATE_ORDER,
+                        newMarketPosition.getEntryOrder().clone()
+                ));
+            }
+        } else {
+            for (Position position : activePositions) {
+                if (position.getGroup().equals(PositionGroup.FILLED)) {
+                    if (!position.isStopLossRequestSent()) {
+                        scheduler.addEvent(new Event(
+                                currentEvent.getDelayedTimestamp(),
+                                EventDestination.EXCHANGE,
+                                OrderAction.CREATE_ORDER,
+                                position.getStopOrder().clone()
+                        ));
+                        position.setStopLossRequestSent(true);
+                    } else if (position.isActiveStopLoss()) { //Must be a better way
+                        if (position.getCloseOrder() == null && transaction.price() < position.getEntryOrder().getFillPrice() - 100) {
+
+                            Order closeOrder = position.createCloseOrder(transaction);
+                            position.setCloseOrder(closeOrder);
+
+                            scheduler.addEvent(new Event(
+                                    currentEvent.getDelayedTimestamp(),
+                                    EventDestination.EXCHANGE,
+                                    OrderAction.CREATE_ORDER,
+                                    closeOrder.clone()
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        if (!inactivePositions.isEmpty() && !printedInactivePositions) {
+            for (Position position : inactivePositions) {
+                if (position.getGroup().equals(PositionGroup.CLOSED)) {
+                    if (position.getProfit() > 0) {
+                        System.out.printf("Ayy caramba we got some $%.2f\n", position.getProfit());
+                    } else {
+                        System.out.printf("My lord, we lost some $%.2f\n", position.getProfit());
+                    }
+
+                    printedInactivePositions = true;
                 }
             }
         }
@@ -133,13 +313,13 @@ public class LocalStrategy {
                                             case NEW:
                                             case FILLED:
                                                 if (position.getEntryOrder().getId() == order.getId()) {
-                                                    position.setEntryOrder(new Order(order));
+                                                    position.setEntryOrder(order.clone());
                                                     issue = false;
                                                 } else if (position.getStopOrder().getId() == order.getId()) { // Might focus on this as it's handling stoplosses
-                                                    position.setStopOrder(new Order(order));
+                                                    position.setStopOrder(order.clone());
                                                     issue = false;
                                                 } else if (position.getCloseOrder().getId() == order.getId()) {
-                                                    position.setCloseOrder(new Order(order));
+                                                    position.setCloseOrder(order.clone());
                                                     issue = false;
                                                 }
                                                 break;
@@ -158,44 +338,83 @@ public class LocalStrategy {
                         } // DONE
 
                         case FILLED -> { // DONE
-                            for(Position position : activePositions){
+                            ArrayList<Position> tempPositions = new ArrayList<>();
+                            for (Position position : activePositions) {
                                 switch (position.getGroup()) {
                                     case PENDING, NEW, FILLED -> {
                                         if (position.getEntryOrder().getId() == order.getId()) {
-                                            if(position.getGroup().equals(PositionGroup.FILLED)){
+                                            if (order.getType().equals(OrderType.MARKET)) {
+                                                position.setMarginBuyBorrowAmount(order.getMarginBuyBorrowAmount());
+                                            }
+                                            if (position.getGroup().equals(PositionGroup.FILLED)) {
                                                 System.out.println("Local Error - double filled the position entry order.");
                                             }
-                                            position.setEntryOrder(new Order(order));
+                                            position.setEntryOrder(order.clone());
                                             position.setGroup(PositionGroup.FILLED);
 
                                         } else if (position.getStopOrder().getId() == order.getId()) {
 
-                                            if(position.getEntryOrder().getStatus().equals(OrderStatus.NEW)){
+                                            position.setStopOrder(order.clone());
+
+                                            if (position.getEntryOrder().getStatus().equals(OrderStatus.NEW)) {
                                                 //TODO: Stoplossed before entry trigger - shouldn't be possible since funds weren't borrowed. This fucked our asset management.
                                                 System.out.println("Local Error - stoploss filled before entry order.");
                                             }
 
-                                            scheduler.addEvent(new Event(
-                                                    currentEvent.getDelayedTimestamp(),
-                                                    EventDestination.EXCHANGE,
-                                                    OrderAction.REPAY_FUNDS,
-                                                    new Order(position.getEntryOrder())));
+                                            if (position.getMarginBuyBorrowAmount() != 0.0) {
+                                                scheduler.addEvent(new Event(
+                                                        currentEvent.getDelayedTimestamp(),
+                                                        EventDestination.EXCHANGE,
+                                                        OrderAction.REPAY_FUNDS,
+                                                        position.getEntryOrder().clone()));
+                                            } else {
+                                                position.closePosition(currentEvent.getDelayedTimestamp());
 
-                                            position.setStopOrder(new Order(order));
+                                                if (position.getGroup().equals(PositionGroup.FILLED)) {
+                                                    position.setGroup(PositionGroup.CLOSED);
+                                                } else {
+                                                    position.setGroup(PositionGroup.DISCARDED);
+                                                }
+
+                                                tempPositions.add(position);
+                                            }
 
                                         } else if (position.getCloseOrder() != null && position.getCloseOrder().getId() == order.getId()) {
 
-                                            scheduler.addEvent(new Event(
-                                                    currentEvent.getDelayedTimestamp(),
-                                                    EventDestination.EXCHANGE,
-                                                    OrderAction.REPAY_FUNDS,
-                                                    new Order(position.getEntryOrder())));
+                                            position.setCloseOrder(order.clone());
 
-                                            position.setCloseOrder(new Order(order));
+                                            if (position.getMarginBuyBorrowAmount() != 0.0) {
+                                                scheduler.addEvent(new Event(
+                                                        currentEvent.getDelayedTimestamp(),
+                                                        EventDestination.EXCHANGE,
+                                                        OrderAction.REPAY_FUNDS,
+                                                        position.getEntryOrder().clone()));
+                                            } else {
+                                                position.closePosition(currentEvent.getDelayedTimestamp());
+
+                                                if (position.getGroup().equals(PositionGroup.FILLED)) {
+                                                    position.setGroup(PositionGroup.CLOSED);
+                                                } else {
+                                                    position.setGroup(PositionGroup.DISCARDED);
+                                                }
+                                            }
+
+                                            if (position.getStopOrder().getStatus().equals(OrderStatus.NEW)) { //If stoploss is still active cancel it
+                                                scheduler.addEvent(new Event(
+                                                        currentEvent.getDelayedTimestamp(),
+                                                        EventDestination.EXCHANGE,
+                                                        OrderAction.CANCEL_ORDER,
+                                                        position.getStopOrder().clone()
+                                                ));
+                                            } else {
+                                                tempPositions.add(position); //Add to inactive positions
+                                            }
                                         }
                                     }
                                 }
                             }
+                            inactivePositions.addAll(tempPositions);
+                            activePositions.removeAll(tempPositions);
                         } // DONE
 
                         case NEW -> {
@@ -213,35 +432,35 @@ public class LocalStrategy {
                     case ORDER_REJECTED -> {
                         switch (order.getRejectionReason()) {
                             case WOULD_TRIGGER_IMMEDIATELY -> {
-                                for(Position position : activePositions){
-                                    switch (position.getGroup()){
+                                for (Position position : activePositions) {
+                                    switch (position.getGroup()) {
                                         case PENDING, NEW -> {
-                                            if(position.getEntryOrder().getId() == order.getId()){
-                                                position.setEntryOrder(new Order(order));
+                                            if (position.getEntryOrder().getId() == order.getId()) {
+                                                position.setEntryOrder(order.clone());
 
                                                 //TODO: Discard position, cancel stoploss if it's already set
-                                                if(position.isStopLossRequestSent()){
+                                                if (position.isStopLossRequestSent()) {
                                                     scheduler.addEvent(new Event(currentEvent.getDelayedTimestamp(),
                                                             EventDestination.EXCHANGE,
                                                             OrderAction.CANCEL_ORDER,
-                                                            new Order(position.getStopOrder())));
+                                                            position.getStopOrder().clone()));
                                                 } else {
                                                     //Discard
                                                     position.setGroup(PositionGroup.DISCARDED);
                                                 }
 
-                                            } else if(position.getStopOrder().getId() == order.getId()){
+                                            } else if (position.getStopOrder().getId() == order.getId()) {
 
                                                 System.out.println("Local Error - pending or new position would trigger immediately.");
 
-                                                position.setStopOrder(new Order(order));
+                                                position.setStopOrder(order.clone());
                                             }
                                         }
                                         case FILLED -> {
-                                            if(position.getEntryOrder().getId() == order.getId()){
+                                            if (position.getEntryOrder().getId() == order.getId()) {
 
                                                 System.out.println("Local Error - rejected already filled position entry order?");
-                                                position.setEntryOrder(new Order(order));
+                                                position.setEntryOrder(order.clone());
 
                                             } else if (position.getStopOrder().getId() == order.getId()) {
 
@@ -254,14 +473,14 @@ public class LocalStrategy {
                                                         currentEvent.getDelayedTimestamp(),
                                                         EventDestination.EXCHANGE,
                                                         OrderAction.CREATE_ORDER,
-                                                        new Order(order)));
+                                                        order.clone()));
 
-                                                position.setStopOrder(new Order(order));
+                                                position.setStopOrder(order.clone());
 
                                                 position.setClosedBeforeStopLoss(true);
-                                            } else if(position.getCloseOrder() != null && position.getCloseOrder().getId() == order.getId()){
+                                            } else if (position.getCloseOrder() != null && position.getCloseOrder().getId() == order.getId()) {
                                                 //For programmatic take profits, not usable for now
-                                                position.setCloseOrder(new Order(order));
+                                                position.setCloseOrder(order.clone());
                                             }
                                         }
                                     }
@@ -287,65 +506,35 @@ public class LocalStrategy {
                                     System.out.println("Local Error - Action rejected - invalid order state - borrow amount = 0?");
                         }
                     } // DONE
-                    case FUNDS_REPAID -> { // DONE
-                        for(Position position : activePositions){
-                            switch (position.getGroup()){
-                                case FILLED -> {
-                                    if(position.getEntryOrder().getId() == order.getId()){
-
-                                        if(position.getCloseOrder() != null){
+                    case FUNDS_REPAID -> {
+                        ArrayList<Position> tempPositions = new ArrayList<>();
+                        for (Position position : activePositions) {
+                            switch (position.getGroup()) {
+                                case NEW, FILLED -> {
+                                    if (position.getEntryOrder().getId() == order.getId()) {
+                                        if (position.getCloseOrder() != null) {
                                             // We closed the order manually
                                         } else {
                                             // We got stoplossed
                                         }
 
-                                        position.setEntryOrder(new Order(order));
+                                        position.setEntryOrder(order.clone());
 
                                         position.closePosition(currentEvent.getDelayedTimestamp());
-                                        position.setGroup(PositionGroup.CLOSED);
+
+                                        if (position.getGroup().equals(PositionGroup.FILLED)) {
+                                            position.setGroup(PositionGroup.CLOSED);
+                                        } else {
+                                            position.setGroup(PositionGroup.DISCARDED);
+                                        }
+
+                                        tempPositions.add(position);
                                     }
                                 }
                             }
                         }
-
-                        Position newClosedPosition = null;
-                        Position newCancelledPosition = null;
-                        //Can be a filled order (closing the position) or a new order (cancelling a position)
-                        for (Position position : filledPositions) {
-                            if (position.getEntryOrder().getId() == order.getId()) {
-                                position.setEntryOrder(order);
-
-                                if (position.getStopOrder().getStatus().equals(OrderStatus.FILLED)) {
-                                    //Repaid after stoploss
-                                }
-
-                                position.closePosition(currentEvent.getDelayedTimestamp()); //TODO: Focus here
-                                newClosedPosition = position;
-
-                                break;
-                            }
-                        }
-                        if (newClosedPosition == null) {
-                            for (Position position : newPositions) {
-                                if (position.getEntryOrder().getId() == order.getId()) {
-                                    position.setEntryOrder(order);
-                                    newCancelledPosition = position;
-
-                                    break;
-                                }
-                            }
-                            if (newCancelledPosition != null) {
-                                Position finalNewCancelledPosition = newCancelledPosition;
-                                cancelledPositions.add(finalNewCancelledPosition);
-                                newPositions.removeIf(position -> position.getId() == finalNewCancelledPosition.getId());
-                            } else {
-                                System.out.println("Local Error - repaid order isn't in filled positions nor new positions?");
-                            }
-                        } else {
-                            Position finalNewClosedPosition = newClosedPosition;
-                            closedPositions.add(new Position(finalNewClosedPosition));
-                            filledPositions.removeIf(position -> position.getId() == finalNewClosedPosition.getId());
-                        }
+                        inactivePositions.addAll(tempPositions);
+                        activePositions.removeAll(tempPositions);
                     } // DONE
                     case ORDER_CANCELLED -> { //DONE?
 
@@ -353,69 +542,90 @@ public class LocalStrategy {
                             System.out.println("Local Error - Cancelling a market order.");
                         }
 
-                        for(Position position : activePositions){
-                            switch (position.getGroup()){
+                        ArrayList<Position> tempPositions = new ArrayList<>();
+                        for (Position position : activePositions) {
+                            switch (position.getGroup()) {
                                 case PENDING, NEW -> {
-                                    if(position.getEntryOrder().getId() == order.getId()){
+                                    if (position.getEntryOrder().getId() == order.getId()) {
 
                                         //Repay funds if stop order is cancelled - IF it's not automatic repay at cancel.
-                                        if(position.getStopOrder().getStatus().equals(OrderStatus.CANCELED)){
-
+                                        if (position.getStopOrder().getStatus().equals(OrderStatus.CANCELED)) {
                                             position.setGroup(PositionGroup.CANCELLED);
+                                            tempPositions.add(position);
+                                        } else {
+                                            //Send request for stoploss order cancellation? Or will that be done manually for now let's do it automatic.
+                                            scheduler.addEvent(new Event(
+                                                    currentEvent.getDelayedTimestamp(),
+                                                    EventDestination.EXCHANGE,
+                                                    OrderAction.CANCEL_ORDER,
+                                                    position.getStopOrder().clone()));
                                         }
 
-                                        position.setEntryOrder(new Order(order));
+                                        position.setEntryOrder(order.clone());
 
-                                    } else if(position.getStopOrder().getId() == order.getId()){
+                                    } else if (position.getStopOrder().getId() == order.getId()) {
 
                                         //Repay funds if entry order is cancelled - IF it's not automatic repay at cancel
-                                        if(position.getEntryOrder().getStatus().equals(OrderStatus.CANCELED)){
+                                        if (position.getEntryOrder().getStatus().equals(OrderStatus.CANCELED)) {
                                             position.setGroup(PositionGroup.CANCELLED);
+                                            tempPositions.add(position);
 
-                                        } else if(position.getEntryOrder().getStatus().equals(OrderStatus.NEW) && position.getEntryOrder().getRejectionReason() != null){ //If the entry order got rejected?
+                                        } else if (position.getEntryOrder().getStatus().equals(OrderStatus.NEW) && position.getEntryOrder().getRejectionReason() != null) { //If the entry order got rejected?
                                             //Funds weren't borrowed, discard the position
                                             position.setGroup(PositionGroup.DISCARDED);
+                                            tempPositions.add(position);
                                         }
 
-                                        position.setStopOrder(new Order(order));
+                                        position.setStopOrder(order.clone());
                                     }
                                 }
                                 case FILLED -> {
-                                    if(position.getEntryOrder().getId() == order.getId()){
+                                    if (position.getEntryOrder().getId() == order.getId()) {
                                         System.out.println("Local Error - cancelling filled position's entry order");
-                                        position.setEntryOrder(new Order(order));
-                                    } else if(position.getStopOrder().getId() == order.getId()){
+                                        position.setEntryOrder(order.clone());
+                                    } else if (position.getStopOrder().getId() == order.getId()) {
                                         //Most likely a breakeven / move stoploss request
-                                        position.setStopOrder(new Order(order));
+                                        position.setStopOrder(order.clone());
+                                    }
+                                }
+                                case CLOSED -> { //Cancelling stoploss order after closing the order
+                                    if (position.getStopOrder().getId() == order.getId()) {
+                                        position.setStopOrder(order.clone());
+                                        tempPositions.add(position);
                                     }
                                 }
                             }
                         }
+                        activePositions.removeAll(tempPositions);
+                        inactivePositions.addAll(tempPositions);
                     } // DONE?
                     case ORDER_CREATED -> { // DONE
-                        for(Position position : activePositions){
-                            switch (position.getGroup()){
+                        for (Position position : activePositions) {
+                            switch (position.getGroup()) {
                                 case PENDING -> {
-                                    if(position.getEntryOrder().getId() == order.getId()){
-                                        position.setEntryOrder(new Order(order));
+                                    if (position.getEntryOrder().getId() == order.getId()) {
+                                        position.setEntryOrder(order.clone());
+                                        if (order.getType().equals(OrderType.LIMIT)) {
+                                            position.setMarginBuyBorrowAmount(order.getMarginBuyBorrowAmount());
+                                        }
                                         position.setGroup(PositionGroup.NEW);
-                                    } else if(position.getStopOrder().getId() == order.getId()){
-                                        position.setEntryOrder(new Order(order));
+                                    } else if (position.getStopOrder().getId() == order.getId()) {
+                                        position.setEntryOrder(order.clone());
                                         System.out.println("Local Error - created a stop order for a pending position before it became new");
                                     }
                                 }
                                 case NEW -> {
-                                    if(position.getEntryOrder().getId() == order.getId()){
-                                        position.setEntryOrder(new Order(order));
+                                    if (position.getEntryOrder().getId() == order.getId()) {
+                                        position.setEntryOrder(order.clone());
                                         System.out.println("Local Error - created a new entry order for a position of status new?");
-                                    } else if(position.getStopOrder().getId() == order.getId()){
-                                        position.setStopOrder(new Order(order));
+                                    } else if (position.getStopOrder().getId() == order.getId()) {
+                                        position.setStopOrder(order.clone());
                                         position.setActiveStopLoss(true);
                                     }
                                 }
                                 case FILLED -> {
-                                    if(position.getStopOrder().getId() == order.getId()){
-                                        position.setStopOrder(new Order(order));
+                                    if (position.getStopOrder().getId() == order.getId()) {
+                                        position.setStopOrder(order.clone());
                                         position.setActiveStopLoss(true);
                                     }
                                 }

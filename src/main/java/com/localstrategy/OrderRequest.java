@@ -3,6 +3,7 @@ package com.localstrategy;
 import com.localstrategy.util.enums.OrderSide;
 import com.localstrategy.util.enums.OrderStatus;
 import com.localstrategy.util.enums.OrderType;
+import com.localstrategy.util.enums.PositionGroup;
 import com.localstrategy.util.types.SingleTransaction;
 
 import java.util.ArrayList;
@@ -14,9 +15,7 @@ public class OrderRequest {
     private double positionSize;
     private double requiredMargin;
 
-    private final ArrayList<Position> pendingPositions;
-    private final ArrayList<Position> newPositions;
-    private final ArrayList<Position> filledPositions;
+    private final ArrayList<Position> activePositions;
     private final UserAssets userAssets;
     private final double risk;
     private final TierManager riskManager;
@@ -26,18 +25,14 @@ public class OrderRequest {
 
     //TODO: Add stop limit orders
     public OrderRequest(
-        ArrayList<Position> pendingPositions,
-        ArrayList<Position> newPositions,
-        ArrayList<Position> filledPositions,
+        ArrayList<Position> activePositions,
         TierManager riskManager,
         UserAssets userAssets,
         double risk, 
         int totalOrderLimit,
         int slippagePct){
 
-            this.pendingPositions = pendingPositions;
-            this.newPositions = newPositions;
-            this.filledPositions = filledPositions;
+            this.activePositions = activePositions;
             this.riskManager = riskManager;
             this.userAssets = userAssets;
             this.risk = risk;
@@ -56,7 +51,8 @@ public class OrderRequest {
                 borrowedAmount,
                 transaction.timestamp()
             );
-            pendingPositions.add(position);
+            position.setGroup(PositionGroup.PENDING);
+            activePositions.add(position);
             return position;
         }
         return null;
@@ -73,7 +69,8 @@ public class OrderRequest {
                 borrowedAmount,
                 transaction.timestamp()
             );
-            pendingPositions.add(position);
+            position.setGroup(PositionGroup.PENDING);
+            activePositions.add(position);
             return position;
         }
         return null;
@@ -118,25 +115,31 @@ public class OrderRequest {
                 riskManager.checkAndUpdateTier(borrowedUSDT, borrowedBTC + amountToBorrow);
             }
 
+            borrowedAmount = amountToBorrow;
+
             requiredMargin = positionSize * entryPrice / riskManager.getCurrentLeverage();
 
             int programmaticCounter = 0;
-            for(Position position : pendingPositions){
-                if(position.getEntryOrder().getType().equals(OrderType.LIMIT) && position.getEntryOrder().getStatus() == OrderStatus.NEW){
-                    programmaticCounter++;
-                }
-            }
-            for(Position position : newPositions){
-                if(position.getEntryOrder().getType().equals(OrderType.LIMIT) && position.getEntryOrder().getStatus() == OrderStatus.NEW){
-                    programmaticCounter++;
-                }
-                if(position.isActiveStopLoss()){
-                    programmaticCounter++;
-                }
-            }
-            for(Position position : filledPositions){
-                if(position.isActiveStopLoss()){
-                    programmaticCounter++;
+            for(Position position : activePositions){
+                switch (position.getGroup()){
+                    case PENDING -> {
+                        if(position.getEntryOrder().getType().equals(OrderType.LIMIT) && position.getEntryOrder().getStatus() == OrderStatus.NEW){
+                            programmaticCounter++;
+                        }
+                    }
+                    case NEW -> {
+                        if(position.getEntryOrder().getType().equals(OrderType.LIMIT) && position.getEntryOrder().getStatus() == OrderStatus.NEW){
+                            programmaticCounter++;
+                        }
+                        if(position.isActiveStopLoss()){
+                            programmaticCounter++;
+                        }
+                    }
+                    case FILLED -> {
+                        if(position.isActiveStopLoss()){
+                            programmaticCounter++;
+                        }
+                    }
                 }
             }
 

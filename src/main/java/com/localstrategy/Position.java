@@ -1,10 +1,11 @@
 package com.localstrategy;
 
 import com.localstrategy.util.enums.*;
+import com.localstrategy.util.types.SingleTransaction;
 
 import java.util.ArrayList;
 
-public class Position {
+public class Position implements Cloneable {
     private long id;
     private double openPrice;
     private double stopLossPrice;
@@ -34,6 +35,8 @@ public class Position {
     private boolean stopLossRequestSent = false;
     private boolean automaticBorrow;
     private boolean autoRepayAtCancel = true;
+
+    private double marginBuyBorrowAmount = 0;
 
     private boolean cancelled = false;
 
@@ -70,6 +73,7 @@ public class Position {
             openPrice,
             direction,
             true,
+            false,
             size, 
             orderType, 
             margin, 
@@ -81,6 +85,7 @@ public class Position {
             stopLossPrice, 
             direction == OrderSide.BUY ? OrderSide.SELL : OrderSide.BUY, 
             false,
+            true,
             size, 
             OrderType.LIMIT, 
             margin, 
@@ -89,58 +94,62 @@ public class Position {
         );
     }
 
-    public Position(Position other) {
-        this.id = other.id;
-        this.openPrice = other.openPrice;
-        this.stopLossPrice = other.stopLossPrice;
-        this.initialStopLossPrice = other.initialStopLossPrice;
-        this.size = other.size;
-        this.closingPrice = other.closingPrice;
-        this.direction = other.direction;
-        this.breakEven = other.breakEven;
-        this.margin = other.margin;
-        this.filled = other.filled;
-        this.closed = other.closed;
-        this.profit = other.profit;
-        this.partiallyClosed = other.partiallyClosed;
-        this.orderType = other.orderType;
-        this.openTimestamp = other.openTimestamp;
-        this.hourlyInterestRate = other.hourlyInterestRate;
-        this.borrowedAmount = other.borrowedAmount;
-        this.fillPrice = other.fillPrice;
-        this.fillTimestamp = other.fillTimestamp;
-        this.closeTimestamp = other.closeTimestamp;
-        this.activeStopLoss = other.activeStopLoss;
-        this.closedBeforeStopLoss = other.closedBeforeStopLoss;
-        this.totalUnpaidInterest = other.totalUnpaidInterest;
-        this.reversed = other.reversed;
-        this.isStopLoss = other.isStopLoss;
-        this.automaticBorrow = other.automaticBorrow;
-        this.autoRepayAtCancel = other.autoRepayAtCancel;
-        this.rejectionReason = other.rejectionReason;
-        this.entryOrder = new Order(other.entryOrder);
-        this.stopLossOrder = new Order(other.stopLossOrder);
-        this.closeOrder = other.closeOrder == null ? null : other.getCloseOrder();
-        this.cancelled = other.cancelled;
-        this.stopLossRequestSent = other.stopLossRequestSent;
+    public Order createCloseOrder(SingleTransaction transaction){
+        return new Order(
+                transaction.price(),
+                this.stopLossOrder.getDirection(),
+                false,
+                false,
+                size,
+                OrderType.MARKET,
+                margin,
+                borrowedAmount,
+                transaction.timestamp()
+        );
+    }
+
+    @Override
+    protected Position clone() throws CloneNotSupportedException {
+        try {
+            Position clonedPosition = (Position) super.clone();
+
+            clonedPosition.entryOrder = this.entryOrder.clone();
+            clonedPosition.stopLossOrder = this.stopLossOrder.clone();
+            if (this.closeOrder != null) {
+                clonedPosition.closeOrder = this.closeOrder.clone();
+            }
+
+            return clonedPosition;
+        } catch (CloneNotSupportedException e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
 
 
     public double closePosition(long closeTimestamp){
-        if(closed || !filled || !entryOrder.getStatus().equals(OrderStatus.FILLED)){
+        if(closed || !entryOrder.getStatus().equals(OrderStatus.FILLED)){
             return 0;
         }
 
         if(stopLossOrder.getStatus().equals(OrderStatus.FILLED)){
             this.profit = (stopLossOrder.getFillPrice() - entryOrder.getFillPrice()) * size * (direction.equals(OrderSide.BUY) ? 1 : -1);
-        } else if(closeOrder.getStatus().equals(OrderStatus.FILLED)) {
+        } else if(closeOrder != null && closeOrder.getStatus().equals(OrderStatus.FILLED)) {
             this.profit = (closeOrder.getFillPrice() - entryOrder.getFillPrice()) * size * (direction.equals(OrderSide.BUY) ? 1 : -1);
         }
         closed = true;
 
         this.closeTimestamp = closeTimestamp;
         return profit;
+    }
+
+    public double getMarginBuyBorrowAmount() {
+        return marginBuyBorrowAmount;
+    }
+
+    public void setMarginBuyBorrowAmount(double marginBuyBorrowAmount) {
+        this.marginBuyBorrowAmount = marginBuyBorrowAmount;
     }
 
     public PositionGroup getGroup() {
@@ -424,11 +433,11 @@ public class Position {
 
     public void setCloseOrder(Order closeOrder) { this.closeOrder = closeOrder; }
 
-    public static ArrayList<Position> deepCopyPositionList(ArrayList<Position> originalList) {
+    public static ArrayList<Position> deepCopyPositionList(ArrayList<Position> originalList) throws CloneNotSupportedException {
         ArrayList<Position> newList = new ArrayList<>();
 
         for (Position pos : originalList) {
-            Position newPos = new Position(pos);
+            Position newPos = pos.clone();
             newList.add(newPos);
         }
         return newList;

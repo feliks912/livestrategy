@@ -185,7 +185,7 @@ public class CandlestickChart extends JFrame {
     public void executor(){
         ArrayList<SingleTransaction> transactionList;
 
-        TransactionLoader transactionLoader = new TransactionLoader("C:/--- BTCUSDT/", 
+        TransactionLoader transactionLoader = new TransactionLoader("C:\\Users\\Admin\\Desktop\\livestrategy\\src\\main\\java\\Resources\\BTCUSDT",
         //null,
         startDate, 
         endDate);
