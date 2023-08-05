@@ -1,6 +1,10 @@
 package com.localstrategy;
 
 import com.localstrategy.util.enums.*;
+import com.localstrategy.util.helper.EventScheduler;
+import com.localstrategy.util.helper.SlippageHandler;
+import com.localstrategy.util.helper.TierManager;
+import com.localstrategy.util.helper.UserAssets;
 import com.localstrategy.util.types.Event;
 import com.localstrategy.util.types.SingleTransaction;
 import com.localstrategy.util.types.UserDataStream;
@@ -13,26 +17,23 @@ import java.util.Map;
 
 //TODO: Check if overall borrow / profit logic is alright
 
-//TODO: Separate Order and Position classes - Position class is a local class comprising of position value and a stop-loss order, Order class is a single Binance-supported order request
+//TODO: Separate Order and Position classes - Position class is a local class comprising of position value and a stop-loss order, Order class is a single BinanceHandler-supported order request
 
 
 
 //FIXME: Refactor
 
-//Note - we don't use borrowed funds when calculating or positions sizes. That's important during live trading. handle it properly that's why I made the request to the Binance API team
+//Note - we don't use borrowed funds when calculating or positions sizes. That's important during live trading. handle it properly that's why I made the request to the BinanceHandler API team
 
 //TODO: Parse strategy as parameter from App instead of hard coding it into TempStrategyExecutor, unless TempStrategyExecutor is the strategy (later)
 //TODO: Add symbol rules (later)
-//TODO: Binance doesn't actually keep track of filled positions but it does offer a list (later)
+//TODO: BinanceHandler doesn't actually keep track of filled positions but it does offer a list (later)
 //TODO: Add manual borrow action (later)
 //TODO: Position liquidation (later)
 
-public class Binance {
+public class BinanceHandler {
 
     public final static int ALGO_ORDER_LIMIT = 5;
-
-    private final int MAX_BORROW_USDT = 900_000;
-    private final int MAX_BORROW_BTC = 72;
 
     private final ArrayList<Order> newOrders = new ArrayList<>();
     private final ArrayList<Order> filledOrders = new ArrayList<>();
@@ -51,13 +52,12 @@ public class Binance {
     private long previousInterestTimestamp = 0;
 
     private boolean userAssetsUpdated = false;
-    private boolean ordersUpdated = false;
 
     private final EventScheduler scheduler;
 
     private Event currentEvent;
 
-    public Binance(Double initialUSDTPortfolio, EventScheduler scheduler){
+    public BinanceHandler(Double initialUSDTPortfolio, EventScheduler scheduler){
 
         this.scheduler = scheduler;
 
@@ -79,9 +79,9 @@ public class Binance {
                 this.transaction = event.getTransaction();
                 checkFills();
             }
-            case ACTION_REQUEST -> {
-                handleUserActionRequest(event.getActionRequest());
-            }
+
+            case ACTION_REQUEST -> handleUserActionRequest(event.getActionRequest());
+
             default -> System.out.println("Exchange Error - Something other than transaction or action request ended up exchange's event stream.");
         }
 
@@ -104,7 +104,7 @@ public class Binance {
             updatedOrders.clear();
 
             userAssetsUpdated = false;
-            ordersUpdated = false;
+            boolean ordersUpdated = false;
         }
     }
     
@@ -112,9 +112,8 @@ public class Binance {
 
         if(entryBlock == null){
             System.out.println("Exchange error - EntryBlock in handleUserActionRequest is NULL which shouldn't be.");
-        }
-
-        if(entryBlock.isEmpty()){
+            return;
+        } else if(entryBlock.isEmpty()) {
             System.out.println("Exchange Error - EntryBlock in handleUserActionRequest is empty which shouldn't be.");
         }
 
@@ -130,7 +129,7 @@ public class Binance {
                                     .filter(p -> p.getType()
                                             .equals(OrderType.LIMIT))
                                     .count()
-                                    >= Binance.ALGO_ORDER_LIMIT);
+                                    >= BinanceHandler.ALGO_ORDER_LIMIT);
 
                     if (progOrdersReached) {
                         order.setStatus(OrderStatus.REJECTED);
@@ -168,7 +167,7 @@ public class Binance {
                         );
 
                         if(isLong){
-                            order.setBorrowedAmount(order.getSize() * fillPrice / tierManager.getCurrentLeverage());
+                            order.setAppropriateUnitPositionValue(order.getSize() * fillPrice / tierManager.getCurrentLeverage());
                         }
 
                         if(userAssets.getFreeUSDT() < order.getSize() * fillPrice && (!isLong && userAssets.getFreeBTC() < order.getSize())) {//Unless we have enough funds.
@@ -197,7 +196,7 @@ public class Binance {
                         createActionResponse(ActionResponse.ACTION_REJECTED, order);
                         continue;
                     }
-                    if (order.isAutoRepayAtCancel() && order.getMarginBuyBorrowAmount() != 0) {
+                    if (order.isAutoRepayAtCancel() && order.getMarginBuyBorrowAmount() != 0.0) {
 
                         RejectionReason rejectionReason = repayFunds(order);
 
@@ -252,12 +251,12 @@ public class Binance {
                             (!order.isStopLoss() && transaction.price() >= order.getOpenPrice()))))) {
 
                     if(isLong){
-                        order.setBorrowedAmount(order.getSize() * fillPrice / tierManager.getCurrentLeverage());
+                        order.setAppropriateUnitPositionValue(order.getSize() * fillPrice / tierManager.getCurrentLeverage());
                     }
 
                     if(isMarketOrder && order.isAutomaticBorrow()){
 
-                        //FIXME: Binance only checks for asset we must borrow
+                        //FIXME: BinanceHandler only checks for asset we must borrow
                         if((isLong && userAssets.getFreeUSDT() < order.getSize() * fillPrice) || (!isLong && userAssets.getFreeBTC() < order.getSize())){
 
                             RejectionReason rejectionReason = borrowFunds(order);
@@ -271,7 +270,7 @@ public class Binance {
                         }
                     }
                     if(isLong){
-                        if(userAssets.getFreeUSDT() < order.getBorrowedAmount()){
+                        if(userAssets.getFreeUSDT() < order.getAppropriateUnitPositionValue()){
                             if(isMarketOrder){ // Action response
                                 order.setStatus(OrderStatus.REJECTED);
                                 order.setRejectionReason(RejectionReason.INSUFFICIENT_FUNDS);
@@ -286,7 +285,7 @@ public class Binance {
                         //Buy BTC
                         userAssets.setFreeUSDT(
                             userAssets.getFreeUSDT()
-                                - order.getBorrowedAmount()
+                                - order.getSize() * fillPrice
                         );
 
                         userAssets.setFreeBTC(
@@ -313,7 +312,7 @@ public class Binance {
                         );
                         userAssets.setFreeUSDT(
                             userAssets.getFreeUSDT()
-                                + order.getBorrowedAmount()
+                                + order.getSize() * fillPrice
                         );
                     }
 
@@ -350,6 +349,17 @@ public class Binance {
 
             previousInterestTimestamp = currentEvent.getDelayedTimestamp();
 
+            for(Order order : newOrders){
+                if(order.getMarginBuyBorrowAmount() != 0.0){
+                    order.increaseUnpaidInterest(transaction.price());
+                }
+            }
+            for(Order order : filledOrders){
+                if(order.getMarginBuyBorrowAmount() != 0.0){
+                    order.increaseUnpaidInterest(transaction.price());
+                }
+            }
+
             userAssets.setTotalUnpaidInterest(
                     userAssets.getTotalUnpaidInterest()
                         + userAssets.getTotalBorrowedUSDT() * TierManager.HOURLY_USDT_INTEREST_RATE
@@ -375,6 +385,7 @@ public class Binance {
             double positionValue = order.getSize() * fillPrice;
 
             //Check maximum borrow amount
+            int MAX_BORROW_USDT = 900_000;
             if(positionValue + userAssets.getTotalBorrowedUSDT() > MAX_BORROW_USDT){
                 return RejectionReason.EXCESS_BORROW;
             }
@@ -415,7 +426,7 @@ public class Binance {
                 userAssets.getTotalUnpaidInterest() 
                     + order.getTotalUnpaidInterest());
 
-            order.setMargin(requiredMargin);
+            order.setBorrowCollateral(requiredMargin);
             order.setMarginBuyBorrowAmount(positionValue);
         
         } else { //Short - borrow BTC
@@ -423,6 +434,7 @@ public class Binance {
             double positionSize = order.getSize();
 
             //Check maximum borrow amount
+            int MAX_BORROW_BTC = 72;
             if(order.getSize() + userAssets.getTotalBorrowedBTC() > MAX_BORROW_BTC){
                 return RejectionReason.EXCESS_BORROW;
             }
@@ -463,66 +475,66 @@ public class Binance {
                 userAssets.getTotalUnpaidInterest() 
                     + order.getTotalUnpaidInterest());
 
-            order.setMargin(requiredMargin);
+            order.setBorrowCollateral(requiredMargin);
             order.setMarginBuyBorrowAmount(positionSize);
         }
         return null;
     }
 
     //TODO: Check and refactor
-    //TODO: Fixme: Binance isn't calculating our order interest for us, we must do so locally.
+    //TODO: Fixme: BinanceHandler isn't calculating our order interest for us, we must do so locally.
     // Currently the repay amount is saved in an order, but we must locally add the unpaid interest amount to that which would offset other calculations.
     //FIXME: Convert the repayFunds so an amount is sent, not an order? Or an order along with the amount?
     private RejectionReason repayFunds(Order order) {
-        if(order.getBorrowedAmount() == 0){
+        if(order.getAppropriateUnitPositionValue() == 0){
             return RejectionReason.INVALID_ORDER_STATE;
         }
 
         if(order.getDirection().equals(OrderSide.BUY)){
             //Return USDT
 
-            if(userAssets.getFreeUSDT() < order.getBorrowedAmount() + order.getTotalUnpaidInterest()){
+            if(userAssets.getFreeUSDT() < order.getAppropriateUnitPositionValue() + order.getTotalUnpaidInterest()){
                 return RejectionReason.INSUFFICIENT_FUNDS;
             }
 
-            if(userAssets.getLockedUSDT() < order.getMargin()){
+            if(userAssets.getLockedUSDT() < order.getBorrowCollateral()){
                 System.out.println("Exchange Error at repayFunds side BUY - locked USDT has insufficient funds to unlock margin?");
             }
 
-            if(userAssets.getTotalBorrowedUSDT() < order.getBorrowedAmount()){
+            if(userAssets.getTotalBorrowedUSDT() < order.getAppropriateUnitPositionValue()){
                 System.out.println("Exchange Error at repayFunds side BUY - borrowed USDT would go negative if we were to exclude the borrowed amount?");
             }
 
             userAssets.setFreeUSDT(
                 userAssets.getFreeUSDT()
-                    - order.getBorrowedAmount()
-                    + order.getMargin()
+                    - order.getAppropriateUnitPositionValue()
+                    + order.getBorrowCollateral()
                     - order.getTotalUnpaidInterest()
             );
 
             userAssets.setLockedUSDT(
                 userAssets.getLockedUSDT()
-                    - order.getMargin()
+                    - order.getBorrowCollateral()
             );
 
             userAssets.setTotalBorrowedUSDT(
                 userAssets.getTotalBorrowedUSDT()
-                    - order.getBorrowedAmount()
+                    - order.getAppropriateUnitPositionValue()
             );
 
         } else {
             //Return BTC
 
-            if(userAssets.getFreeBTC() < order.getSize() || userAssets.getFreeUSDT() < order.getMargin()
+            if(userAssets.getFreeBTC() < order.getSize() || userAssets.getFreeUSDT() < order.getBorrowCollateral()
                     - order.getTotalUnpaidInterest()){
                         return RejectionReason.INSUFFICIENT_FUNDS;
             }
 
-            if(userAssets.getLockedUSDT() < order.getMargin()){
+            if(userAssets.getLockedUSDT() < order.getBorrowCollateral()){
                 System.out.println("Exchange Error at repayFunds side SELL - locked USDT has insufficient funds to unlock margin?");
             }
 
-            if(userAssets.getTotalBorrowedBTC() < order.getBorrowedAmount()){
+            if(userAssets.getTotalBorrowedBTC() < order.getAppropriateUnitPositionValue()){
                 System.out.println("Exchange Error at repayFunds side SELL - borrowed BTC would go negative if we were to exclude the borrowed amount?");
             }
 
@@ -533,13 +545,13 @@ public class Binance {
 
             userAssets.setFreeUSDT(
                 userAssets.getFreeUSDT()
-                    + order.getMargin()
+                    + order.getBorrowCollateral()
                     - order.getTotalUnpaidInterest()
             );
 
             userAssets.setLockedUSDT(
                 userAssets.getLockedUSDT()
-                    - order.getMargin()
+                    - order.getBorrowCollateral()
             );
 
             userAssets.setTotalBorrowedBTC(

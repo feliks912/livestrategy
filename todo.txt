@@ -1,8 +1,13 @@
+Todo:
+    Refactor order and position variable names - 'done'
+    Abstract position creation in separate class
+    Convert data to binary
+
 Testing:
-    Solved opening a market order, closing it on stoploss, and market exit. Also repaying.
-    Solved opening a limit order, cancelling a limit order right after opening (and paying interest)
-    Solved opening a limit order, filling it and TP'ing it
-    Solved opening a limit order and SL'ing on BE + some, with profit
+    Solved opening a market order, closing it on stoploss, and market exit. Also repaying. both on long and short
+    Solved opening a limit order, cancelling a limit order right after opening (and paying interest), both on long and short
+    Solved opening a limit order, filling it and TP'ing it on both long and short
+    Solved opening a limit order and SL'ing on BE + some, with profit, both long and short
 
     TODO: Position counts profit correctly but userAssets are still fucked.
 

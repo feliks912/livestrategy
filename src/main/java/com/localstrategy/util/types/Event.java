@@ -81,10 +81,6 @@ public class Event implements Comparable<Event> {
         return eventTimestamp;
     }
 
-    public int getLatency() {
-        return eventLatency;
-    }
-
     public long getDelayedTimestamp() {
         return eventDelayedTimestamp;
     }
