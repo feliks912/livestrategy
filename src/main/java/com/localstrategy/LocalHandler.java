@@ -1,7 +1,7 @@
 package com.localstrategy;
 
 import com.localstrategy.util.enums.*;
-import com.localstrategy.util.helper.CandleConstructor;
+import com.localstrategy.util.helper.*;
 import com.localstrategy.util.types.Candle;
 import com.localstrategy.util.types.Event;
 import com.localstrategy.util.types.SingleTransaction;
@@ -10,7 +10,7 @@ import com.localstrategy.util.types.UserDataStream;
 import java.util.ArrayList;
 import java.util.Map;
 
-public class LocalStrategy {
+public class LocalHandler {
 
     private static final int CANDLE_VOLUME = 2_000_000;
     private static final double RISK_PCT = 0.1;
@@ -26,12 +26,18 @@ public class LocalStrategy {
     private final OrderRequest orderRequest;
     private Candle lastCandle;
 
+    private ArrayList<Candle> candles = new ArrayList<>();
+
     private Event currentEvent;
     private SingleTransaction transaction;
 
     private boolean closeRequestSent = false;
 
-    public LocalStrategy(double initialFreeUSDT, EventScheduler scheduler) {
+    private boolean printedInactivePositions = false;
+
+    UserStrategy strategy;
+
+    public LocalHandler(double initialFreeUSDT, EventScheduler scheduler) {
 
         this.scheduler = scheduler;
 
@@ -42,22 +48,133 @@ public class LocalStrategy {
                 new TierManager(),
                 userAssets,
                 RISK_PCT,
-                Binance.ALGO_ORDER_LIMIT,
+                BinanceHandler.ALGO_ORDER_LIMIT,
                 SLIPPAGE_PCT);
 
         //TODO: Print parameters on strategy start
+
+        strategy = new UserStrategy(this, transaction, candles, activePositions, inactivePositions);
     }
-
-
-    boolean printedInactivePositions = false;
-
 
     private void priceUpdate(SingleTransaction transaction) {
-        test4();
+        strategy.priceUpdate(transaction);
     }
+
+    private void newCandle(Candle lastCandle) {
+        strategy.candleUpdate(lastCandle);
+    }
+
+    public Position executeMarketOrder(double stopPrice){
+        Position newMarketPosition = orderRequest.newMarketPosition(transaction, stopPrice);
+
+        if (newMarketPosition != null) {
+            scheduler.addEvent(new Event(
+                    currentEvent.getDelayedTimestamp(),
+                    EventDestination.EXCHANGE,
+                    OrderAction.CREATE_ORDER,
+                    newMarketPosition.getEntryOrder().clone()
+            ));
+        }
+
+        return newMarketPosition;
+    }
+
+    public Position executeLimitOrder(double entryPrice, double stopPrice){
+        Position newLimitPosition = orderRequest.newLimitPosition(entryPrice, stopPrice, transaction);
+
+        if (newLimitPosition != null) {
+            scheduler.addEvent(new Event(
+                    currentEvent.getDelayedTimestamp(),
+                    EventDestination.EXCHANGE,
+                    OrderAction.CREATE_ORDER,
+                    newLimitPosition.getEntryOrder().clone()
+            ));
+        }
+
+        return newLimitPosition;
+    }
+
+    public boolean activateStopLoss(Position position){
+        if(position == null || position.isStopLossRequestSent() || position.isActiveStopLoss()){
+            return true;
+        }
+
+        scheduler.addEvent(new Event(
+                currentEvent.getDelayedTimestamp(),
+                EventDestination.EXCHANGE,
+                OrderAction.CREATE_ORDER,
+                position.getStopOrder().clone()
+        ));
+
+        position.setStopLossRequestSent(true);
+
+        return false;
+    }
+
+    public boolean updateStopLoss(double newStopPrice, Position position){
+        if (position == null || !position.isActiveStopLoss() || !position.getGroup().equals(PositionGroup.FILLED)) { //Must be a better way
+            return true;
+        }
+
+        scheduler.addEvent(new Event(
+                currentEvent.getDelayedTimestamp(),
+                EventDestination.EXCHANGE,
+                OrderAction.CANCEL_ORDER,
+                position.getStopOrder().clone()
+        ));
+
+        position.getStopOrder().setOpenPrice(46400);
+        position.setOpenTimestamp(currentEvent.getDelayedTimestamp());
+
+        scheduler.addEvent(new Event(
+                currentEvent.getDelayedTimestamp(),
+                EventDestination.EXCHANGE,
+                OrderAction.CREATE_ORDER,
+                position.getStopOrder().clone()
+        ));
+
+        position.setBreakEven(true);
+
+        return false;
+    }
+
+    public boolean cancelPosition(Position position){
+        if(position == null || !position.getGroup().equals(PositionGroup.NEW) || !position.getGroup().equals(PositionGroup.FILLED)){
+            return true;
+        }
+
+        scheduler.addEvent(new Event(
+                currentEvent.getDelayedTimestamp(),
+                EventDestination.EXCHANGE,
+                OrderAction.CANCEL_ORDER,
+                position.getEntryOrder().clone()
+        ));
+
+        return false;
+    }
+
+    public boolean closePosition(Position position){
+        if (position == null || position.getCloseOrder() != null || !position.getGroup().equals(PositionGroup.FILLED)) {
+            return true;
+        }
+
+        Order closeOrder = position.createCloseOrder(transaction);
+        position.setCloseOrder(closeOrder);
+
+        scheduler.addEvent(new Event(
+                currentEvent.getDelayedTimestamp(),
+                EventDestination.EXCHANGE,
+                OrderAction.CREATE_ORDER,
+                closeOrder.clone()
+        ));
+
+        return false;
+    }
+
+
     private void test4(){
         if (activePositions.isEmpty()) {
-            Position newMarketPosition = orderRequest.newLimitPosition(45000, 44900, transaction);
+            Position newMarketPosition = orderRequest.newLimitPosition(46560, 46580, transaction);
 
             if (newMarketPosition != null) {
                 scheduler.addEvent(new Event(
@@ -82,7 +199,7 @@ public class LocalStrategy {
                         }
                     }
                     case FILLED -> {
-                        if (!position.isBreakEven() && position.isActiveStopLoss() && transaction.price() >= 46550) { //Must be a better way
+                        if (!position.isBreakEven() && position.isActiveStopLoss() && transaction.price() <= 46300) { //Must be a better way
 
                             scheduler.addEvent(new Event(
                                     currentEvent.getDelayedTimestamp(),
@@ -91,7 +208,7 @@ public class LocalStrategy {
                                     position.getStopOrder().clone()
                             ));
 
-                            position.getStopOrder().setOpenPrice(46150);
+                            position.getStopOrder().setOpenPrice(46400);
                             position.setOpenTimestamp(currentEvent.getDelayedTimestamp());
 
                             scheduler.addEvent(new Event(
@@ -116,10 +233,10 @@ public class LocalStrategy {
                 }
             }
         }
-    }
+    } // Limit with BE
 
     private void test3(){
-        if (activePositions.isEmpty()) {
+        if (activePositions.isEmpty() && inactivePositions.isEmpty()) {
             Position newMarketPosition = orderRequest.newLimitPosition(45000, 44900, transaction);
 
             if (newMarketPosition != null) {
@@ -166,16 +283,15 @@ public class LocalStrategy {
             for (Position position : inactivePositions) {
                 if (position.getGroup().equals(PositionGroup.CLOSED)) {
                     System.out.printf("Position TP'd successfully. Profit is $%.2f\n", position.getProfit());
-
                     printedInactivePositions = true;
                 }
             }
         }
-    }
+    } // Limit buy and TP
 
     private void test2(){
         if (activePositions.isEmpty()) {
-            Position newMarketPosition = orderRequest.newLimitPosition(transaction.price() + 100, transaction.price() + 110, transaction);
+            Position newMarketPosition = orderRequest.newLimitPosition(transaction.price() - 100, transaction.price() - 110, transaction);
 
             if (newMarketPosition != null) {
                 scheduler.addEvent(new Event(
@@ -217,7 +333,7 @@ public class LocalStrategy {
                 }
             }
         }
-    }
+    } // Limit order cancelling
 
     private void test1() {
         if (activePositions.isEmpty() && inactivePositions.isEmpty()) {
@@ -272,11 +388,9 @@ public class LocalStrategy {
                 }
             }
         }
-    }
+    } // 1RR market order
 
-    private void newCandle(SingleTransaction transaction, ArrayList<Candle> candles) {
 
-    }
 
 
     public void onEvent(Event event) {
@@ -294,10 +408,10 @@ public class LocalStrategy {
                 userAssets = new UserAssets(userDataStream.userAssets());
 
                 if (userAssets.getMarginLevel() <= 1.05) {
-                    System.out.println("LocalStrategy Error - Liquidation. Should have been called in exchange first.");
+                    System.out.println("LocalHandler Error - Liquidation. Should have been called in exchange first.");
                 } else if (userAssets.getMarginLevel() <= 1.1) { //TODO: Handle margin level report - close positions and repay funds
                     //Margin call
-                    System.out.println("LocalStrategy Margin call");
+                    System.out.println("LocalHandler Margin call");
                 }
 
                 for (Order order : userDataStream.updatedOrders()) {
@@ -305,7 +419,7 @@ public class LocalStrategy {
                         case REJECTED -> { //DONE
                             switch (order.getRejectionReason()) {
                                 case INSUFFICIENT_FUNDS, INSUFFICIENT_MARGIN -> {
-                                    System.out.println("LocalStrategy Error - Market position rejected for insufficient margin or insufficient funds - should have been checked during order creation?");
+                                    System.out.println("LocalHandler Error - Market position rejected for insufficient margin or insufficient funds - should have been checked during order creation?");
                                     boolean issue = true;
                                     for (Position position : activePositions) {
                                         switch (position.getGroup()) {
@@ -419,6 +533,10 @@ public class LocalStrategy {
 
                         case NEW -> {
                         } // Handled in action response
+
+                        case CANCELED -> {
+                            System.out.println("breakpoint");
+                        }
                     }
                 }
             } // DONE
@@ -639,12 +757,13 @@ public class LocalStrategy {
     }
 
     //TODO: implement walls
-    public void onTransaction(SingleTransaction transaction) {
+    private void onTransaction(SingleTransaction transaction) {
         Candle candle = candleConstructor.processTradeEvent(transaction);
 
         if (candle != null) { // New candle
             lastCandle = candle;
-            newCandle(transaction, candleConstructor.getCandles());
+            candles = candleConstructor.getCandles();
+            newCandle(lastCandle);
         }
 
         priceUpdate(transaction);

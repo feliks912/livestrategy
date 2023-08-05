@@ -1,5 +1,6 @@
-package com.localstrategy;
+package com.localstrategy.util.helper;
 
+import com.localstrategy.LatencyProcessor;
 import com.localstrategy.util.enums.EventDestination;
 import com.localstrategy.util.enums.EventType;
 import com.localstrategy.util.types.Event;

@@ -1,7 +1,7 @@
 package com.localstrategy.util.misc;
 
-import com.localstrategy.Position;
 import com.localstrategy.util.helper.CandleConstructor;
+import com.localstrategy.util.helper.Position;
 import com.localstrategy.util.helper.TransactionLoader;
 import com.localstrategy.util.types.Candle;
 import com.localstrategy.util.types.SingleTransaction;

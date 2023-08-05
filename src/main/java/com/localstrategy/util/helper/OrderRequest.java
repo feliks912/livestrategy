@@ -1,4 +1,4 @@
-package com.localstrategy;
+package com.localstrategy.util.helper;
 
 import com.localstrategy.util.enums.OrderSide;
 import com.localstrategy.util.enums.OrderStatus;
@@ -76,7 +76,7 @@ public class OrderRequest {
         return null;
     }
 
-    //FIXME: This still calculates amount to borrow even if the position size goes over. It borrows and then takes everything else from our portfolio. Binance doesn't support that with automatic borrowings
+    //FIXME: This still calculates amount to borrow even if the position size goes over. It borrows and then takes everything else from our portfolio. BinanceHandler doesn't support that with automatic borrowings
     //TODO: Add return statuses
     //TODO: Add condition when slippage crosses the stop-loss
     private boolean calculatePositionParameters(double entryPrice, double stopLossPrice){

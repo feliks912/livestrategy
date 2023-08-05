@@ -1,7 +1,7 @@
 package com.localstrategy.util.misc;
 
-import com.localstrategy.Position;
-import com.localstrategy.TierManager;
+import com.localstrategy.util.helper.Position;
+import com.localstrategy.util.helper.TierManager;
 import com.localstrategy.util.types.Candle;
 import com.localstrategy.util.types.SingleTransaction;
 
@@ -207,7 +207,7 @@ public class StrategyExecutor {
                         double profit = position.closePosition(closePrice, currentTransaction.getTimestamp());
 
                         portfolio += profit;
-                        usedMargin -= position.getMargin();
+                        usedMargin -= position.getBorrowCollateral();
 
                         if(!position.isReversed()){
                             removePositions.add(position);
@@ -225,7 +225,7 @@ public class StrategyExecutor {
 
                     double profit = position.closePosition(previousCandle.getIndex() + 1, currentTransaction.getTimestamp(), closePrice);
                     portfolio += profit;
-                    usedMargin -= position.getMargin();
+                    usedMargin -= position.getBorrowCollateral();
 
                     removePositions.add(position);
                 }
@@ -242,7 +242,7 @@ public class StrategyExecutor {
 
                     double profit = position.closePosition(previousCandle.getIndex() + 1, currentTransaction.getTimestamp(), closePrice);
                     portfolio += profit;
-                    usedMargin -= position.getMargin();
+                    usedMargin -= position.getBorrowCollateral();
 
                     removePositions.add(position);
                 }
@@ -271,7 +271,7 @@ public class StrategyExecutor {
 
                         double profit = position.closePosition(previousCandle.getIndex() + 1, currentTransaction.getTimestamp(), closePrice);
                         portfolio += profit;
-                        usedMargin -= position.getMargin();
+                        usedMargin -= position.getBorrowCollateral();
 
                         removePositions.add(position);
                     }
@@ -340,7 +340,7 @@ public class StrategyExecutor {
                         double profit = position.closePosition(previousCandle.getIndex() + 1, currentTransaction.getTimestamp(), stopPrice);
                         temporaryProfit += profit;
                         portfolio += profit;
-                        usedMargin -= position.getMargin();
+                        usedMargin -= position.getBorrowCollateral();
 
                         removePositions.add(position);
                     } else {
@@ -359,12 +359,12 @@ public class StrategyExecutor {
                 if((position.getDirection() == 1 && currentPrice <= position.getOpenPrice()) ||
                     position.getDirection() == -1 && currentPrice >= position.getOpenPrice()) {
 
-                    if(portfolio - usedMargin > position.getMargin()){
+                    if(portfolio - usedMargin > position.getBorrowCollateral()){
                         usedMargin += position.fillPosition(previousCandle.getIndex() + 1);
 
                         if(tierManager.calculateMarginLevel(currentPrice, portfolio - usedMargin) < 1.1){
                             position.closePosition(previousCandle.getIndex() + 1, currentTransaction.getTimestamp(), position.getOpenPrice());
-                            usedMargin -= position.getMargin();
+                            usedMargin -= position.getBorrowCollateral();
                             removePositions.add(position);
                         } else {
                             portfolio -= position.payCommission();
@@ -421,7 +421,7 @@ public class StrategyExecutor {
                 System.out.println("Liquidation risk call, liquidating all open positions with loss");
                 for(Position position : positions){
                     portfolio += position.closePosition(previousCandle.getIndex() + 1, currentTransaction.getTimestamp(), position.getInitialStopLossPrice());
-                    usedMargin -= position.getMargin();
+                    usedMargin -= position.getBorrowCollateral();
                 }
             } else if(marginLevel > 1.05 && marginLevel < 1.1){
                 System.out.println("Margin call.");
@@ -886,11 +886,11 @@ public class StrategyExecutor {
         );
 
         if(positions.size() > positionsSize && orderType.equals("market")) { // Successfully created a position
-            usedMargin += positions.get(positions.size() - 1).getMargin();
+            usedMargin += positions.get(positions.size() - 1).getBorrowCollateral();
 
             if(tierManager.calculateMarginLevel(entryPrice, portfolio - usedMargin) < 1.1){
                 positions.get(positions.size() - 1).closePosition(entryIndex, entryTimestamp, entryPrice); //Cancel last position
-                usedMargin -= positions.get(positions.size() - 1).getMargin();
+                usedMargin -= positions.get(positions.size() - 1).getBorrowCollateral();
                 positions.remove(positions.get(positions.size() - 1));
             } else {
                 portfolio -= positions.get(positions.size() - 1).payCommission();

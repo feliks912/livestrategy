@@ -2,6 +2,7 @@ package com.localstrategy;
 
 import com.localstrategy.util.enums.EventDestination;
 import com.localstrategy.util.enums.EventType;
+import com.localstrategy.util.helper.EventScheduler;
 import com.localstrategy.util.helper.TransactionLoader;
 import com.localstrategy.util.types.Event;
 import com.localstrategy.util.types.SingleTransaction;
@@ -10,14 +11,14 @@ import java.util.ArrayList;
 
 public class StrategyStarter {
     TransactionLoader transactionLoader;
-    Binance exchangeHandler;
-    LocalStrategy localHandler;
+    BinanceHandler exchangeHandler;
+    LocalHandler localHandler;
     private final EventScheduler scheduler = new EventScheduler();
 
     public StrategyStarter(String inputDataFolderPath, String inputLatencyFilePath, String fromDate, String toDate, double initialUSDTPortfolio) {
 
-        this.exchangeHandler = new Binance(initialUSDTPortfolio, scheduler);
-        this.localHandler = new LocalStrategy(initialUSDTPortfolio, scheduler);
+        this.exchangeHandler = new BinanceHandler(initialUSDTPortfolio, scheduler);
+        this.localHandler = new LocalHandler(initialUSDTPortfolio, scheduler);
 
         this.transactionLoader = new TransactionLoader(inputDataFolderPath, fromDate, toDate);
 

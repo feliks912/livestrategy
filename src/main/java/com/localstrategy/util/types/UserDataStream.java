@@ -1,7 +1,7 @@
 package com.localstrategy.util.types;
 
 import com.localstrategy.Order;
-import com.localstrategy.UserAssets;
+import com.localstrategy.util.helper.UserAssets;
 
 import java.util.ArrayList;
 

@@ -1,7 +1,7 @@
 package com.localstrategy.util.misc;
 
-import com.localstrategy.Position;
 import com.localstrategy.util.enums.OrderSide;
+import com.localstrategy.util.helper.Position;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;

@@ -4,6 +4,7 @@ import com.localstrategy.util.enums.OrderSide;
 import com.localstrategy.util.enums.OrderStatus;
 import com.localstrategy.util.enums.OrderType;
 import com.localstrategy.util.enums.RejectionReason;
+import com.localstrategy.util.helper.TierManager;
 
 import java.util.ArrayList;
 
@@ -14,11 +15,11 @@ public class Order implements Cloneable{
     private double openPrice;
     private double size;
     private OrderSide direction;
-    private double margin;
+    private double borrowCollateral;
     private OrderType orderType;
     private long openTimestamp;
     private double hourlyInterestRate;
-    private double borrowedAmount;
+    private double appropriateUnitPositionValue;
     private double fillPrice;
     private long fillTimestamp;
     private double totalUnpaidInterest;
@@ -40,8 +41,8 @@ public class Order implements Cloneable{
             boolean isStopLoss,
             double size,
             OrderType orderType,
-            double margin,
-            double borrowedAmount,
+            double borrowCollateral,
+            double appropriateUnitPositionValue,
             long openTimestamp) {
 
         this.id = lastId++;
@@ -52,11 +53,11 @@ public class Order implements Cloneable{
         this.openPrice = openPrice;
         this.size = size;
         this.direction = direction;
-        this.borrowedAmount = borrowedAmount;
-        this.margin = margin;
+        this.appropriateUnitPositionValue = appropriateUnitPositionValue;
+        this.borrowCollateral = borrowCollateral;
         this.openTimestamp = openTimestamp;
         this.hourlyInterestRate = direction.equals(OrderSide.BUY) ? TierManager.HOURLY_USDT_INTEREST_RATE / 100 : TierManager.HOURLY_BTC_INTEREST_RATE / 100;
-        this.totalUnpaidInterest = borrowedAmount * hourlyInterestRate * (direction.equals(OrderSide.BUY) ? 1 : openPrice);
+        this.totalUnpaidInterest = appropriateUnitPositionValue * hourlyInterestRate * (direction.equals(OrderSide.BUY) ? 1 : openPrice);
     }
 
     @Override
@@ -111,12 +112,12 @@ public class Order implements Cloneable{
         this.direction = direction;
     }
 
-    public double getMargin() {
-        return this.margin;
+    public double getBorrowCollateral() {
+        return this.borrowCollateral;
     }
 
-    public void setMargin(double margin) {
-        this.margin = margin;
+    public void setBorrowCollateral(double borrowCollateral) {
+        this.borrowCollateral = borrowCollateral;
     }
 
     public OrderType getType() {
@@ -143,12 +144,12 @@ public class Order implements Cloneable{
         this.hourlyInterestRate = hourlyInterestRate;
     }
 
-    public double getBorrowedAmount() {
-        return this.borrowedAmount;
+    public double getAppropriateUnitPositionValue() {
+        return this.appropriateUnitPositionValue;
     }
 
-    public void setBorrowedAmount(double borrowedAmount) {
-        this.borrowedAmount = borrowedAmount;
+    public void setAppropriateUnitPositionValue(double appropriateUnitPositionValue) {
+        this.appropriateUnitPositionValue = appropriateUnitPositionValue;
     }
 
     public double getFillPrice() {
@@ -222,7 +223,7 @@ public class Order implements Cloneable{
 
     // TODO: account for partial closes in borrowedAmount
     public void increaseUnpaidInterest(double currentPrice) {
-        this.totalUnpaidInterest += borrowedAmount * hourlyInterestRate * (direction.equals(OrderSide.BUY) ? 1 : currentPrice);
+        this.totalUnpaidInterest += appropriateUnitPositionValue * hourlyInterestRate * (direction.equals(OrderSide.BUY) ? 1 : currentPrice);
     }
 
     public static ArrayList<Order> deepCopyOrderList(ArrayList<Order> originalList) {

@@ -1,4 +1,4 @@
-package com.localstrategy;
+package com.localstrategy.util.helper;
 
 import com.localstrategy.util.enums.OrderSide;
 

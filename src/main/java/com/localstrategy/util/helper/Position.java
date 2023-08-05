@@ -1,5 +1,6 @@
-package com.localstrategy;
+package com.localstrategy.util.helper;
 
+import com.localstrategy.Order;
 import com.localstrategy.util.enums.*;
 import com.localstrategy.util.types.SingleTransaction;
 
@@ -14,7 +15,7 @@ public class Position implements Cloneable {
     private double closingPrice = 0;
     private OrderSide direction;
     private boolean breakEven = false;
-    private double margin;
+    private double borrowCollateral;
     private boolean filled = false;
     private boolean closed = false;
     private double profit = 0;
@@ -22,7 +23,7 @@ public class Position implements Cloneable {
     private OrderType orderType;
     private long openTimestamp;
     private double hourlyInterestRate;
-    private double borrowedAmount;
+    private double appropriateUnitPositionValue;
     private double fillPrice;
     private long fillTimestamp;
     private long closeTimestamp;
@@ -54,8 +55,8 @@ public class Position implements Cloneable {
             double initialStopLossPrice,
             double size,
             OrderType orderType,
-            double margin,
-            double borrowedAmount,
+            double borrowCollateral,
+            double appropriateUnitPositionValue,
             long openTimestamp) {
 
         this.id = positionId++;
@@ -66,8 +67,8 @@ public class Position implements Cloneable {
         this.openTimestamp = openTimestamp;
         this.size = size;
         this.direction = openPrice > stopLossPrice ? OrderSide.BUY : OrderSide.SELL;
-        this.borrowedAmount = borrowedAmount;
-        this.margin = margin;
+        this.appropriateUnitPositionValue = appropriateUnitPositionValue;
+        this.borrowCollateral = borrowCollateral;
     
         this.entryOrder = new Order(
             openPrice,
@@ -75,9 +76,9 @@ public class Position implements Cloneable {
             true,
             false,
             size, 
-            orderType, 
-            margin, 
-            borrowedAmount, 
+            orderType,
+                borrowCollateral,
+                appropriateUnitPositionValue,
             openTimestamp
         );
 
@@ -87,25 +88,27 @@ public class Position implements Cloneable {
             false,
             true,
             size, 
-            OrderType.LIMIT, 
-            margin, 
-            borrowedAmount, 
+            OrderType.LIMIT,
+                borrowCollateral,
+                appropriateUnitPositionValue,
             openTimestamp
         );
     }
 
     public Order createCloseOrder(SingleTransaction transaction){
-        return new Order(
+        Order closeOrder = new Order(
                 transaction.price(),
                 this.stopLossOrder.getDirection(),
                 false,
                 false,
                 size,
                 OrderType.MARKET,
-                margin,
-                borrowedAmount,
+                borrowCollateral,
+                appropriateUnitPositionValue,
                 transaction.timestamp()
         );
+        closeOrder.setMarginBuyBorrowAmount(entryOrder.getMarginBuyBorrowAmount());
+        return closeOrder;
     }
 
     @Override
@@ -257,12 +260,12 @@ public class Position implements Cloneable {
         this.breakEven = breakEven;
     }
 
-    public double getMargin() {
-        return this.margin;
+    public double getBorrowCollateral() {
+        return this.borrowCollateral;
     }
 
-    public void setMargin(double margin) {
-        this.margin = margin;
+    public void setBorrowCollateral(double borrowCollateral) {
+        this.borrowCollateral = borrowCollateral;
     }
 
     public boolean isFilled() {
@@ -313,12 +316,12 @@ public class Position implements Cloneable {
         this.openTimestamp = openTimestamp;
     }
 
-    public double getBorrowedAmount() {
-        return this.borrowedAmount;
+    public double getAppropriateUnitPositionValue() {
+        return this.appropriateUnitPositionValue;
     }
 
-    public void setBorrowedAmount(double borrowedAmount) {
-        this.borrowedAmount = borrowedAmount;
+    public void setAppropriateUnitPositionValue(double appropriateUnitPositionValue) {
+        this.appropriateUnitPositionValue = appropriateUnitPositionValue;
     }
 
     public double getFillPrice() {
