@@ -26,7 +26,7 @@ public class LocalHandler {
     private final OrderRequest orderRequest;
     private Candle lastCandle;
 
-    private ArrayList<Candle> candles = new ArrayList<>();
+    private ArrayList<Candle> candles = candleConstructor.getCandles();
 
     private Event currentEvent;
     private SingleTransaction transaction;
@@ -53,7 +53,7 @@ public class LocalHandler {
 
         //TODO: Print parameters on strategy start
 
-        strategy = new UserStrategy(this, transaction, candles, activePositions, inactivePositions);
+        strategy = new UserStrategy(this, candles, activePositions, inactivePositions);
     }
 
     private void priceUpdate(SingleTransaction transaction) {
@@ -530,13 +530,6 @@ public class LocalHandler {
                             inactivePositions.addAll(tempPositions);
                             activePositions.removeAll(tempPositions);
                         } // DONE
-
-                        case NEW -> {
-                        } // Handled in action response
-
-                        case CANCELED -> {
-                            System.out.println("breakpoint");
-                        }
                     }
                 }
             } // DONE

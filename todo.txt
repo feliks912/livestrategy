@@ -2,6 +2,7 @@ Todo:
     Refactor order and position variable names - 'done'
     Abstract position creation in separate class
     Convert data to binary
+    Fixme: If we don't place a stop order the local logic will fuck up the funds I guess basically it's all fucked everywhere
 
 Testing:
     Solved opening a market order, closing it on stoploss, and market exit. Also repaying. both on long and short

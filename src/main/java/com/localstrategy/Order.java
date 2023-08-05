@@ -61,7 +61,7 @@ public class Order implements Cloneable{
     }
 
     @Override
-    protected Order clone() {
+    public Order clone() {
         try {
             return (Order) super.clone();
         } catch (CloneNotSupportedException e) {

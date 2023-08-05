@@ -7,7 +7,7 @@ public class App {
 //        new TradingGUI(2000000, null, null);
 
          new StrategyStarter(
-            "src/main/java/Resources/BTCUSDT/",
+            "C:\\--- BTCUSDT",
             "src/main/java/Resources/only_latencies_fixed.csv",
             null,
             null,

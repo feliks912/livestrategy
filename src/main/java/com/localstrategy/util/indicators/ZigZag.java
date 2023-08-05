@@ -1,4 +1,4 @@
-package com.localstrategy.util.old;
+package com.localstrategy.util.indicators;
 
 import java.util.logging.Logger;
 
