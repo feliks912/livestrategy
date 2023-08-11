@@ -4,6 +4,7 @@ import com.localstrategy.util.enums.OrderSide;
 import com.localstrategy.util.enums.OrderStatus;
 import com.localstrategy.util.enums.OrderType;
 import com.localstrategy.util.enums.PositionGroup;
+import com.localstrategy.util.types.Position;
 import com.localstrategy.util.types.SingleTransaction;
 
 import java.util.ArrayList;
@@ -41,7 +42,7 @@ public class OrderRequest {
     }
 
     public Position newMarketPosition(SingleTransaction transaction, double stopLossPrice){
-        if(calculatePositionParameters(transaction.price(), stopLossPrice)){
+        if(calculatePositionParameters(transaction.price(), stopLossPrice, transaction)){
             Position position = new Position(
                 transaction.price(),
                 stopLossPrice, 
@@ -59,7 +60,7 @@ public class OrderRequest {
     }
 
     public Position newLimitPosition(double entryPrice, double stopLossPrice, SingleTransaction transaction){
-        if(calculatePositionParameters(entryPrice, stopLossPrice)){
+        if(calculatePositionParameters(entryPrice, stopLossPrice, transaction)){
             Position position = new Position(
                 entryPrice, 
                 stopLossPrice, 
@@ -79,10 +80,16 @@ public class OrderRequest {
     //FIXME: This still calculates amount to borrow even if the position size goes over. It borrows and then takes everything else from our portfolio. BinanceHandler doesn't support that with automatic borrowings
     //TODO: Add return statuses
     //TODO: Add condition when slippage crosses the stop-loss
-    private boolean calculatePositionParameters(double entryPrice, double stopLossPrice){
-        if (Math.abs(entryPrice - stopLossPrice) > 2) { //Minimum $2 difference between entry and stop.
+    private boolean calculatePositionParameters(double entryPrice, double stopLossPrice, SingleTransaction transaction){
+        if (Math.abs(entryPrice - stopLossPrice) > 2 && transaction != null) { //Minimum $2 difference between entry and stop.
 
-            positionSize = userAssets.getFreeUSDT() * risk / 100 / Math.abs(entryPrice - stopLossPrice);
+            double totalFreeUsdt = userAssets.getFreeUSDT() + userAssets.getLockedUSDT() - userAssets.getTotalBorrowedUSDT() - userAssets.getRemainingInterestUSDT();
+
+            // USDT is locked when borrowing USDT or BTC
+            // FreeUSDT is got when we sell borrowed BTC or when we borrow USDT
+
+
+            positionSize = totalFreeUsdt * risk / 100 / Math.abs(entryPrice - stopLossPrice);
 
             double slippageLimitedPositionSize = Math.min(
                 SlippageHandler.getMaximumOrderSize(entryPrice, Math.abs(entryPrice - stopLossPrice), slippagePct, (entryPrice > stopLossPrice ? OrderSide.BUY : OrderSide.SELL)),

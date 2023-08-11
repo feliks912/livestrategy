@@ -1,11 +1,9 @@
 package com.localstrategy.util.helper;
 
+import com.localstrategy.StrategyStarter;
 import com.localstrategy.util.types.Candle;
 import com.localstrategy.util.types.SingleTransaction;
 
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 
 public class CandleConstructor {
@@ -33,7 +31,8 @@ public class CandleConstructor {
     public Candle processTradeEvent(SingleTransaction transactionEvent){
 
         //TODO: We reset the total volume but don't adjust the prices? Look into it
-        int currentDayOfMonth = LocalDateTime.ofInstant(
+        //TODO: Commented method compatible with streaming
+        /*int currentDayOfMonth = LocalDateTime.ofInstant(
                 Instant.ofEpochMilli(transactionEvent.timestamp()),
                 ZoneId.systemDefault()
         ).getDayOfMonth();
@@ -42,7 +41,12 @@ public class CandleConstructor {
             totalVolume = 0;
         }
 
-        previousDayOfMonth = currentDayOfMonth;
+        previousDayOfMonth = currentDayOfMonth;*/
+
+        if(StrategyStarter.newDay){
+            totalVolume = 0;
+            StrategyStarter.newDay = false;
+        }
 
         //FIXME: Return value is off. Theoretically 2 candles can be formed
         //TODO: What?

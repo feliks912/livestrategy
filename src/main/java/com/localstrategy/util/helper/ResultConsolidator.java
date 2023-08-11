@@ -1,5 +1,7 @@
 package com.localstrategy.util.helper;
 
+import com.localstrategy.util.types.Position;
+
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Files;

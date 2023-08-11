@@ -1,8 +1,17 @@
 Todo:
+    Introduce BigDecimal
+    Remove Maps from Event
+
+
+Todo:
     Refactor order and position variable names - 'done'
     Abstract position creation in separate class
     Convert data to binary
     Fixme: If we don't place a stop order the local logic will fuck up the funds I guess basically it's all fucked everywhere
+    Fixme: Are we adding the newly created borrowed funds order interest to total interest? Are we doing it even when we don't borrow?
+    Todo: Binance won't borrow funds if enough assets are available, even for limit orders which won't get executed if at time of filling there aren't enough free funds. I don't think I'm handling that correctly in the local logic
+    Fixme: Introduce roundings to BTC values (5 decimals) and USDT (2 decimals) to avoid getting e-12 differences in price. Ideally we convert them to BigDecimal at the cost of time.
+    Todo: Replace action request and action response singleton maps with a simpler, lower overhead type (class perhaps)
 
 Testing:
     Solved opening a market order, closing it on stoploss, and market exit. Also repaying. both on long and short

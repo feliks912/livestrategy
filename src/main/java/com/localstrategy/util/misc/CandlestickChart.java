@@ -1,9 +1,9 @@
 package com.localstrategy.util.misc;
 
+import com.localstrategy.util.helper.BinaryTransactionLoader;
 import com.localstrategy.util.helper.CandleConstructor;
-import com.localstrategy.util.helper.Position;
-import com.localstrategy.util.helper.TransactionLoader;
 import com.localstrategy.util.types.Candle;
+import com.localstrategy.util.types.Position;
 import com.localstrategy.util.types.SingleTransaction;
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
@@ -185,16 +185,15 @@ public class CandlestickChart extends JFrame {
     public void executor(){
         ArrayList<SingleTransaction> transactionList;
 
-        TransactionLoader transactionLoader = new TransactionLoader("C:\\Users\\Admin\\Desktop\\livestrategy\\src\\main\\java\\Resources\\BTCUSDT",
-        //null,
+        BinaryTransactionLoader transactionLoader = new BinaryTransactionLoader("C:\\--- BTCUSDT",
         startDate, 
         endDate);
 
-        int fileCount = transactionLoader.getTotalCsvFiles();
+        int fileCount = transactionLoader.getTotalFileCount();
 
         for(int i = 1; i <= fileCount; i++){
 
-            transactionList = new ArrayList<SingleTransaction>(transactionLoader.loadNextDay());
+            transactionList = new ArrayList<>(transactionLoader.loadNextDay());
 
             for(SingleTransaction transaction : transactionList){
                 if(startingTimestamp == 0){
@@ -207,6 +206,7 @@ public class CandlestickChart extends JFrame {
                     //zigZagStrat.priceUpdate(i, transaction, candleConstructor.getLastCandle());
                 } 
                 else if(candle != null){ // New candle is formed
+
                     //zigZagStrat.newCandle(transactiodn, candleConstructor.getCandles());
 
                     //TODO: Update chart and set boolean flag to wait

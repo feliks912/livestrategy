@@ -2,9 +2,9 @@ package com.localstrategy;
 
 public class App {
 
-    public static void main( String[] args ) {
+    public static void main(String[] args) {
 
-//        new TradingGUI(2000000, null, null);
+//         new TradingGUI(2000000, "2022-11-03", null);
 
          new StrategyStarter(
             "C:\\--- BTCUSDT",

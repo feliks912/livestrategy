@@ -1,8 +1,8 @@
 package com.localstrategy.util.misc;
 
-import com.localstrategy.util.helper.Position;
 import com.localstrategy.util.helper.TierManager;
 import com.localstrategy.util.types.Candle;
+import com.localstrategy.util.types.Position;
 import com.localstrategy.util.types.SingleTransaction;
 
 import java.util.ArrayList;

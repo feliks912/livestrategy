@@ -14,8 +14,9 @@ public class UserAssets {
 
     private double marginLevel = 999;
 
-    //TODO: Calculate total unpaid interest and add an incrementing function
-    private double totalUnpaidInterest = 0;
+    private double totalUnpaidBTCInterest = 0;
+
+    private double totalUnpaidUSDTInterest = 0;
 
     public UserAssets(){
 
@@ -30,7 +31,24 @@ public class UserAssets {
         this.totalBorrowedUSDT = userAssets.getTotalBorrowedUSDT();
         this.totalBorrowedBTC = userAssets.getTotalBorrowedBTC();
         this.marginLevel = userAssets.getMarginLevel();
-        this.totalUnpaidInterest = userAssets.getTotalUnpaidInterest();
+        this.totalUnpaidUSDTInterest = userAssets.getRemainingInterestUSDT();
+        this.totalUnpaidBTCInterest = userAssets.getRemainingInterestBTC();
+    }
+
+    public double getRemainingInterestUSDT() {
+        return totalUnpaidUSDTInterest;
+    }
+
+    public void setRemainingInterestUSDT(double totalUnpaidUSDTInterest) {
+        this.totalUnpaidUSDTInterest = totalUnpaidUSDTInterest;
+    }
+
+    public double getRemainingInterestBTC() {
+        return totalUnpaidBTCInterest;
+    }
+
+    public void setRemainingInterestBTC(double totalUnpaidBTCInterest) {
+        this.totalUnpaidBTCInterest = totalUnpaidBTCInterest;
     }
 
     public long getTimestamp() {
@@ -101,31 +119,19 @@ public class UserAssets {
         return this.totalBorrowedBTC;
     }
 
-    public void setTotalUnpaidInterest(double interest){
-        this.totalUnpaidInterest = interest;
-    }
-
-    public double getTotalUnpaidInterest(){
-        return this.totalUnpaidInterest;
-    }
-
-    public void increaseTotalUnpaidInterest(double currentPrice){
-        this.totalUnpaidInterest += 
-            totalBorrowedUSDT * TierManager.HOURLY_USDT_INTEREST_RATE +
-            totalBorrowedBTC * TierManager.HOURLY_BTC_INTEREST_RATE * currentPrice;
-    }
-
     @Override
     public String toString() {
-        return "{" +
-            " freeUSDT='" + getFreeUSDT() + "'" +
-            ", lockedUSDT='" + getLockedUSDT() + "'" +
-            ", freeBTC='" + getFreeBTC() + "'" +
-            ", lockedBTC='" + getLockedBTC() + "'" +
-            ", totalBorrowedUSDT='" + getTotalBorrowedUSDT() + "'" +
-            ", totalBorrowedBTC='" + getTotalBorrowedBTC() + "'" +
-            ", marginLevel='" + getMarginLevel() + "'" +
-            ", totalUnpaidInterest='" + getTotalUnpaidInterest() + "'" +
-            "}";
+        return "UserAssets{" +
+//                "timestamp=" + timestamp +
+                ", freeUSDT=" + freeUSDT +
+                ", lockedUSDT=" + lockedUSDT +
+                ", freeBTC=" + freeBTC +
+                ", lockedBTC=" + lockedBTC +
+                ", totalBorrowedUSDT=" + totalBorrowedUSDT +
+                ", totalBorrowedBTC=" + totalBorrowedBTC +
+//                ", marginLevel=" + marginLevel +
+//                ", totalUnpaidBTCInterest=" + totalUnpaidBTCInterest +
+//                ", totalUnpaidUSDTInterest=" + totalUnpaidUSDTInterest +
+                '}';
     }
 }

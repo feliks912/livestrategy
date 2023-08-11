@@ -1,8 +1,13 @@
 package com.localstrategy.util.helper;
 
+import com.localstrategy.StrategyStarter;
 import com.localstrategy.util.types.SingleTransaction;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -24,8 +29,6 @@ public class TransactionLoader {
 
     private final Queue<Path> filesQueue;
     private final int processorCount = Runtime.getRuntime().availableProcessors();
-
-    private String filename;
 
     public TransactionLoader(String folderPath, String inputFromDate, String inputToDate) {
         this.filesQueue = new PriorityQueue<>();
@@ -68,17 +71,57 @@ public class TransactionLoader {
         }
     }
 
+    public List<SingleTransaction> loadNextDaySingleThread() {
+        StrategyStarter.newDay = true;
 
-    public List<SingleTransaction> loadNextDay() {
-
-        if(filesQueue.isEmpty()) {
+        if (filesQueue.isEmpty()) {
             return null;
         }
 
         List<SingleTransaction> transactions = new ArrayList<>();
 
         Path filePath = filesQueue.poll();
-        filename = filePath.getFileName().toString();
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(filePath.toFile()))) {
+            List<String> lines = reader.lines().toList();
+
+            if (lines.isEmpty()) {
+                return null;
+            }
+
+            String[] firstTransactionData = lines.get(0).split(",");
+            double firstPrice = round(Double.parseDouble(firstTransactionData[0]), 2);
+            long firstTime = Long.parseLong(firstTransactionData[2]);
+
+            transactions.add(new SingleTransaction(
+                    firstPrice,
+                    firstPrice * Integer.parseInt(firstTransactionData[1]) / 10_000_000,
+                    firstTime
+            ));
+
+            for (int i = 1; i < lines.size(); i++) {
+                String[] transactionData = lines.get(i).split(",");
+                transactions.add(createTransaction(transactionData, firstPrice, firstTime));
+            }
+
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+        return transactions;
+    }
+
+
+    public List<SingleTransaction> loadNextDayConcurrent() {
+
+        StrategyStarter.newDay = true;
+
+        if(filesQueue.isEmpty()) {
+            return null;
+        }
+
+        List<SingleTransaction> transactions =   new ArrayList<>();
+
+        Path filePath = filesQueue.poll();
 
         try (Stream<String> lines = Files.lines(filePath)) {
             Iterator<String> lineIterator = lines.iterator();
@@ -126,7 +169,7 @@ public class TransactionLoader {
 
     private SingleTransaction createTransaction(String[] transactionData, double firstPrice, long firstTime) {
 
-        double price = Double.parseDouble(transactionData[0]) + firstPrice;
+        double price = round(Double.parseDouble(transactionData[0]) + firstPrice, 2); // Round to 2 decimals
 
         return new SingleTransaction(
                 price,
@@ -135,8 +178,16 @@ public class TransactionLoader {
         );
     }
 
+    public static double round(double value, int places) {
+        if (places < 0) throw new IllegalArgumentException();
 
-    public int getTotalCsvFiles() {
+        BigDecimal bd = BigDecimal.valueOf(value);
+        bd = bd.setScale(places, RoundingMode.HALF_UP);
+        return bd.doubleValue();
+    }
+
+
+    public int getTotalFileCount() {
         return filesQueue.size();
     }
 }

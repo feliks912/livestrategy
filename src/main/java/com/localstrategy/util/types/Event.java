@@ -1,6 +1,5 @@
 package com.localstrategy.util.types;
 
-import com.localstrategy.Order;
 import com.localstrategy.util.enums.ActionResponse;
 import com.localstrategy.util.enums.EventDestination;
 import com.localstrategy.util.enums.EventType;
@@ -62,6 +61,10 @@ public class Event implements Comparable<Event> {
     public int compareTo(Event other) {
         int timestampComparison = Long.compare(this.eventDelayedTimestamp, other.eventDelayedTimestamp);
         return (timestampComparison != 0) ? timestampComparison : Long.compare(this.eventId, other.eventId);
+    }
+
+    public long getId(){
+        return this.eventId;
     }
 
     public void setEventLatency(int latency){

@@ -9,7 +9,9 @@ import java.util.PriorityQueue;
 
 public class EventScheduler {
 
-    private final PriorityQueue<Event> eventQueue = new PriorityQueue<>();
+    int MAXIMUM_INSTANTANEOUS_EVENT_COUNT = 15000; //It seems around 15000 transactions can pile up...
+
+    private final PriorityQueue<Event> eventQueue = new PriorityQueue<>(MAXIMUM_INSTANTANEOUS_EVENT_COUNT);
 
     public void addEvent(Event event) {
 
