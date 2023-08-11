@@ -4,31 +4,33 @@ import com.localstrategy.StrategyStarter;
 import com.localstrategy.util.types.Candle;
 import com.localstrategy.util.types.SingleTransaction;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 
 public class CandleConstructor {
     private boolean closeOnNext;
-    private double totalVolume;
-    private double candleOpen;
-    private double candleHigh;
-    private double candleLow;
-    private final double volumePerCandle;
+    private BigDecimal totalVolume;
+    private BigDecimal candleOpen;
+    private BigDecimal candleHigh;
+    private BigDecimal candleLow;
+    private final int volumePerCandle;
     private int transactionCount;
     private long lastTransactionId;
     private final ArrayList<Candle> candles = new ArrayList<>();
     private int previousDayOfMonth = -1;
     private int candleIndex = 0;
 
-    private double closeOnNextOpen;
+    private BigDecimal closeOnNextOpen;
     private int closeOnNextTransactionCount;
 
     private static final int MAXIMUM_CANDLES_SIZE = 2000;
 
-    public CandleConstructor(double volumePerCandle){
+    public CandleConstructor(int volumePerCandle) {
         this.volumePerCandle = volumePerCandle;
     }
 
-    public Candle processTradeEvent(SingleTransaction transactionEvent){
+    public Candle processTradeEvent(SingleTransaction transactionEvent) {
 
         //TODO: We reset the total volume but don't adjust the prices? Look into it
         //TODO: Commented method compatible with streaming
@@ -38,13 +40,13 @@ public class CandleConstructor {
         ).getDayOfMonth();
 
         if(currentDayOfMonth != previousDayOfMonth){
-            totalVolume = 0;
+            totalVolume = BigDecimal.ZERO;
         }
 
         previousDayOfMonth = currentDayOfMonth;*/
 
-        if(StrategyStarter.newDay){
-            totalVolume = 0;
+        if (StrategyStarter.newDay) {
+            totalVolume = BigDecimal.ZERO;
             StrategyStarter.newDay = false;
         }
 
@@ -52,14 +54,13 @@ public class CandleConstructor {
         //TODO: What?
         Candle returnValue = null;
 
-        double currentPrice = transactionEvent.price();
+        BigDecimal currentPrice = transactionEvent.price().setScale(2, RoundingMode.HALF_UP);
 
         //First transaction, candle volume larger than maximum or new day
-        Candle candle;
-        if(totalVolume == 0){
+        if (totalVolume.compareTo(BigDecimal.ZERO) == 0) {
 
             //If one transaction had volume larger than the maximum candle volume we must read the next transaction's price to set it as close
-            if(closeOnNext){
+            if (closeOnNext) {
 
                 returnValue = makeAndGetCandle(transactionEvent, currentPrice, closeOnNextOpen, closeOnNextTransactionCount);
 
@@ -70,20 +71,20 @@ public class CandleConstructor {
             candleLow = currentPrice;
         }
 
-        double currentVolume = transactionEvent.amount();
+        BigDecimal currentVolume = transactionEvent.amount().setScale(8, RoundingMode.HALF_UP);
 
-        if(totalVolume + currentVolume < volumePerCandle){
+        if (totalVolume.add(currentVolume).compareTo(BigDecimal.valueOf(volumePerCandle)) < 0) {
             transactionCount++;
-            totalVolume += currentVolume;
-            candleHigh = Math.max(currentPrice, candleHigh);
-            candleLow = Math.min(currentPrice, candleLow);
+            totalVolume = totalVolume.add(currentVolume);
+            candleHigh = candleHigh.max(currentPrice);
+            candleLow = candleLow.min(currentPrice);
 
             //lastTransactionId = transactionEvent.getTransactionId(); //FIXME: Uncomment lastTransactionId during live testing
         } else {
-            totalVolume = currentVolume > volumePerCandle ? 0 : currentVolume; //FIXME: This transfers volume over days as well
-            closeOnNext = currentVolume > volumePerCandle;
+            boolean closeOnNext = currentVolume.compareTo(BigDecimal.valueOf(volumePerCandle)) > 0;
+            totalVolume = closeOnNext ? BigDecimal.ZERO : currentVolume; //FIXME: This transfers volume over days as well
 
-            if(!closeOnNext){ //If normal candle formed not a single transaction candle
+            if (!closeOnNext) { //If normal candle formed not a single transaction candle
 
                 returnValue = makeAndGetCandle(transactionEvent, currentPrice, candleOpen, transactionCount);
 
@@ -102,11 +103,11 @@ public class CandleConstructor {
         return returnValue;
     }
 
-    private Candle makeAndGetCandle(SingleTransaction transactionEvent, double currentPrice, double candleOpen, int candleVolume) {
+    private Candle makeAndGetCandle(SingleTransaction transactionEvent, BigDecimal currentPrice, BigDecimal candleOpen, int candleVolume) {
 
         Candle candle;
-        candleHigh = Math.max(candleHigh, currentPrice);
-        candleLow = Math.min(candleLow, currentPrice);
+        candleHigh = candleHigh.max(currentPrice);
+        candleLow = candleLow.min(currentPrice);
 
         candle = new Candle(
                 candleOpen,
@@ -120,7 +121,7 @@ public class CandleConstructor {
                 lastTransactionId
         );
 
-        if(candles.size() >= MAXIMUM_CANDLES_SIZE){
+        if (candles.size() >= MAXIMUM_CANDLES_SIZE) {
             candles.remove(0);
         }
 
@@ -128,53 +129,53 @@ public class CandleConstructor {
         return candle;
     }
 
-    public int calculateDistance(double candleHigh, double candleLow){
+    public int calculateDistance(BigDecimal candleHigh, BigDecimal candleLow) {
         int highDistance = 0;
         int lowDistance = 0;
 
         //for (int i = 1; candleIndex - i >= 0; i++) { //THis is when we don't shave off candles in the list
-        
-        int i = 1;
-        
-        for(; i < candles.size(); i++){
-            Candle leftCandle = candles.get(candles.size()-1 - i);
 
-            if (highDistance == 0 && candleHigh < leftCandle.high()) {
+        int i = 1;
+
+        for (; i < candles.size(); i++) {
+            Candle leftCandle = candles.get(candles.size() - 1 - i);
+
+            if (highDistance == 0 && candleHigh.compareTo(leftCandle.high()) < 0) {
                 highDistance = i;
             }
-            if (lowDistance == 0 && candleLow > leftCandle.low()) {
+            if (lowDistance == 0 && candleLow.compareTo(leftCandle.low()) > 0) {
                 lowDistance = -i;
             }
             if (highDistance != 0 && lowDistance != 0) {
                 break;
             }
         }
-        
-        if(i == candles.size()){ //Went through all candles
-            if(highDistance == 0){
+
+        if (i == candles.size()) { //Went through all candles
+            if (highDistance == 0) {
                 highDistance = i;
             }
-            if(lowDistance == 0){
+            if (lowDistance == 0) {
                 lowDistance = -i;
             }
         }
 
-        if(highDistance > -lowDistance){
+        if (highDistance > -lowDistance) {
             return highDistance;
         }
 
         return lowDistance;
     }
 
-    public Candle getLastCandle(){
+    public Candle getLastCandle() {
         return candles.get(candles.size() - 1);
     }
 
-    public int getLastCandleIndex(){
+    public int getLastCandleIndex() {
         return candles.size();
     }
 
-    public ArrayList<Candle> getCandles(){
+    public ArrayList<Candle> getCandles() {
         return candles;
     }
 }

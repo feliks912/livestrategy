@@ -24,7 +24,7 @@ public class ResultConsolidator {
 
             for (Position position : positions) {
                 // only write positions with non-zero profit and that are closed
-                if (position.isClosed() && position.getProfit() != 0) {
+                if (position.isClosed() && position.getProfit().doubleValue() != 0) {
                     StringJoiner joiner = new StringJoiner(";");
     
                     i++;

@@ -99,11 +99,11 @@ public class BinaryTransactionLoader {
                 timestamp = buffer.getInt() + firstTimestamp;
             }
 
-            double formattedPrice = price / 100.;
+            BigDecimal formattedPrice = BigDecimal.valueOf(price / 100.).setScale(2, RoundingMode.HALF_UP);
 
             SingleTransaction transaction = new SingleTransaction(
                     formattedPrice,
-                    (formattedPrice * quantity / 10_000_000),
+                    (formattedPrice.multiply(BigDecimal.valueOf(quantity)).divide(BigDecimal.valueOf(10_000_000), 8, RoundingMode.HALF_UP)),
                     timestamp
             );
 
@@ -111,14 +111,6 @@ public class BinaryTransactionLoader {
         }
 
         return transactionDataList;
-    }
-
-    public static double round(double value, int places) {
-        if (places < 0) throw new IllegalArgumentException();
-
-        BigDecimal bd = BigDecimal.valueOf(value);
-        bd = bd.setScale(places, RoundingMode.HALF_UP);
-        return bd.doubleValue();
     }
 
     public int getTotalFileCount() {

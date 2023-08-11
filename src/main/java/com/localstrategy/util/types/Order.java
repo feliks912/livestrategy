@@ -3,25 +3,30 @@ package com.localstrategy.util.types;
 import com.localstrategy.util.enums.*;
 import com.localstrategy.util.helper.TierManager;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 
-public class Order implements Cloneable{
+public class Order implements Cloneable {
 
+    private static final int PRECISION_GENERAL = 8;
+    private static final int PRECISION_PRICE = 2;
+    
     private static long lastId = 0;
     private long id;
-    private double openPrice;
-    private double size;
+    private BigDecimal openPrice;
+    private BigDecimal size;
     private OrderSide direction;
 
     private OrderType orderType;
     private long openTimestamp;
-    private double hourlyInterestRate;
-    private double borrowCollateral; // Required USDT margin to make the borrow both for USDT and BTC
-    private double appropriateUnitPositionValue; // The equivalent value related to calculations. USDT for longs and BTC for shorts
-    private double marginBuyBorrowAmount = 0; // How much automatic borrow actually borrowed from the exchange
-    private double fillPrice;
+    private BigDecimal hourlyInterestRate;
+    private BigDecimal borrowCollateral;
+    private BigDecimal appropriateUnitPositionValue;
+    private BigDecimal marginBuyBorrowAmount = BigDecimal.ZERO;
+    private BigDecimal fillPrice;
     private long fillTimestamp;
-    private double totalUnpaidInterest;
+    private BigDecimal totalUnpaidInterest;
     private boolean isStopLoss;
     private RejectionReason rejectionReason;
     private OrderStatus status;
@@ -32,64 +37,76 @@ public class Order implements Cloneable{
     private OrderPurpose purpose;
 
     public Order(
-            double openPrice,
+            BigDecimal openPrice,
             OrderSide direction,
             boolean automaticBorrow,
             boolean isStopLoss,
-            double size,
+            BigDecimal size,
             OrderType orderType,
-            double borrowCollateral,
-            double appropriateUnitPositionValue,
+            BigDecimal borrowCollateral,
+            BigDecimal appropriateUnitPositionValue,
             long openTimestamp,
             OrderPurpose purpose) {
 
         this.id = lastId++;
         this.orderType = orderType;
-        this.automaticBorrow = automaticBorrow; //Stop-losses don't borrow funds as the funds are already borrowed
+        this.automaticBorrow = automaticBorrow;
         this.isStopLoss = isStopLoss;
         this.status = OrderStatus.NEW;
-        this.openPrice = openPrice;
-        this.size = size;
+        this.openPrice = openPrice.setScale(PRECISION_PRICE, RoundingMode.HALF_UP);
+        this.size = size.setScale(PRECISION_GENERAL, RoundingMode.HALF_UP);
         this.direction = direction;
-        this.appropriateUnitPositionValue = appropriateUnitPositionValue;
-        this.borrowCollateral = borrowCollateral;
+        this.appropriateUnitPositionValue = appropriateUnitPositionValue.setScale(PRECISION_GENERAL, RoundingMode.HALF_UP);
+        this.borrowCollateral = borrowCollateral.setScale(PRECISION_GENERAL, RoundingMode.HALF_UP);
         this.openTimestamp = openTimestamp;
         this.purpose = purpose;
 
-        this.hourlyInterestRate = direction.equals(OrderSide.BUY) ? TierManager.HOURLY_USDT_INTEREST_RATE / 100 : TierManager.HOURLY_BTC_INTEREST_RATE / 100;
+        this.hourlyInterestRate = direction.equals(OrderSide.BUY)
+                ? TierManager.HOURLY_USDT_INTEREST_RATE.divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP)
+                : TierManager.HOURLY_BTC_INTEREST_RATE.divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP);
     }
 
-    public OrderPurpose getPurpose(){
+    public OrderPurpose getPurpose() {
         return this.purpose;
     }
 
-    public void initializeInterest(double price){
-        this.totalUnpaidInterest = appropriateUnitPositionValue * hourlyInterestRate;
+    public void initializeInterest() {
+        this.totalUnpaidInterest = this.appropriateUnitPositionValue.multiply(this.hourlyInterestRate).setScale(PRECISION_GENERAL, RoundingMode.HALF_UP);
     }
 
-    public void increaseUnpaidInterest(double currentPrice) {
-        this.totalUnpaidInterest += appropriateUnitPositionValue * hourlyInterestRate;
+    public void increaseUnpaidInterest() {
+        this.totalUnpaidInterest = this.totalUnpaidInterest.add(this.appropriateUnitPositionValue.multiply(this.hourlyInterestRate)).setScale(PRECISION_GENERAL, RoundingMode.HALF_UP);
     }
 
     @Override
     public Order clone() {
         try {
-            return (Order) super.clone();
+            Order clonedOrder = (Order) super.clone();
+
+            // Clone BigDecimal fields
+            clonedOrder.openPrice = this.openPrice.setScale(this.openPrice.scale(), RoundingMode.HALF_UP);
+            clonedOrder.size = this.size.setScale(this.size.scale(), RoundingMode.HALF_UP);
+            clonedOrder.appropriateUnitPositionValue = this.appropriateUnitPositionValue.setScale(this.appropriateUnitPositionValue.scale(), RoundingMode.HALF_UP);
+            clonedOrder.borrowCollateral = this.borrowCollateral.setScale(this.borrowCollateral.scale(), RoundingMode.HALF_UP);
+            clonedOrder.marginBuyBorrowAmount = this.marginBuyBorrowAmount.setScale(this.marginBuyBorrowAmount.scale(), RoundingMode.HALF_UP);
+
+            // Handle other fields as needed
+
+            return clonedOrder;
         } catch (CloneNotSupportedException e) {
             e.printStackTrace();
             return null;
         }
     }
 
-    public double getMarginBuyBorrowAmount() {
+
+    public BigDecimal getMarginBuyBorrowAmount() {
         return marginBuyBorrowAmount;
     }
 
-    public void setMarginBuyBorrowAmount(double marginBuyBorrowAmount) {
-        this.marginBuyBorrowAmount = marginBuyBorrowAmount;
+    public void setMarginBuyBorrowAmount(BigDecimal marginBuyBorrowAmount) {
+        this.marginBuyBorrowAmount = marginBuyBorrowAmount.setScale(PRECISION_GENERAL, RoundingMode.HALF_UP);
     }
-
-
 
     public long getId() {
         return this.id;
@@ -99,20 +116,20 @@ public class Order implements Cloneable{
         this.id = id;
     }
 
-    public double getOpenPrice() {
+    public BigDecimal getOpenPrice() {
         return this.openPrice;
     }
 
-    public void setOpenPrice(double openPrice) {
-        this.openPrice = openPrice;
+    public void setOpenPrice(BigDecimal openPrice) {
+        this.openPrice = openPrice.setScale(PRECISION_PRICE, RoundingMode.HALF_UP);
     }
 
-    public double getSize() {
+    public BigDecimal getSize() {
         return this.size;
     }
 
-    public void setSize(double size) {
-        this.size = size;
+    public void setSize(BigDecimal size) {
+        this.size = size.setScale(PRECISION_GENERAL, RoundingMode.HALF_UP);
     }
 
     public OrderSide getDirection() {
@@ -123,12 +140,12 @@ public class Order implements Cloneable{
         this.direction = direction;
     }
 
-    public double getBorrowCollateral() {
+    public BigDecimal getBorrowCollateral() {
         return this.borrowCollateral;
     }
 
-    public void setBorrowCollateral(double borrowCollateral) {
-        this.borrowCollateral = borrowCollateral;
+    public void setBorrowCollateral(BigDecimal borrowCollateral) {
+        this.borrowCollateral = borrowCollateral.setScale(PRECISION_GENERAL, RoundingMode.HALF_UP);
     }
 
     public OrderType getType() {
@@ -147,28 +164,20 @@ public class Order implements Cloneable{
         this.openTimestamp = openTimestamp;
     }
 
-    public double getHourlyInterestRate() {
-        return this.hourlyInterestRate;
-    }
-
-    public void setHourlyInterestRate(double hourlyInterestRate) {
-        this.hourlyInterestRate = hourlyInterestRate;
-    }
-
-    public double getAppropriateUnitPositionValue() {
+    public BigDecimal getAppropriateUnitPositionValue() {
         return this.appropriateUnitPositionValue;
     }
 
-    public void setAppropriateUnitPositionValue(double appropriateUnitPositionValue) {
-        this.appropriateUnitPositionValue = appropriateUnitPositionValue;
+    public void setAppropriateUnitPositionValue(BigDecimal appropriateUnitPositionValue) {
+        this.appropriateUnitPositionValue = appropriateUnitPositionValue.setScale(PRECISION_GENERAL, RoundingMode.HALF_UP);
     }
 
-    public double getFillPrice() {
+    public BigDecimal getFillPrice() {
         return this.fillPrice;
     }
 
-    public void setFillPrice(double fillPrice) {
-        this.fillPrice = fillPrice;
+    public void setFillPrice(BigDecimal fillPrice) {
+        this.fillPrice = fillPrice.setScale(PRECISION_PRICE, RoundingMode.HALF_UP);
     }
 
     public long getFillTimestamp() {
@@ -179,12 +188,12 @@ public class Order implements Cloneable{
         this.fillTimestamp = fillTimestamp;
     }
 
-    public double getTotalUnpaidInterest() {
+    public BigDecimal getTotalUnpaidInterest() {
         return this.totalUnpaidInterest;
     }
 
-    public void setTotalUnpaidInterest(double totalUnpaidInterest) {
-        this.totalUnpaidInterest = totalUnpaidInterest;
+    public void setTotalUnpaidInterest(BigDecimal totalUnpaidInterest) {
+        this.totalUnpaidInterest = totalUnpaidInterest.setScale(PRECISION_GENERAL, RoundingMode.HALF_UP);
     }
 
     public boolean isStopLoss() {
@@ -231,7 +240,6 @@ public class Order implements Cloneable{
         this.autoRepayAtCancel = autoRepayAtCancel;
     }
 
-
     public static ArrayList<Order> deepCopyOrderList(ArrayList<Order> originalList) {
         ArrayList<Order> newList = new ArrayList<>();
 
@@ -241,5 +249,4 @@ public class Order implements Cloneable{
         }
         return newList;
     }
-    
 }

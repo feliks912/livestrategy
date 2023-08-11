@@ -5,8 +5,6 @@ import com.localstrategy.util.enums.EventDestination;
 import com.localstrategy.util.enums.EventType;
 import com.localstrategy.util.enums.OrderAction;
 
-import java.util.Collections;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class Event implements Comparable<Event> {
@@ -23,38 +21,47 @@ public class Event implements Comparable<Event> {
 
     private final SingleTransaction transaction;
     private final UserDataStream userDataStream;
-    private final Map<OrderAction, Order> actionRequest;
-    private final Map<ActionResponse, Order> actionResponse;
+
+    private final OrderAction request;
+    private final ActionResponse response;
+
+    private final Order order;
 
     // Common constructor
-    private Event(EventType eventType, long eventTimestamp, EventDestination destination,
-                  SingleTransaction transaction, UserDataStream userDataStream,
-                  Map<OrderAction, Order> actionRequest, Map<ActionResponse, Order> actionResponse) {
+    private Event(EventType eventType,
+                  long eventTimestamp,
+                  EventDestination destination,
+                  SingleTransaction transaction,
+                  UserDataStream userDataStream,
+                  OrderAction request,
+                  ActionResponse response,
+                  Order order) {
         this.eventId = eventIdCounter.incrementAndGet();
         this.eventType = eventType;
         this.eventTimestamp = eventTimestamp;
         this.destination = destination;
         this.transaction = transaction;
         this.userDataStream = userDataStream;
-        this.actionRequest = actionRequest;
-        this.actionResponse = actionResponse;
+        this.request = request;
+        this.response = response;
+        this.order = order;
     }
 
     // Specific constructors
     public Event(long eventTimestamp, EventDestination destination, SingleTransaction transaction) {
-        this(EventType.TRANSACTION, eventTimestamp, destination, transaction, null, null, null);
+        this(EventType.TRANSACTION, eventTimestamp, destination, transaction, null, null, null, null);
     }
 
     public Event(long eventTimestamp, EventDestination destination, UserDataStream userDataStream) {
-        this(EventType.USER_DATA_STREAM, eventTimestamp, destination, null, userDataStream, null, null);
+        this(EventType.USER_DATA_STREAM, eventTimestamp, destination, null, userDataStream, null, null, null);
     }
 
     public Event(long eventTimestamp, EventDestination destination, OrderAction action, Order order) {
-        this(EventType.ACTION_REQUEST, eventTimestamp, destination, null, null, Collections.singletonMap(action, order), null);
+        this(EventType.ACTION_REQUEST, eventTimestamp, destination, null, null, action, null, order);
     }
 
     public Event(long eventTimestamp, EventDestination destination, ActionResponse response, Order order) {
-        this(EventType.ACTION_RESPONSE, eventTimestamp, destination, null, null, null, Collections.singletonMap(response, order));
+        this(EventType.ACTION_RESPONSE, eventTimestamp, destination, null, null, null, response, order);
     }
 
     @Override
@@ -96,27 +103,13 @@ public class Event implements Comparable<Event> {
         return userDataStream;
     }
 
-    public Map<OrderAction, Order> getActionRequest() {
-        return actionRequest;
+    public OrderAction getActionRequest() {
+        return this.request;
     }
 
-    public Map<ActionResponse, Order> getActionResponse() {
-        return actionResponse;
+    public ActionResponse getActionResponse() {
+        return this.response;
     }
 
-    @Override
-    public String toString() {
-        return "Event{" +
-                "eventType=" + eventType +
-                ", eventId=" + eventId +
-                ", destination=" + destination +
-                ", eventTimestamp=" + eventTimestamp +
-                ", eventLatency=" + eventLatency +
-                ", eventDelayedTimestamp=" + eventDelayedTimestamp +
-                ", transaction=" + transaction +
-                ", userDataStream=" + userDataStream +
-                ", actionRequest=" + actionRequest +
-                ", actionResponse=" + actionResponse +
-                '}';
-    }
+    public Order getOrder() { return this.order; }
 }

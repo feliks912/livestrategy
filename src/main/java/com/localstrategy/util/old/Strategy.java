@@ -1,10 +1,11 @@
-package com.localstrategy;
+package com.localstrategy.util.old;
 
-import com.localstrategy.util.helper.UserAssets;
+import com.localstrategy.LocalHandler;
 import com.localstrategy.util.indicators.ZigZag;
 import com.localstrategy.util.types.Candle;
 import com.localstrategy.util.types.Position;
 import com.localstrategy.util.types.SingleTransaction;
+import com.localstrategy.util.types.UserAssets;
 
 import java.util.ArrayList;
 import java.util.Collections;

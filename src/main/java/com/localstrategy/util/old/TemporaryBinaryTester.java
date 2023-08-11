@@ -1,4 +1,4 @@
-package com.localstrategy.util.misc;
+package com.localstrategy.util.old;
 
 import com.localstrategy.util.types.SingleTransaction;
 

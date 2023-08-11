@@ -53,7 +53,7 @@ public class CandlestickChart extends JFrame {
     private String startDate;
     private String endDate;
 
-    public CandlestickChart(double candleVolume, PositionsTable positionsTable, boolean visible, String startDate, String endDate) {
+    public CandlestickChart(int candleVolume, PositionsTable positionsTable, boolean visible, String startDate, String endDate) {
         super("Candlestick Chart Demo");
         this.positionsTable = positionsTable;
 
@@ -298,10 +298,10 @@ public class CandlestickChart extends JFrame {
 
         OHLCDataItem candle = new OHLCDataItem(
             calendar.getTime(),
-            tempCandle.open(),
-            tempCandle.high(),
-            tempCandle.low(),
-            tempCandle.close(),
+            tempCandle.open().doubleValue(),
+            tempCandle.high().doubleValue(),
+            tempCandle.low().doubleValue(),
+            tempCandle.close().doubleValue(),
             Math.abs(tempCandle.tick()) < distanceSet ? -1 : 1
         );
         dataset.addCandle(candle);
@@ -340,8 +340,8 @@ public class CandlestickChart extends JFrame {
 
         // Add new annotations for each position
         for (Position position : positions) {
-            double priceEntry = position.getOpenPrice();
-            double stopLossPrice = position.getStopLossPrice();
+            double priceEntry = position.getOpenPrice().doubleValue();
+            double stopLossPrice = position.getStopLossPrice().doubleValue();
             int entryIndex = 0; // position.getEntryPriceIndex();
             int stopLossIndex = 0; // position.getInitialStopLossIndex();
 

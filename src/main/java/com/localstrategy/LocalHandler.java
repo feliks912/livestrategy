@@ -1,11 +1,15 @@
 package com.localstrategy;
 
 import com.localstrategy.util.enums.*;
-import com.localstrategy.util.helper.*;
+import com.localstrategy.util.helper.CandleConstructor;
+import com.localstrategy.util.helper.EventScheduler;
+import com.localstrategy.util.helper.OrderRequest;
+import com.localstrategy.util.helper.TierManager;
 import com.localstrategy.util.types.*;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
-import java.util.Map;
 
 public class LocalHandler {
 
@@ -50,7 +54,7 @@ public class LocalHandler {
 
         this.scheduler = scheduler;
 
-        userAssets.setFreeUSDT(initialFreeUSDT);
+        userAssets.setFreeUSDT(BigDecimal.valueOf(initialFreeUSDT));
 
         orderRequest = new OrderRequest(
                 activePositions,
@@ -73,7 +77,7 @@ public class LocalHandler {
         strategy.candleUpdate(lastCandle);
     }
 
-    public Position executeMarketOrder(double stopPrice) {
+    public Position executeMarketOrder(BigDecimal stopPrice) {
         Position newMarketPosition = orderRequest.newMarketPosition(transaction, stopPrice);
 
         if (newMarketPosition != null) {
@@ -88,7 +92,7 @@ public class LocalHandler {
         return newMarketPosition;
     }
 
-    public Position executeLimitOrder(double entryPrice, double stopPrice) {
+    public Position executeLimitOrder(BigDecimal entryPrice, BigDecimal stopPrice) {
         Position newLimitPosition = orderRequest.newLimitPosition(entryPrice, stopPrice, transaction);
 
         if (newLimitPosition != null) {
@@ -120,7 +124,7 @@ public class LocalHandler {
         return false;
     }
 
-    public boolean updateStopLoss(double newStopPrice, Position position) {
+    public boolean updateStopLoss(BigDecimal newStopPrice, Position position) {
         if (position == null || !position.isActiveStopLoss() || !position.getGroup().equals(PositionGroup.FILLED)) { //Must be a better way
             return true;
         }
@@ -181,225 +185,6 @@ public class LocalHandler {
     }
 
 
-    private void test4() {
-        if (activePositions.isEmpty()) {
-            Position newMarketPosition = orderRequest.newLimitPosition(46560, 46580, transaction);
-
-            if (newMarketPosition != null) {
-                scheduler.addEvent(new Event(
-                        currentEvent.getDelayedTimestamp(),
-                        EventDestination.EXCHANGE,
-                        OrderAction.CREATE_ORDER,
-                        newMarketPosition.getEntryOrder().clone()
-                ));
-            }
-        } else {
-            for (Position position : activePositions) {
-                switch (position.getGroup()) {
-                    case NEW -> {
-                        if (!position.isStopLossRequestSent()) {
-                            scheduler.addEvent(new Event(
-                                    currentEvent.getDelayedTimestamp(),
-                                    EventDestination.EXCHANGE,
-                                    OrderAction.CREATE_ORDER,
-                                    position.getStopOrder().clone()
-                            ));
-                            position.setStopLossRequestSent(true);
-                        }
-                    }
-                    case FILLED -> {
-                        if (!position.isBreakEven() && position.isActiveStopLoss() && transaction.price() <= 46300) { //Must be a better way
-
-                            scheduler.addEvent(new Event(
-                                    currentEvent.getDelayedTimestamp(),
-                                    EventDestination.EXCHANGE,
-                                    OrderAction.CANCEL_ORDER,
-                                    position.getStopOrder().clone()
-                            ));
-
-                            position.getStopOrder().setOpenPrice(46400);
-                            position.setOpenTimestamp(currentEvent.getDelayedTimestamp());
-
-                            scheduler.addEvent(new Event(
-                                    currentEvent.getDelayedTimestamp(),
-                                    EventDestination.EXCHANGE,
-                                    OrderAction.CREATE_ORDER,
-                                    position.getStopOrder().clone()
-                            ));
-
-                            position.setBreakEven(true);
-                        }
-                    }
-                }
-            }
-        }
-        if (!inactivePositions.isEmpty() && !printedInactivePositions) {
-            for (Position position : inactivePositions) {
-                if (position.getGroup().equals(PositionGroup.CLOSED)) {
-                    System.out.printf("Position SL'd successfully with a profit is $%.2f\n", position.getProfit());
-
-                    printedInactivePositions = true;
-                }
-            }
-        }
-    } // Limit with BE
-
-    private void test3() {
-        if (activePositions.isEmpty() && inactivePositions.isEmpty()) {
-            Position newMarketPosition = orderRequest.newLimitPosition(45000, 44900, transaction);
-
-            if (newMarketPosition != null) {
-                scheduler.addEvent(new Event(
-                        currentEvent.getDelayedTimestamp(),
-                        EventDestination.EXCHANGE,
-                        OrderAction.CREATE_ORDER,
-                        newMarketPosition.getEntryOrder().clone()
-                ));
-            }
-        } else {
-            for (Position position : activePositions) {
-                switch (position.getGroup()) {
-                    case NEW -> {
-                        if (!position.isStopLossRequestSent()) {
-                            scheduler.addEvent(new Event(
-                                    currentEvent.getDelayedTimestamp(),
-                                    EventDestination.EXCHANGE,
-                                    OrderAction.CREATE_ORDER,
-                                    position.getStopOrder().clone()
-                            ));
-                            position.setStopLossRequestSent(true);
-                        }
-                    }
-                    case FILLED -> {
-                        if (position.getCloseOrder() == null && position.isActiveStopLoss() && transaction.price() >= 46200) { //Must be a better way
-
-                            Order closeOrder = position.createCloseOrder(transaction);
-
-                            scheduler.addEvent(new Event(
-                                    currentEvent.getDelayedTimestamp(),
-                                    EventDestination.EXCHANGE,
-                                    OrderAction.CREATE_ORDER,
-                                    closeOrder.clone()
-                            ));
-
-                            position.setCloseOrder(closeOrder);
-                        }
-                    }
-                }
-            }
-        }
-        if (!inactivePositions.isEmpty() && !printedInactivePositions) {
-            for (Position position : inactivePositions) {
-                if (position.getGroup().equals(PositionGroup.CLOSED)) {
-                    System.out.printf("Position TP'd successfully. Profit is $%.2f\n", position.getProfit());
-                    printedInactivePositions = true;
-                }
-            }
-        }
-    } // Limit buy and TP
-
-    private void test2() {
-        if (activePositions.isEmpty()) {
-            Position newMarketPosition = orderRequest.newLimitPosition(transaction.price() - 100, transaction.price() - 110, transaction);
-
-            if (newMarketPosition != null) {
-                scheduler.addEvent(new Event(
-                        currentEvent.getDelayedTimestamp(),
-                        EventDestination.EXCHANGE,
-                        OrderAction.CREATE_ORDER,
-                        newMarketPosition.getEntryOrder().clone()
-                ));
-            }
-        } else {
-            for (Position position : activePositions) {
-                if (position.getGroup().equals(PositionGroup.NEW)) {
-                    if (!position.isStopLossRequestSent()) {
-                        scheduler.addEvent(new Event(
-                                currentEvent.getDelayedTimestamp(),
-                                EventDestination.EXCHANGE,
-                                OrderAction.CREATE_ORDER,
-                                position.getStopOrder().clone()
-                        ));
-                        position.setStopLossRequestSent(true);
-                    } else if (!closeRequestSent && position.isActiveStopLoss()) { //Must be a better way
-                        scheduler.addEvent(new Event(
-                                currentEvent.getDelayedTimestamp(),
-                                EventDestination.EXCHANGE,
-                                OrderAction.CANCEL_ORDER,
-                                position.getEntryOrder().clone()
-                        ));
-                        closeRequestSent = true;
-                    }
-                }
-            }
-        }
-        if (!inactivePositions.isEmpty() && !printedInactivePositions) {
-            for (Position position : inactivePositions) {
-                if (position.getGroup().equals(PositionGroup.CANCELLED)) {
-                    System.out.println(currentEvent.getId() + "Position cancelled successfully.");
-
-                    printedInactivePositions = true;
-                }
-            }
-        }
-    } // Limit order cancelling
-
-    private void test1() {
-        if (activePositions.isEmpty() && inactivePositions.isEmpty()) {
-            Position newMarketPosition = orderRequest.newMarketPosition(transaction, transaction.price() + 100);
-
-            if (newMarketPosition != null) {
-                scheduler.addEvent(new Event(
-                        currentEvent.getDelayedTimestamp(),
-                        EventDestination.EXCHANGE,
-                        OrderAction.CREATE_ORDER,
-                        newMarketPosition.getEntryOrder().clone()
-                ));
-            }
-        } else {
-            for (Position position : activePositions) {
-                if (position.getGroup().equals(PositionGroup.FILLED)) {
-                    if (!position.isStopLossRequestSent()) {
-                        scheduler.addEvent(new Event(
-                                currentEvent.getDelayedTimestamp(),
-                                EventDestination.EXCHANGE,
-                                OrderAction.CREATE_ORDER,
-                                position.getStopOrder().clone()
-                        ));
-                        position.setStopLossRequestSent(true);
-                    } else if (position.isActiveStopLoss()) { //Must be a better way
-                        if (position.getCloseOrder() == null && transaction.price() < position.getEntryOrder().getFillPrice() - 100) {
-
-                            Order closeOrder = position.createCloseOrder(transaction);
-                            position.setCloseOrder(closeOrder);
-
-                            scheduler.addEvent(new Event(
-                                    currentEvent.getDelayedTimestamp(),
-                                    EventDestination.EXCHANGE,
-                                    OrderAction.CREATE_ORDER,
-                                    closeOrder.clone()
-                            ));
-                        }
-                    }
-                }
-            }
-        }
-        if (!inactivePositions.isEmpty() && !printedInactivePositions) {
-            for (Position position : inactivePositions) {
-                if (position.getGroup().equals(PositionGroup.CLOSED)) {
-                    if (position.getProfit() > 0) {
-                        System.out.printf("Ayy caramba we got some $%.2f\n", position.getProfit());
-                    } else {
-                        System.out.printf("My lord, we lost some $%.2f\n", position.getProfit());
-                    }
-
-                    printedInactivePositions = true;
-                }
-            }
-        }
-    } // 1RR market order
-
-
     public void onEvent(Event event) {
 
 
@@ -418,7 +203,8 @@ public class LocalHandler {
                 userAssets = new UserAssets(userDataStream.userAssets());
 
                 //Repay interest and handle the response, we do that by setting total Unpaid interest and everything else to 0
-                if(!repayUSDTRequestSent && userAssets.getRemainingInterestUSDT() >= 10){
+                if(!repayUSDTRequestSent
+                        && userAssets.getRemainingInterestUSDT().compareTo(BigDecimal.valueOf(10)) >= 0){
                     // Repay 10 USDT
 
                     Order repayOrderUSDT = new Order(
@@ -426,15 +212,15 @@ public class LocalHandler {
                         OrderSide.BUY,
                         false,
                         false,
-                        0.0,
+                            BigDecimal.ZERO,
                         OrderType.MARKET,
-                        0.0,
-                        0.0,
+                            BigDecimal.ZERO,
+                            BigDecimal.ZERO,
                         event.getDelayedTimestamp(),
                         OrderPurpose.REPAY
                     );
 
-                    repayOrderUSDT.setMarginBuyBorrowAmount(0);
+                    repayOrderUSDT.setMarginBuyBorrowAmount(BigDecimal.ZERO);
                     repayOrderUSDT.setTotalUnpaidInterest(userAssets.getRemainingInterestUSDT());
 
                     USDTInterestRepayOrderId = repayOrderUSDT.getId();
@@ -449,7 +235,9 @@ public class LocalHandler {
                     repayUSDTRequestSent = true;
                 }
 
-                if(!repayBTCRequestSent && userAssets.getRemainingInterestBTC() * transaction.price() >= 10 && userAssets.getRemainingInterestBTC() >= 0.00001){
+                if(!repayBTCRequestSent
+                        && userAssets.getRemainingInterestBTC().multiply(transaction.price()).compareTo(BigDecimal.valueOf(10)) >= 0
+                        && userAssets.getRemainingInterestBTC().compareTo(BigDecimal.valueOf(0.00001)) >= 0){
                     // Repay remaining BTC by first buying them on market, handle repay response on order fill
 
                     Order rebuyOrderBTC = new Order(
@@ -459,13 +247,13 @@ public class LocalHandler {
                         false,
                         userAssets.getRemainingInterestBTC(),
                         OrderType.MARKET,
-                        0.0,
-                        0.0,
+                            BigDecimal.ZERO,
+                            BigDecimal.ZERO,
                         event.getDelayedTimestamp(),
                         OrderPurpose.REPAY
                     );
 
-                    rebuyOrderBTC.setMarginBuyBorrowAmount(0);
+                    rebuyOrderBTC.setMarginBuyBorrowAmount(BigDecimal.ZERO);
                     rebuyOrderBTC.setTotalUnpaidInterest(userAssets.getRemainingInterestBTC());
 
                     BTCInterestRepayOrderId = rebuyOrderBTC.getId();
@@ -480,9 +268,9 @@ public class LocalHandler {
                     repayBTCRequestSent = true;
                 }
 
-                if (userAssets.getMarginLevel() <= 1.05) {
+                if (userAssets.getMarginLevel().compareTo(BigDecimal.valueOf(1.05)) <= 0) {
                     System.out.println(currentEvent.getId() + "LocalHandler Error - Liquidation. Should have been called in exchange first.");
-                } else if (userAssets.getMarginLevel() <= 1.1) { //TODO: Handle margin level report - close positions and repay funds
+                } else if (userAssets.getMarginLevel().compareTo(BigDecimal.valueOf(1.1)) <= 0) { //TODO: Handle margin level report - close positions and repay funds
                     //Margin call
                     System.out.println(currentEvent.getId() + "LocalHandler Margin call");
                 }
@@ -554,9 +342,9 @@ public class LocalHandler {
                                                 System.out.println(currentEvent.getId() + "Local Error - stoploss filled before entry order.");
                                             }
 
-                                            if (position.getMarginBuyBorrowAmount() != 0.0) {
+                                            if (position.getMarginBuyBorrowAmount().compareTo(BigDecimal.ZERO) != 0) {
 
-                                                position.getEntryOrder().setTotalUnpaidInterest(0); // Null the unpaid interest we do that elsewhere
+                                                position.getEntryOrder().setTotalUnpaidInterest(BigDecimal.ZERO); // Null the unpaid interest we do that elsewhere
 
                                                 scheduler.addEvent(new Event(
                                                         currentEvent.getDelayedTimestamp(),
@@ -579,9 +367,9 @@ public class LocalHandler {
 
                                             position.setCloseOrder(order.clone());
 
-                                            if (position.getMarginBuyBorrowAmount() != 0.0) {
+                                            if (position.getMarginBuyBorrowAmount().compareTo(BigDecimal.ZERO) != 0) {
 
-                                                position.getEntryOrder().setTotalUnpaidInterest(0);
+                                                position.getEntryOrder().setTotalUnpaidInterest(BigDecimal.ZERO);
 
                                                 scheduler.addEvent(new Event(
                                                         currentEvent.getDelayedTimestamp(),
@@ -614,7 +402,7 @@ public class LocalHandler {
                             }
 
                             if(order.getId() == BTCInterestRepayOrderId){ // If it's done for repaying purposes
-                                order.setAppropriateUnitPositionValue(0); // Don't know if this is required
+                                order.setAppropriateUnitPositionValue(BigDecimal.ZERO); // Don't know if this is required
                                 order.setDirection(OrderSide.SELL); // We repay BTC
 
                                 scheduler.addEvent(new Event(
@@ -646,10 +434,9 @@ public class LocalHandler {
                 increaseInterest();
             } // DONE
             case ACTION_RESPONSE -> {
-                Map<ActionResponse, Order> response = event.getActionResponse();
 
-                ActionResponse actionResponse = response.keySet().iterator().next();
-                Order order = response.values().iterator().next();
+                ActionResponse actionResponse = event.getActionResponse();
+                Order order = event.getOrder();
 
                 switch (actionResponse) {
                     case ORDER_REJECTED -> {
@@ -751,21 +538,28 @@ public class LocalHandler {
                                     break;
                                 }
 
-                                if(userAssets.getFreeBTC() * transaction.price() + userAssets.getFreeUSDT() > order.getMarginBuyBorrowAmount() * (order.getDirection().equals(OrderSide.BUY) ? 1 : transaction.price())){
+                                if(userAssets.getFreeBTC().multiply(transaction.price()).add(userAssets.getFreeUSDT())
+                                        .compareTo(order.getMarginBuyBorrowAmount().multiply(
+                                                order.getDirection().equals(OrderSide.BUY) ? BigDecimal.ONE : transaction.price()
+                                        )) > 0){
+
                                     for(Position position : activePositions){
                                         if(position.getGroup().equals(PositionGroup.FILLED) && position.getCloseOrder() == null){
                                             //Lower the position value and convert back to USDT required to pay off the loan
 
                                             reattemptRepayOrderId = order.getId();
 
-                                            double previousSize = position.getSize();
+                                            BigDecimal previousSize = position.getSize().setScale(position.getSize().scale(), RoundingMode.HALF_UP);
 
-                                            double adjustedSize = position.getSize()
-                                                    - (userAssets.getFreeBTC() * transaction.price() + userAssets.getFreeUSDT()
-                                                        - order.getMarginBuyBorrowAmount() * (order.getDirection().equals(OrderSide.BUY) ? 1 : transaction.price()))
-                                                        / transaction.price();
+                                            BigDecimal adjustedSize = position.getSize().subtract(
+                                                    (userAssets.getFreeBTC().multiply(transaction.price()).add(userAssets.getFreeUSDT())
+                                                            .subtract(order.getMarginBuyBorrowAmount().multiply(
+                                                                    (order.getDirection().equals(OrderSide.BUY) ? BigDecimal.ONE : transaction.price())
+                                                            )))
+                                                    .divide(transaction.price(), 8, RoundingMode.HALF_UP)
+                                            );
 
-                                            double buyBackSize = previousSize - adjustedSize;
+                                            BigDecimal buyBackSize = previousSize.subtract(adjustedSize).setScale(8, RoundingMode.HALF_UP);
 
                                             position.setSize(adjustedSize);
                                             position.getEntryOrder().setSize(adjustedSize);
@@ -796,13 +590,13 @@ public class LocalHandler {
                                                     false,
                                                     buyBackSize,
                                                     OrderType.MARKET,
-                                                    0.0,
-                                                    0.0,
+                                                    BigDecimal.ZERO,
+                                                    BigDecimal.ZERO,
                                                     currentEvent.getDelayedTimestamp(),
                                                     OrderPurpose.BUYBACK
                                             );
 
-                                            buyBackOrder.setMarginBuyBorrowAmount(0);
+                                            buyBackOrder.setMarginBuyBorrowAmount(BigDecimal.ZERO);
 
                                             buyBackOrderId = buyBackOrder.getId();
 
@@ -957,7 +751,8 @@ public class LocalHandler {
                                             position.setMarginBuyBorrowAmount(order.getMarginBuyBorrowAmount());
 
                                             // We executed a short order without borrowings funds now we got to recuperate
-                                            if(order.getMarginBuyBorrowAmount() == 0.0 && order.getDirection().equals(OrderSide.SELL)){
+                                            if(order.getMarginBuyBorrowAmount().compareTo(BigDecimal.ZERO) == 0
+                                                    && order.getDirection().equals(OrderSide.SELL)){
                                                 Order buyBackOrder = new Order(
                                                         transaction.price(),
                                                         OrderSide.BUY,
@@ -965,8 +760,8 @@ public class LocalHandler {
                                                         false,
                                                         order.getSize(),
                                                         OrderType.MARKET,
-                                                        0.0,
-                                                        0.0,
+                                                        BigDecimal.ZERO,
+                                                        BigDecimal.ZERO,
                                                         currentEvent.getDelayedTimestamp(),
                                                         OrderPurpose.BUYBACK
                                                 );
@@ -1038,7 +833,7 @@ public class LocalHandler {
                     stopOrder.clone()
             ));
 
-            stopOrder.setSize(order.getSize() + order.getTotalUnpaidInterest());
+            stopOrder.setSize(order.getSize().add(order.getTotalUnpaidInterest()));
 
             scheduler.addEvent(new Event(
                     currentEvent.getDelayedTimestamp(),
@@ -1051,7 +846,7 @@ public class LocalHandler {
         } else {
             // Increase stoploss size
 
-            stopOrder.setSize(stopOrder.getSize() + order.getTotalUnpaidInterest());
+            stopOrder.setSize(stopOrder.getSize().add(order.getTotalUnpaidInterest()));
         }
     }
 
@@ -1064,9 +859,9 @@ public class LocalHandler {
             for (Position position : activePositions) {
                 Order order = position.getEntryOrder();
 
-                if (order.getMarginBuyBorrowAmount() != 0.0) {
+                if (order.getMarginBuyBorrowAmount().compareTo(BigDecimal.ZERO) != 0) {
 
-                    order.increaseUnpaidInterest(transaction.price());
+                    order.increaseUnpaidInterest();
 //                    if (order.getDirection().equals(OrderSide.SELL)) { // Every time BTC interest increases in a short order we must update the stoploss to buy more bitcoin when triggered
 //                        //Now we're removing the stoploss, then adding on instantly. IRL it would be better to keep the stoploss and accumulate interest until we can just buy $10 on market
 //

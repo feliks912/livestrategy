@@ -6,23 +6,25 @@ import com.localstrategy.util.enums.OrderType;
 import com.localstrategy.util.enums.PositionGroup;
 import com.localstrategy.util.types.Position;
 import com.localstrategy.util.types.SingleTransaction;
+import com.localstrategy.util.types.UserAssets;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 
 public class OrderRequest {
 
     public int totalProgrammaticOrderLimit;
 
-    private double positionSize;
-    private double requiredMargin;
-
     private final ArrayList<Position> activePositions;
     private final UserAssets userAssets;
     private final double risk;
     private final TierManager riskManager;
-    private final int slippagePct;
+    private final BigDecimal slippagePct;
 
-    public double borrowedAmount;
+    private BigDecimal positionSize;
+    private BigDecimal amountToBorrow;
+    private BigDecimal requiredMargin;
 
     //TODO: Add stop limit orders
     public OrderRequest(
@@ -38,10 +40,10 @@ public class OrderRequest {
             this.userAssets = userAssets;
             this.risk = risk;
             this.totalProgrammaticOrderLimit = totalOrderLimit;
-            this.slippagePct = slippagePct;
+            this.slippagePct = BigDecimal.valueOf(slippagePct);
     }
 
-    public Position newMarketPosition(SingleTransaction transaction, double stopLossPrice){
+    public Position newMarketPosition(SingleTransaction transaction, BigDecimal stopLossPrice){
         if(calculatePositionParameters(transaction.price(), stopLossPrice, transaction)){
             Position position = new Position(
                 transaction.price(),
@@ -49,7 +51,7 @@ public class OrderRequest {
                 positionSize, 
                 OrderType.MARKET,
                 requiredMargin, 
-                borrowedAmount,
+                amountToBorrow,
                 transaction.timestamp()
             );
             position.setGroup(PositionGroup.PENDING);
@@ -59,7 +61,7 @@ public class OrderRequest {
         return null;
     }
 
-    public Position newLimitPosition(double entryPrice, double stopLossPrice, SingleTransaction transaction){
+    public Position newLimitPosition(BigDecimal entryPrice, BigDecimal stopLossPrice, SingleTransaction transaction){
         if(calculatePositionParameters(entryPrice, stopLossPrice, transaction)){
             Position position = new Position(
                 entryPrice, 
@@ -67,7 +69,7 @@ public class OrderRequest {
                 positionSize, 
                 OrderType.LIMIT, 
                 requiredMargin, 
-                borrowedAmount,
+                amountToBorrow,
                 transaction.timestamp()
             );
             position.setGroup(PositionGroup.PENDING);
@@ -77,54 +79,61 @@ public class OrderRequest {
         return null;
     }
 
+
     //FIXME: This still calculates amount to borrow even if the position size goes over. It borrows and then takes everything else from our portfolio. BinanceHandler doesn't support that with automatic borrowings
     //TODO: Add return statuses
     //TODO: Add condition when slippage crosses the stop-loss
-    private boolean calculatePositionParameters(double entryPrice, double stopLossPrice, SingleTransaction transaction){
-        if (Math.abs(entryPrice - stopLossPrice) > 2 && transaction != null) { //Minimum $2 difference between entry and stop.
+    private boolean calculatePositionParameters(BigDecimal entryPrice, BigDecimal stopLossPrice, SingleTransaction transaction){
 
-            double totalFreeUsdt = userAssets.getFreeUSDT() + userAssets.getLockedUSDT() - userAssets.getTotalBorrowedUSDT() - userAssets.getRemainingInterestUSDT();
+        BigDecimal absPriceDiff = entryPrice.subtract(stopLossPrice).abs();
+
+        if (absPriceDiff.compareTo(BigDecimal.valueOf(2)) > 0 && transaction != null) { //Minimum $2 difference between entry and stop.
+
+            BigDecimal totalFreeUsdt = userAssets.getFreeUSDT()
+                    .add(userAssets.getLockedUSDT())
+                    .subtract(userAssets.getTotalBorrowedUSDT())
+                    .subtract(userAssets.getRemainingInterestUSDT());
 
             // USDT is locked when borrowing USDT or BTC
             // FreeUSDT is got when we sell borrowed BTC or when we borrow USDT
 
 
-            positionSize = totalFreeUsdt * risk / 100 / Math.abs(entryPrice - stopLossPrice);
+            positionSize = totalFreeUsdt.multiply(BigDecimal.valueOf(risk))
+                    .divide(BigDecimal.valueOf(100), RoundingMode.UNNECESSARY)
+                    .divide(absPriceDiff, 6, RoundingMode.HALF_UP);
 
-            double slippageLimitedPositionSize = Math.min(
-                SlippageHandler.getMaximumOrderSize(entryPrice, Math.abs(entryPrice - stopLossPrice), slippagePct, (entryPrice > stopLossPrice ? OrderSide.BUY : OrderSide.SELL)),
-                SlippageHandler.getMaximumOrderSize(stopLossPrice, Math.abs(entryPrice - stopLossPrice), slippagePct, (entryPrice > stopLossPrice ? OrderSide.SELL : OrderSide.BUY))
-            );
-        
-            positionSize = Math.min(152, Math.max(0.00001, 
-                Math.max(10 / entryPrice, Math.min(
-                    slippageLimitedPositionSize, positionSize))));
+            BigDecimal slippageLimitedPositionSize = SlippageHandler.getMaximumOrderSize(entryPrice, absPriceDiff, slippagePct, (entryPrice.compareTo(stopLossPrice) > 0 ? OrderSide.BUY : OrderSide.SELL))
+                    .min(SlippageHandler.getMaximumOrderSize(stopLossPrice, absPriceDiff, slippagePct, (entryPrice.compareTo(stopLossPrice) > 0 ? OrderSide.SELL : OrderSide.BUY)));
 
-            double borrowedUSDT = userAssets.getTotalBorrowedUSDT();
-            double borrowedBTC = userAssets.getTotalBorrowedBTC();
+            positionSize = slippageLimitedPositionSize
+                    .min(positionSize)
+                    .max(BigDecimal.valueOf(10).divide(entryPrice, RoundingMode.UNNECESSARY))
+                    .max(BigDecimal.valueOf(0.00001))
+                    .min(BigDecimal.valueOf(152));
 
-            double amountToBorrow = positionSize;
+            BigDecimal borrowedUSDT = userAssets.getTotalBorrowedUSDT();
+            BigDecimal borrowedBTC = userAssets.getTotalBorrowedBTC();
 
-            if(entryPrice > stopLossPrice){
-                amountToBorrow *= entryPrice;
+            amountToBorrow = positionSize.setScale(8, RoundingMode.HALF_UP);
 
-                if(borrowedUSDT + amountToBorrow > 900000){
+            if(entryPrice.compareTo(stopLossPrice) > 0){
+                amountToBorrow = amountToBorrow.multiply(entryPrice);
+
+                if(borrowedUSDT.add(amountToBorrow).compareTo(TierManager.MAX_BORROW_USDT) > 0){
                     return false;
                 }
 
-                riskManager.checkAndUpdateTier(borrowedUSDT + amountToBorrow, borrowedBTC);
+                riskManager.checkAndUpdateTier(borrowedUSDT.add(amountToBorrow).doubleValue(), borrowedBTC.doubleValue());
             }
             else {
-                if(borrowedBTC + amountToBorrow > 72){
+                if(borrowedBTC.add(amountToBorrow).compareTo(TierManager.MAX_BORROW_BTC) > 0){
                     return false;
                 } 
                 
-                riskManager.checkAndUpdateTier(borrowedUSDT, borrowedBTC + amountToBorrow);
+                riskManager.checkAndUpdateTier(borrowedUSDT.doubleValue(), borrowedBTC.add(amountToBorrow).doubleValue());
             }
 
-            borrowedAmount = amountToBorrow;
-
-            requiredMargin = positionSize * entryPrice / riskManager.getCurrentLeverage();
+            requiredMargin = positionSize.multiply(entryPrice).divide(BigDecimal.valueOf(riskManager.getCurrentLeverage()), 8, RoundingMode.HALF_UP);
 
             int programmaticCounter = 0;
             for(Position position : activePositions){
@@ -150,7 +159,7 @@ public class OrderRequest {
                 }
             }
 
-            return userAssets.getFreeUSDT() > requiredMargin &&
+            return userAssets.getFreeUSDT().compareTo(requiredMargin) > 0 &&
                     programmaticCounter < totalProgrammaticOrderLimit;
         }
         return false;

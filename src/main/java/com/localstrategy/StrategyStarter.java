@@ -5,9 +5,9 @@ import com.localstrategy.util.enums.EventType;
 import com.localstrategy.util.enums.OrderPurpose;
 import com.localstrategy.util.helper.BinaryTransactionLoader;
 import com.localstrategy.util.helper.EventScheduler;
-import com.localstrategy.util.helper.UserAssets;
 import com.localstrategy.util.types.Event;
 import com.localstrategy.util.types.SingleTransaction;
+import com.localstrategy.util.types.UserAssets;
 
 import java.util.ArrayList;
 
@@ -73,12 +73,11 @@ public class StrategyStarter {
             }
 
             if (event.getType().equals(EventType.ACTION_REQUEST)
-                    && event.getActionRequest().entrySet().iterator().next().getValue().getId() == 8691) {
+                    && event.getOrder().getId() == 8691) {
                 boolean point = true;
             }
 
-            if(event.getType().equals(EventType.ACTION_REQUEST)
-                    && event.getActionRequest().entrySet().iterator().next().getValue().getPurpose().equals(OrderPurpose.REPAY)){
+            if(event.getType().equals(EventType.ACTION_REQUEST) && event.getOrder().getPurpose().equals(OrderPurpose.REPAY)){
                 boolean point = true;
             }
 
@@ -102,8 +101,8 @@ public class StrategyStarter {
                         //dailyReport(currentDay, transactionList.get(0));
 
                         UserAssets assets = exchangeHandler.getUserAssets();
-                        double endOfDayUSDT = (assets.getFreeUSDT() + assets.getLockedUSDT() - assets.getTotalBorrowedUSDT())
-                                + (assets.getFreeBTC() + assets.getLockedBTC() - assets.getTotalBorrowedBTC()) * transactionList.get(0).price();
+                        double endOfDayUSDT = assets.getFreeUSDT().add(assets.getLockedUSDT()).subtract(assets.getTotalBorrowedUSDT())
+                                .add(assets.getFreeBTC().add(assets.getLockedBTC()).subtract(assets.getTotalBorrowedBTC()).multiply(transactionList.get(0).price())).doubleValue();
 
                         double dayDiffPct = (endOfDayUSDT - previousDayUSDT) / previousDayUSDT * 100;
 
@@ -135,8 +134,8 @@ public class StrategyStarter {
 
     private void dailyReport(int day, SingleTransaction transaction) {
         UserAssets assets = exchangeHandler.getUserAssets();
-        double endOfDayUSDT = (assets.getFreeUSDT() + assets.getLockedUSDT() - assets.getTotalBorrowedUSDT())
-                + (assets.getFreeBTC() + assets.getLockedBTC() - assets.getTotalBorrowedBTC()) * transaction.price();
+        double endOfDayUSDT = assets.getFreeUSDT().add(assets.getLockedUSDT()).subtract(assets.getTotalBorrowedUSDT())
+                .add(assets.getFreeBTC().add(assets.getLockedBTC()).subtract(assets.getTotalBorrowedBTC()).multiply(transaction.price())).doubleValue();
 
         double dayDiffPct = (endOfDayUSDT - previousDayUSDT) / previousDayUSDT * 100;
 

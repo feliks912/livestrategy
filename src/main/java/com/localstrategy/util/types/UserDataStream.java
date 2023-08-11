@@ -1,7 +1,5 @@
 package com.localstrategy.util.types;
 
-import com.localstrategy.util.helper.UserAssets;
-
 import java.util.ArrayList;
 
 public record UserDataStream(UserAssets userAssets, ArrayList<Order> updatedOrders) {

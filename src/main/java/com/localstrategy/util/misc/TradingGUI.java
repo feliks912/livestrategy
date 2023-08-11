@@ -1,13 +1,9 @@
 package com.localstrategy.util.misc;
 
-import javax.swing.AbstractAction;
-import javax.swing.JComponent;
-import javax.swing.JFrame;
-import javax.swing.KeyStroke;
-
-import javax.swing.JSplitPane;
-import java.awt.BorderLayout;
-import java.awt.event.*;
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.KeyEvent;
 
 public class TradingGUI extends JFrame {
 
@@ -17,7 +13,7 @@ public class TradingGUI extends JFrame {
     private double currentPortfolio = 0;
 
 
-    public TradingGUI(double candleVolume, String startDate, String endDate) {
+    public TradingGUI(int candleVolume, String startDate, String endDate) {
         // Set the layout manager for the frame
         setLayout(new BorderLayout());
 

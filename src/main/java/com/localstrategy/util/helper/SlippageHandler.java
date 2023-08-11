@@ -2,39 +2,55 @@ package com.localstrategy.util.helper;
 
 import com.localstrategy.util.enums.OrderSide;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
 public class SlippageHandler {
 
-    private static final double ORDERBOOK_PCT = 0.4; //0.4%
-    private static final double ORDERBOOK_QTY = 150; //150 BTC
+    private static final BigDecimal ORDERBOOK_PCT = BigDecimal.valueOf(0.4); // 0.4%
+    private static final BigDecimal ORDERBOOK_QTY = BigDecimal.valueOf(150); // 150 BTC
 
-    private static final double SQUARE_ROOT_MODEL_CONSTANT = 0.5;
+    private static final BigDecimal SQUARE_ROOT_MODEL_CONSTANT = BigDecimal.valueOf(0.5);
     private static final long BTCUSDT_DAILY_VOLUME = 8_570_000_000L;
 
+    public static BigDecimal getSlippageFillPrice(BigDecimal price, BigDecimal orderSize, OrderSide orderSide) {
+        BigDecimal direction = (orderSide.equals(OrderSide.BUY) ? BigDecimal.ONE : BigDecimal.ONE.negate());
+        BigDecimal fillPrice = price.multiply(BigDecimal.ONE.add(ORDERBOOK_PCT.divide(BigDecimal.valueOf(100), RoundingMode.UNNECESSARY)
+                .divide(ORDERBOOK_QTY, RoundingMode.HALF_UP).divide(BigDecimal.valueOf(Math.sqrt(2)), RoundingMode.HALF_UP)
+                .multiply(orderSize).multiply(direction)));
 
-    public static double getSlippageFillPrice(double price, double orderSize, OrderSide orderSide) {
-        double direction = (orderSide.equals(OrderSide.BUY) ? 1 : -1);
-        return price * (1 + ORDERBOOK_PCT / 100 / ORDERBOOK_QTY / Math.sqrt(2) * orderSize * direction);
+        return fillPrice.setScale(2, RoundingMode.HALF_UP);
     }
 
-    public static double getMaximumOrderSize(double price, double priceDifference, double percentage, OrderSide orderSide) {
-        double direction = (orderSide.equals(OrderSide.BUY) ? 1 : -1);
-        double fillingPrice = price + direction * (percentage / 100) * priceDifference;
-        double priceRatio = Math.abs((fillingPrice - price) / price);
+    public static BigDecimal getMaximumOrderSize(BigDecimal price, BigDecimal priceDifference,
+                                                 BigDecimal percentage, OrderSide orderSide) {
+        BigDecimal direction = (orderSide.equals(OrderSide.BUY) ? BigDecimal.ONE : BigDecimal.ONE.negate());
+        BigDecimal fillingPrice = price.add(direction.multiply(percentage.divide(BigDecimal.valueOf(100), RoundingMode.UNNECESSARY)
+                .multiply(priceDifference)));
+        BigDecimal priceRatio = fillingPrice.subtract(price).abs().divide(price, RoundingMode.HALF_UP);
 
-        return priceRatio * ORDERBOOK_QTY * Math.sqrt(2) / (ORDERBOOK_PCT / 100);
+        BigDecimal maximumOrderSize = priceRatio.multiply(ORDERBOOK_QTY).multiply(BigDecimal.valueOf(Math.sqrt(2)))
+                .divide(ORDERBOOK_PCT.divide(BigDecimal.valueOf(100), RoundingMode.UNNECESSARY), RoundingMode.HALF_UP);
+
+        return maximumOrderSize.setScale(8, RoundingMode.HALF_UP);
     }
 
-    public static double getRootSlippageFillPrice(double price, double volatility, double orderSize, OrderSide orderSide){
-        double deltaPrice = volatility * SQUARE_ROOT_MODEL_CONSTANT * Math.sqrt(orderSize*price / 2*BTCUSDT_DAILY_VOLUME);
-        deltaPrice *= orderSide.equals(OrderSide.BUY) ? 1 : -1;
-        return price + deltaPrice;
+    public static BigDecimal getRootSlippageFillPrice(BigDecimal price, BigDecimal volatility,
+                                                      BigDecimal orderSize, OrderSide orderSide) {
+        BigDecimal deltaPrice = volatility.multiply(SQUARE_ROOT_MODEL_CONSTANT)
+                .multiply(BigDecimal.valueOf(Math.sqrt(orderSize.multiply(price).divide(BigDecimal.valueOf(2).multiply(BigDecimal.valueOf(BTCUSDT_DAILY_VOLUME)), RoundingMode.HALF_UP).doubleValue())));
+        deltaPrice = deltaPrice.multiply(orderSide.equals(OrderSide.BUY) ? BigDecimal.ONE : BigDecimal.ONE.negate());
+
+        BigDecimal rootFillPrice = price.add(deltaPrice);
+
+        return rootFillPrice.setScale(2, RoundingMode.HALF_UP);
     }
 
-    //FIXME: fix me
-    public static double getRootMaximumOrderSize(double price, double priceDifference, double percentage, double volatility, OrderSide orderSide){
-        double direction = (orderSide.equals(OrderSide.BUY) ? 1 : -1);
-        double fillingPrice = price + direction * (percentage / 100) * priceDifference;
-
-        return 0.0;
+    //FIXME: Fixme.
+    public static BigDecimal getRootMaximumOrderSize(BigDecimal price, BigDecimal priceDifference,
+                                                     BigDecimal percentage, BigDecimal volatility, OrderSide orderSide) {
+        return BigDecimal.ZERO;
     }
+
+
 }

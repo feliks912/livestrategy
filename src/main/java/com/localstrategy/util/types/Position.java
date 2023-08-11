@@ -2,32 +2,37 @@ package com.localstrategy.util.types;
 
 import com.localstrategy.util.enums.*;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 
 public class Position implements Cloneable {
+    private static final int PRECISION_GENERAL = 8;
+    private static final int PRECISION_PRICE = 2;
+
     private long id;
-    private double openPrice;
-    private double stopLossPrice;
-    private double initialStopLossPrice;
-    private double size;
+    private BigDecimal openPrice;
+    private BigDecimal stopLossPrice;
+    private BigDecimal initialStopLossPrice;
+    private BigDecimal size;
     private double closingPrice = 0;
     private OrderSide direction;
     private boolean breakEven = false;
-    private double borrowCollateral;
+    private BigDecimal borrowCollateral;
     private boolean filled = false;
     private boolean closed = false;
-    private double profit = 0;
+    private BigDecimal profit = BigDecimal.ZERO;
     private boolean partiallyClosed = false;
     private OrderType orderType;
     private long openTimestamp;
-    private double hourlyInterestRate;
-    private double appropriateUnitPositionValue;
-    private double fillPrice;
+    private BigDecimal hourlyInterestRate;
+    private BigDecimal appropriateUnitPositionValue;
+    private BigDecimal fillPrice;
     private long fillTimestamp;
     private long closeTimestamp;
     private boolean activeStopLoss;
     private boolean closedBeforeStopLoss;
-    private double totalUnpaidInterest;
+    private BigDecimal totalUnpaidInterest;
     private boolean reversed;
     private boolean isStopLoss;
     private RejectionReason rejectionReason;
@@ -35,7 +40,7 @@ public class Position implements Cloneable {
     private boolean automaticBorrow;
     private boolean autoRepayAtCancel = true;
 
-    private double marginBuyBorrowAmount = 0;
+    private BigDecimal marginBuyBorrowAmount = BigDecimal.ZERO;
 
     private boolean cancelled = false;
 
@@ -49,59 +54,59 @@ public class Position implements Cloneable {
     private static long positionId = 0;
 
     public Position(
-            double openPrice,
-            double initialStopLossPrice,
-            double size,
+            BigDecimal openPrice,
+            BigDecimal initialStopLossPrice,
+            BigDecimal size,
             OrderType orderType,
-            double borrowCollateral,
-            double appropriateUnitPositionValue,
+            BigDecimal borrowCollateral,
+            BigDecimal appropriateUnitPositionValue,
             long openTimestamp) {
 
         this.id = positionId++;
         this.orderType = orderType;
         this.stopLossPrice = initialStopLossPrice;
         this.initialStopLossPrice = initialStopLossPrice;
-        this.openPrice = openPrice;
+        this.openPrice = openPrice.setScale(PRECISION_PRICE, RoundingMode.HALF_UP);
         this.openTimestamp = openTimestamp;
-        this.size = size;
-        this.direction = openPrice > stopLossPrice ? OrderSide.BUY : OrderSide.SELL;
-        this.appropriateUnitPositionValue = appropriateUnitPositionValue;
-        this.borrowCollateral = borrowCollateral;
-    
+        this.size = size.setScale(PRECISION_GENERAL, RoundingMode.HALF_UP);
+        this.direction = openPrice.compareTo(stopLossPrice) > 0 ? OrderSide.BUY : OrderSide.SELL;
+        this.appropriateUnitPositionValue = appropriateUnitPositionValue.setScale(PRECISION_GENERAL, RoundingMode.HALF_UP);
+        this.borrowCollateral = borrowCollateral.setScale(PRECISION_GENERAL, RoundingMode.HALF_UP);
+
         this.entryOrder = new Order(
-            openPrice,
-            direction,
-            true,
-            false,
-            size, 
-            orderType,
-            borrowCollateral,
-            appropriateUnitPositionValue,
-            openTimestamp,
-            OrderPurpose.ENTRY
+                openPrice,
+                direction,
+                true,
+                false,
+                size,
+                orderType,
+                borrowCollateral,
+                appropriateUnitPositionValue,
+                openTimestamp,
+                OrderPurpose.ENTRY
         );
 
         this.stopLossOrder = new Order(
-            stopLossPrice, 
-            direction == OrderSide.BUY ? OrderSide.SELL : OrderSide.BUY, 
-            false,
-            true,
-            size,
-            OrderType.LIMIT,
-            borrowCollateral,
-            appropriateUnitPositionValue,
-            openTimestamp,
-            OrderPurpose.STOP
+                stopLossPrice,
+                direction == OrderSide.BUY ? OrderSide.SELL : OrderSide.BUY,
+                false,
+                true,
+                size,
+                OrderType.LIMIT,
+                borrowCollateral,
+                appropriateUnitPositionValue,
+                openTimestamp,
+                OrderPurpose.STOP
         );
     }
 
-    public Order createCloseOrder(SingleTransaction transaction){
+    public Order createCloseOrder(SingleTransaction transaction) {
         Order closeOrder = new Order(
                 transaction.price(),
                 this.stopLossOrder.getDirection(),
                 false,
                 false,
-                size + (entryOrder.getDirection().equals(OrderSide.SELL) ? entryOrder.getTotalUnpaidInterest() : 0),
+                size.add(entryOrder.getDirection().equals(OrderSide.SELL) ? entryOrder.getTotalUnpaidInterest() : BigDecimal.ZERO),
                 OrderType.MARKET,
                 borrowCollateral,
                 appropriateUnitPositionValue,
@@ -112,10 +117,20 @@ public class Position implements Cloneable {
     }
 
     @Override
-    protected Position clone() throws CloneNotSupportedException {
+    protected Position clone() {
         try {
             Position clonedPosition = (Position) super.clone();
 
+            // Clone BigDecimal fields
+            clonedPosition.openPrice = this.openPrice.setScale(this.openPrice.scale(), RoundingMode.HALF_UP);
+            clonedPosition.stopLossPrice = this.stopLossPrice.setScale(this.stopLossPrice.scale(), RoundingMode.HALF_UP);
+            clonedPosition.initialStopLossPrice = this.initialStopLossPrice.setScale(this.initialStopLossPrice.scale(), RoundingMode.HALF_UP);
+            clonedPosition.size = this.size.setScale(this.size.scale(), RoundingMode.HALF_UP);
+            clonedPosition.appropriateUnitPositionValue = this.appropriateUnitPositionValue.setScale(this.appropriateUnitPositionValue.scale(), RoundingMode.HALF_UP);
+            clonedPosition.borrowCollateral = this.borrowCollateral.setScale(this.borrowCollateral.scale(), RoundingMode.HALF_UP);
+            clonedPosition.marginBuyBorrowAmount = this.marginBuyBorrowAmount.setScale(this.marginBuyBorrowAmount.scale(), RoundingMode.HALF_UP);
+
+            // Clone other fields
             clonedPosition.entryOrder = this.entryOrder.clone();
             clonedPosition.stopLossOrder = this.stopLossOrder.clone();
             if (this.closeOrder != null) {
@@ -130,106 +145,112 @@ public class Position implements Cloneable {
     }
 
 
-
-    public double closePosition(long closeTimestamp){
-        if(closed || !entryOrder.getStatus().equals(OrderStatus.FILLED)){
+    public double closePosition(long closeTimestamp) {
+        if (closed || !entryOrder.getStatus().equals(OrderStatus.FILLED)) {
             return 0;
         }
 
-        if(stopLossOrder.getStatus().equals(OrderStatus.FILLED)){
-            this.profit = (stopLossOrder.getFillPrice() - entryOrder.getFillPrice()) * size * (direction.equals(OrderSide.BUY) ? 1 : -1);
-        } else if(closeOrder != null && closeOrder.getStatus().equals(OrderStatus.FILLED)) {
-            this.profit = (closeOrder.getFillPrice() - entryOrder.getFillPrice()) * size * (direction.equals(OrderSide.BUY) ? 1 : -1);
+        if (stopLossOrder.getStatus().equals(OrderStatus.FILLED)) {
+            this.profit = (stopLossOrder.getFillPrice().subtract(entryOrder.getFillPrice())).multiply(size)
+                    .multiply(direction.equals(OrderSide.BUY) ? BigDecimal.ONE : BigDecimal.ONE.negate());
+        } else if (closeOrder != null && closeOrder.getStatus().equals(OrderStatus.FILLED)) {
+            this.profit = (closeOrder.getFillPrice().subtract(entryOrder.getFillPrice())).multiply(size)
+                    .multiply(direction.equals(OrderSide.BUY) ? BigDecimal.ONE : BigDecimal.ONE.negate());
         }
         closed = true;
 
         this.closeTimestamp = closeTimestamp;
-        return profit;
-    }
-
-    public double getMarginBuyBorrowAmount() {
-        return marginBuyBorrowAmount;
-    }
-
-    public void setMarginBuyBorrowAmount(double marginBuyBorrowAmount) {
-        this.marginBuyBorrowAmount = marginBuyBorrowAmount;
-    }
-
-    public PositionGroup getGroup() {
-        return group;
-    }
-
-    public void setGroup(PositionGroup group) {
-        this.group = group;
-    }
-
-    public boolean isStopLossRequestSent(){
-        return this.stopLossRequestSent;
-    }
-
-    public void setStopLossRequestSent(boolean sent){
-        this.stopLossRequestSent = sent;
-    }
-
-    public boolean isCancelled(){
-        return this.cancelled;
-    }
-
-    public void setCancelled(boolean cancelled){
-        this.cancelled = cancelled;
+        return profit.doubleValue();
     }
 
     public double calculateProfit(double closePrice) {
-        return (closePrice - fillPrice) * size * (direction.equals(OrderSide.BUY) ? 1 : -1);
+        BigDecimal closePriceBigDecimal = BigDecimal.valueOf(closePrice);
+        return (closePriceBigDecimal.subtract(fillPrice)).multiply(size)
+                .multiply(direction.equals(OrderSide.BUY) ? BigDecimal.ONE : BigDecimal.ONE.negate()).doubleValue();
     }
 
     public double calculateRR(double closePrice) {
-        return (closePrice - fillPrice) / (fillPrice - initialStopLossPrice);
+        return BigDecimal.valueOf(closePrice).subtract(fillPrice).divide(fillPrice.subtract(initialStopLossPrice), PRECISION_PRICE, RoundingMode.HALF_UP).doubleValue();
     }
 
-    public void setClosedBeforeStoploss() {
-        this.closedBeforeStopLoss = true;
+    public boolean isStopLoss() {
+        return isStopLoss;
     }
 
+    public void setStopLoss(boolean stopLoss) {
+        isStopLoss = stopLoss;
+    }
+
+    public RejectionReason getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(RejectionReason rejectionReason) {
+        this.rejectionReason = rejectionReason;
+    }
+
+    public Order getEntryOrder() {
+        return entryOrder;
+    }
+
+    public void setEntryOrder(Order entryOrder) {
+        this.entryOrder = entryOrder;
+    }
+
+    public Order getStopOrder() {
+        return stopLossOrder;
+    }
+
+    public void setStopOrder(Order stopLossOrder) {
+        this.stopLossOrder = stopLossOrder;
+    }
+
+    public Order getCloseOrder() {
+        return closeOrder;
+    }
+
+    public void setCloseOrder(Order closeOrder) {
+        this.closeOrder = closeOrder;
+    }
 
     public long getId() {
         return this.id;
     }
 
-    public void setId(int id) {
+    public void setId(long id) {
         this.id = id;
     }
 
-    public double getOpenPrice() {
+    public BigDecimal getOpenPrice() {
         return this.openPrice;
     }
 
-    public void setOpenPrice(double openPrice) {
-        this.openPrice = openPrice;
+    public void setOpenPrice(BigDecimal openPrice) {
+        this.openPrice = openPrice.setScale(PRECISION_PRICE, RoundingMode.HALF_UP);
     }
 
-    public double getStopLossPrice() {
+    public BigDecimal getStopLossPrice() {
         return this.stopLossPrice;
     }
 
-    public void setStopLossPrice(double stopLossPrice) {
-        this.stopLossPrice = stopLossPrice;
+    public void setStopLossPrice(BigDecimal stopLossPrice) {
+        this.stopLossPrice = stopLossPrice.setScale(PRECISION_PRICE, RoundingMode.HALF_UP);
     }
 
-    public double getInitialStopLossPrice() {
+    public BigDecimal getInitialStopLossPrice() {
         return this.initialStopLossPrice;
     }
 
-    public void setInitialStopLossPrice(double initialStopLossPrice) {
-        this.initialStopLossPrice = initialStopLossPrice;
+    public void setInitialStopLossPrice(BigDecimal initialStopLossPrice) {
+        this.initialStopLossPrice = initialStopLossPrice.setScale(PRECISION_PRICE, RoundingMode.HALF_UP);
     }
 
-    public double getSize() {
+    public BigDecimal getSize() {
         return this.size;
     }
 
-    public void setSize(double size) {
-        this.size = size;
+    public void setSize(BigDecimal size) {
+        this.size = size.setScale(PRECISION_GENERAL, RoundingMode.HALF_UP);
     }
 
     public double getClosingPrice() {
@@ -260,12 +281,12 @@ public class Position implements Cloneable {
         this.breakEven = breakEven;
     }
 
-    public double getBorrowCollateral() {
+    public BigDecimal getBorrowCollateral() {
         return this.borrowCollateral;
     }
 
-    public void setBorrowCollateral(double borrowCollateral) {
-        this.borrowCollateral = borrowCollateral;
+    public void setBorrowCollateral(BigDecimal borrowCollateral) {
+        this.borrowCollateral = borrowCollateral.setScale(PRECISION_GENERAL, RoundingMode.HALF_UP);
     }
 
     public boolean isFilled() {
@@ -292,12 +313,12 @@ public class Position implements Cloneable {
         this.closed = closed;
     }
 
-    public double getProfit() {
+    public BigDecimal getProfit() {
         return this.profit;
     }
 
-    public void setProfit(double profit) {
-        this.profit = profit;
+    public void setProfit(BigDecimal profit) {
+        this.profit = profit.setScale(PRECISION_GENERAL, RoundingMode.HALF_UP);
     }
 
     public OrderType getOrderType() {
@@ -316,20 +337,20 @@ public class Position implements Cloneable {
         this.openTimestamp = openTimestamp;
     }
 
-    public double getAppropriateUnitPositionValue() {
+    public BigDecimal getAppropriateUnitPositionValue() {
         return this.appropriateUnitPositionValue;
     }
 
-    public void setAppropriateUnitPositionValue(double appropriateUnitPositionValue) {
-        this.appropriateUnitPositionValue = appropriateUnitPositionValue;
+    public void setAppropriateUnitPositionValue(BigDecimal appropriateUnitPositionValue) {
+        this.appropriateUnitPositionValue = appropriateUnitPositionValue.setScale(PRECISION_GENERAL, RoundingMode.HALF_UP);
     }
 
-    public double getFillPrice() {
+    public BigDecimal getFillPrice() {
         return this.fillPrice;
     }
 
-    public void setFillPrice(double fillPrice) {
-        this.fillPrice = fillPrice;
+    public void setFillPrice(BigDecimal fillPrice) {
+        this.fillPrice = fillPrice.setScale(PRECISION_PRICE, RoundingMode.HALF_UP);
     }
 
     public long getFillTimestamp() {
@@ -372,12 +393,12 @@ public class Position implements Cloneable {
         this.closedBeforeStopLoss = closedBeforeStopLoss;
     }
 
-    public double getTotalUnpaidInterest() {
+    public BigDecimal getTotalUnpaidInterest() {
         return this.totalUnpaidInterest;
     }
 
-    public void setTotalUnpaidInterest(double totalUnpaidInterest) {
-        this.totalUnpaidInterest = totalUnpaidInterest;
+    public void setTotalUnpaidInterest(BigDecimal totalUnpaidInterest) {
+        this.totalUnpaidInterest = totalUnpaidInterest.setScale(PRECISION_GENERAL, RoundingMode.HALF_UP);
     }
 
     public boolean isReversed() {
@@ -416,25 +437,49 @@ public class Position implements Cloneable {
         this.autoRepayAtCancel = autoRepayAtCancel;
     }
 
-    public Order getEntryOrder() {
-        return this.entryOrder;
+    public BigDecimal getMarginBuyBorrowAmount() {
+        return marginBuyBorrowAmount;
     }
 
-    public void setEntryOrder(Order entryOrder) {
-        this.entryOrder = entryOrder;
+    public void setMarginBuyBorrowAmount(BigDecimal marginBuyBorrowAmount) {
+        this.marginBuyBorrowAmount = marginBuyBorrowAmount.setScale(PRECISION_GENERAL, RoundingMode.HALF_UP);
     }
 
-    public Order getStopOrder() {
-        return this.stopLossOrder;
+    public PositionGroup getGroup() {
+        return group;
     }
 
-    public void setStopOrder(Order stopLossOrder) {
-        this.stopLossOrder = stopLossOrder;
+    public void setGroup(PositionGroup group) {
+        this.group = group;
     }
 
-    public Order getCloseOrder() { return this.closeOrder; }
+    public boolean isStopLossRequestSent() {
+        return this.stopLossRequestSent;
+    }
 
-    public void setCloseOrder(Order closeOrder) { this.closeOrder = closeOrder; }
+    public void setStopLossRequestSent(boolean sent) {
+        this.stopLossRequestSent = sent;
+    }
+
+    public boolean isCancelled() {
+        return this.cancelled;
+    }
+
+    public void setCancelled(boolean cancelled) {
+        this.cancelled = cancelled;
+    }
+
+    public Order createEntryOrder() {
+        return entryOrder.clone();
+    }
+
+    public Order createStopLossOrder() {
+        return stopLossOrder.clone();
+    }
+
+    public Order createCloseOrder() {
+        return closeOrder != null ? closeOrder.clone() : null;
+    }
 
     public static ArrayList<Position> deepCopyPositionList(ArrayList<Position> originalList) throws CloneNotSupportedException {
         ArrayList<Position> newList = new ArrayList<>();
@@ -445,5 +490,4 @@ public class Position implements Cloneable {
         }
         return newList;
     }
-    
 }
