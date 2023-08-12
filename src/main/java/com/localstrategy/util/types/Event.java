@@ -6,6 +6,7 @@ import com.localstrategy.util.enums.EventType;
 import com.localstrategy.util.enums.OrderAction;
 
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 public class Event implements Comparable<Event> {
 
@@ -112,4 +113,23 @@ public class Event implements Comparable<Event> {
     }
 
     public Order getOrder() { return this.order; }
+
+    @Override
+    public String toString() {
+//        String returnString = "Event{" +
+//                "eventType=" + eventType +
+//                ", eventId=" + eventId +
+//                ", destination=" + destination + ": ";
+
+        String returnString = destination + ": ";
+
+        switch(eventType){
+            case ACTION_REQUEST -> returnString = returnString.concat("Action= " + request + ", order Id= " + order.getId() + ", position Id= " + order.getPositionId() + ", order purpose= " + order.getPurpose() + ", order direction= " + order.getDirection());
+            case ACTION_RESPONSE -> returnString = returnString.concat("Response= " + response + ", order Id= " + order.getId() + ", position Id= " + order.getPositionId() + ", order purpose= " + order.getPurpose() + ", order direction= " + order.getDirection());
+            case TRANSACTION -> returnString = returnString.concat(transaction.toString());
+            case USER_DATA_STREAM -> returnString = returnString.concat(userDataStream.userAssets().toString() + " " + userDataStream.updatedOrders().stream().map(o -> String.format("%d", o.getId())).collect(Collectors.joining(" ")));
+        }
+
+        return returnString;
+    }
 }

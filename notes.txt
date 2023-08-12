@@ -1,14 +1,15 @@
-Creating market sell order
-    size 0.1772421127259892
-    collateral 821.8573200992811
-    value 0.1772421127259892
-    margin buy 0.0
-    unpaid interest 0.0
+Test 1:
+    3285465455 Exchange Error at repayFunds - unpaid interest would go negative?
+    3285551657 Exchange Error at repayFunds - unpaid interest would go negative?
+    3285607013 Exchange Error at repayFunds - unpaid interest would go negative?
+    3286358192 Exchange Error at repayFunds - unpaid interest would go negative?
+    3286510607 Exchange Error at repayFunds - unpaid interest would go negative?
+    3286528464 Exchange Error at repayFunds - unpaid interest would go negative?
+    3287112332 Exchange Error at repayFunds - unpaid interest would go negative?
+    3287417902 Exchange Error at repayFunds - unpaid interest would go negative?
+    3288164717 Exchange Error at repayFunds - unpaid interest would go negative?
 
-At event 212761593 order 8691 attempts to repay funds after closing.
-Previous short order sold BTC for USDT without borrowing, because we had enough Free BTC to cover the position without borrowing.
-Therefore, order 8691 doesn't have enough free BTC to repay.
-We must now buy BTC on market to repay order 8691, IF the order which sold the bitcoin without borrowing doesn't close in the meantime.
-If the order does close in the meantime, we will have the delta of bitcoin between those two order indefinitely stuck in our account,
-Which we would have to sell manually,
-If we manage to detect both those events.
+    3347651781LocalHandler Margin call
+    3380881085LocalHandler Margin call
+    ...
+    margin call.

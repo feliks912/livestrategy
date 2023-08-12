@@ -26,11 +26,13 @@ public class Order implements Cloneable {
     private BigDecimal marginBuyBorrowAmount = BigDecimal.ZERO;
     private BigDecimal fillPrice;
     private long fillTimestamp;
-    private BigDecimal totalUnpaidInterest;
+    private BigDecimal totalUnpaidInterest = BigDecimal.ZERO;
     private boolean isStopLoss;
     private RejectionReason rejectionReason;
     private OrderStatus status;
     private boolean automaticBorrow;
+
+    private long positionId;
 
     private boolean autoRepayAtCancel = true;
 
@@ -46,7 +48,8 @@ public class Order implements Cloneable {
             BigDecimal borrowCollateral,
             BigDecimal appropriateUnitPositionValue,
             long openTimestamp,
-            OrderPurpose purpose) {
+            OrderPurpose purpose,
+            long positionId) {
 
         this.id = lastId++;
         this.orderType = orderType;
@@ -60,10 +63,15 @@ public class Order implements Cloneable {
         this.borrowCollateral = borrowCollateral.setScale(PRECISION_GENERAL, RoundingMode.HALF_UP);
         this.openTimestamp = openTimestamp;
         this.purpose = purpose;
+        this.positionId = positionId;
 
         this.hourlyInterestRate = direction.equals(OrderSide.BUY)
                 ? TierManager.HOURLY_USDT_INTEREST_RATE.divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP)
                 : TierManager.HOURLY_BTC_INTEREST_RATE.divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP);
+    }
+
+    public long getPositionId(){
+        return this.positionId;
     }
 
     public OrderPurpose getPurpose() {

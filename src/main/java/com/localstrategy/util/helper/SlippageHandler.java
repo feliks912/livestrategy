@@ -15,8 +15,8 @@ public class SlippageHandler {
 
     public static BigDecimal getSlippageFillPrice(BigDecimal price, BigDecimal orderSize, OrderSide orderSide) {
         BigDecimal direction = (orderSide.equals(OrderSide.BUY) ? BigDecimal.ONE : BigDecimal.ONE.negate());
-        BigDecimal fillPrice = price.multiply(BigDecimal.ONE.add(ORDERBOOK_PCT.divide(BigDecimal.valueOf(100), RoundingMode.UNNECESSARY)
-                .divide(ORDERBOOK_QTY, RoundingMode.HALF_UP).divide(BigDecimal.valueOf(Math.sqrt(2)), RoundingMode.HALF_UP)
+        BigDecimal fillPrice = price.multiply(BigDecimal.ONE.add(ORDERBOOK_PCT.divide(BigDecimal.valueOf(100))
+                .divide(ORDERBOOK_QTY, RoundingMode.HALF_UP).divide(BigDecimal.valueOf(Math.sqrt(2)))
                 .multiply(orderSize).multiply(direction)));
 
         return fillPrice.setScale(2, RoundingMode.HALF_UP);
@@ -25,12 +25,12 @@ public class SlippageHandler {
     public static BigDecimal getMaximumOrderSize(BigDecimal price, BigDecimal priceDifference,
                                                  BigDecimal percentage, OrderSide orderSide) {
         BigDecimal direction = (orderSide.equals(OrderSide.BUY) ? BigDecimal.ONE : BigDecimal.ONE.negate());
-        BigDecimal fillingPrice = price.add(direction.multiply(percentage.divide(BigDecimal.valueOf(100), RoundingMode.UNNECESSARY)
+        BigDecimal fillingPrice = price.add(direction.multiply(percentage.divide(BigDecimal.valueOf(100))
                 .multiply(priceDifference)));
-        BigDecimal priceRatio = fillingPrice.subtract(price).abs().divide(price, RoundingMode.HALF_UP);
+        BigDecimal priceRatio = fillingPrice.subtract(price).abs().divide(price, 8, RoundingMode.HALF_UP);
 
         BigDecimal maximumOrderSize = priceRatio.multiply(ORDERBOOK_QTY).multiply(BigDecimal.valueOf(Math.sqrt(2)))
-                .divide(ORDERBOOK_PCT.divide(BigDecimal.valueOf(100), RoundingMode.UNNECESSARY), RoundingMode.HALF_UP);
+                .divide(ORDERBOOK_PCT.divide(BigDecimal.valueOf(100)));
 
         return maximumOrderSize.setScale(8, RoundingMode.HALF_UP);
     }

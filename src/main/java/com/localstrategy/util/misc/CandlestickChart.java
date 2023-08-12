@@ -298,10 +298,10 @@ public class CandlestickChart extends JFrame {
 
         OHLCDataItem candle = new OHLCDataItem(
             calendar.getTime(),
-            tempCandle.open().doubleValue(),
-            tempCandle.high().doubleValue(),
-            tempCandle.low().doubleValue(),
-            tempCandle.close().doubleValue(),
+            tempCandle.open(),
+            tempCandle.high(),
+            tempCandle.low(),
+            tempCandle.close(),
             Math.abs(tempCandle.tick()) < distanceSet ? -1 : 1
         );
         dataset.addCandle(candle);

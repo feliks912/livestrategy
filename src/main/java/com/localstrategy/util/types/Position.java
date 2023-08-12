@@ -83,7 +83,8 @@ public class Position implements Cloneable {
                 borrowCollateral,
                 appropriateUnitPositionValue,
                 openTimestamp,
-                OrderPurpose.ENTRY
+                OrderPurpose.ENTRY,
+                positionId
         );
 
         this.stopLossOrder = new Order(
@@ -96,13 +97,14 @@ public class Position implements Cloneable {
                 borrowCollateral,
                 appropriateUnitPositionValue,
                 openTimestamp,
-                OrderPurpose.STOP
+                OrderPurpose.STOP,
+                positionId
         );
     }
 
     public Order createCloseOrder(SingleTransaction transaction) {
         Order closeOrder = new Order(
-                transaction.price(),
+                BigDecimal.valueOf(transaction.price()),
                 this.stopLossOrder.getDirection(),
                 false,
                 false,
@@ -111,7 +113,8 @@ public class Position implements Cloneable {
                 borrowCollateral,
                 appropriateUnitPositionValue,
                 transaction.timestamp(),
-                OrderPurpose.CLOSE
+                OrderPurpose.CLOSE,
+                positionId
         );
         return closeOrder;
     }

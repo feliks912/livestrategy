@@ -44,9 +44,9 @@ public class OrderRequest {
     }
 
     public Position newMarketPosition(SingleTransaction transaction, BigDecimal stopLossPrice){
-        if(calculatePositionParameters(transaction.price(), stopLossPrice, transaction)){
+        if(calculatePositionParameters(BigDecimal.valueOf(transaction.price()), stopLossPrice, transaction)){
             Position position = new Position(
-                transaction.price(),
+                BigDecimal.valueOf(transaction.price()),
                 stopLossPrice, 
                 positionSize, 
                 OrderType.MARKET,
@@ -99,7 +99,7 @@ public class OrderRequest {
 
 
             positionSize = totalFreeUsdt.multiply(BigDecimal.valueOf(risk))
-                    .divide(BigDecimal.valueOf(100), RoundingMode.UNNECESSARY)
+                    .divide(BigDecimal.valueOf(100))
                     .divide(absPriceDiff, 6, RoundingMode.HALF_UP);
 
             BigDecimal slippageLimitedPositionSize = SlippageHandler.getMaximumOrderSize(entryPrice, absPriceDiff, slippagePct, (entryPrice.compareTo(stopLossPrice) > 0 ? OrderSide.BUY : OrderSide.SELL))
@@ -107,7 +107,7 @@ public class OrderRequest {
 
             positionSize = slippageLimitedPositionSize
                     .min(positionSize)
-                    .max(BigDecimal.valueOf(10).divide(entryPrice, RoundingMode.UNNECESSARY))
+                    .max(BigDecimal.valueOf(10).divide(entryPrice, 8, RoundingMode.HALF_UP))
                     .max(BigDecimal.valueOf(0.00001))
                     .min(BigDecimal.valueOf(152));
 

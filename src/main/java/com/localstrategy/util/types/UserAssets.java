@@ -17,11 +17,13 @@ public class UserAssets {
     private BigDecimal totalBorrowedUSDT = BigDecimal.ZERO;
     private BigDecimal totalBorrowedBTC = BigDecimal.ZERO;
 
-    private BigDecimal marginLevel = BigDecimal.valueOf(999);
+    private double marginLevel = 999;
 
     private BigDecimal totalUnpaidBTCInterest = BigDecimal.ZERO;
 
     private BigDecimal totalUnpaidUSDTInterest = BigDecimal.ZERO;
+
+    private double savePrice;
 
     public UserAssets() {
     }
@@ -37,6 +39,21 @@ public class UserAssets {
         this.marginLevel = userAssets.getMarginLevel();
         this.totalUnpaidUSDTInterest = userAssets.getRemainingInterestUSDT();
         this.totalUnpaidBTCInterest = userAssets.getRemainingInterestBTC();
+        this.savePrice = userAssets.getSavePrice();
+    }
+
+    public double getMomentaryOwnedAssets(){
+        return freeUSDT.add(lockedUSDT).subtract(totalBorrowedUSDT).subtract(totalUnpaidUSDTInterest).add(
+                freeBTC.add(lockedBTC).subtract(totalBorrowedBTC).subtract(totalUnpaidBTCInterest).multiply(BigDecimal.valueOf(savePrice))
+        ).doubleValue();
+    }
+
+    public void setSavePrice(double price){
+        this.savePrice = price;
+    }
+
+    public double getSavePrice(){
+        return this.savePrice;
     }
 
     public BigDecimal getRemainingInterestUSDT() {
@@ -63,12 +80,12 @@ public class UserAssets {
         this.timestamp = timestamp;
     }
 
-    public BigDecimal getMarginLevel() {
+    public double getMarginLevel() {
         return marginLevel;
     }
 
-    public void setMarginLevel(BigDecimal marginLevel) {
-        this.marginLevel = marginLevel.setScale(3, RoundingMode.HALF_UP);
+    public void setMarginLevel(double marginLevel) {
+        this.marginLevel = marginLevel;
     }
 
     public BigDecimal getFreeUSDT() {

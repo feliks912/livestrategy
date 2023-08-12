@@ -9,9 +9,12 @@ import com.localstrategy.util.types.Event;
 import com.localstrategy.util.types.SingleTransaction;
 import com.localstrategy.util.types.UserAssets;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 
 public class StrategyStarter {
+
+    public static int currentDay = 0;
     BinaryTransactionLoader transactionLoader;
     BinanceHandler exchangeHandler;
     LocalHandler localHandler;
@@ -34,7 +37,9 @@ public class StrategyStarter {
     }
 
 
-    public void execute(String outputCSVPath) {
+    long counter = 0;
+
+    public ArrayList<UserAssets> execute(String outputCSVPath) {
 
         int fileCounter = transactionLoader.getTotalFileCount();
         ;
@@ -58,15 +63,30 @@ public class StrategyStarter {
                 boolean point = true;
             }
 
-            int currentDay = initialFileCounter - fileCounter + 1;
+            currentDay = initialFileCounter - fileCounter + 1;
 
-            if(currentDay > 0 && event.getType().equals(EventType.USER_DATA_STREAM)) {
+
+//            if(currentDay == 52) {
+//                if (!event.getType().equals(EventType.TRANSACTION)) {
+//                    System.out.println(counter + " " + event);
+//                    counter = 0;
+//                } else if(event.getDestination().equals(EventDestination.EXCHANGE)){
+//                    counter++;
+//                }
+//            }
+
+
+            if(currentDay == 52 && event.getType().equals(EventType.USER_DATA_STREAM)) {
                 boolean point = true;
 
                 UserAssets assets = event.getUserDataStream().userAssets();
 
-                System.out.println("Day " + currentDay + ", Event Id " + event.getId() + ", " + assets.toString());
+                //System.out.println("Day " + currentDay + ", Event Id " + event.getId() + ", " + assets.toString());
             }
+
+//            if(currentDay == 53){
+//                break;
+//            }
 
             if(event.getType().equals(EventType.ACTION_REQUEST)){
 //                System.out.println(event.getActionRequest().entrySet().iterator().next().getValue().getPurpose());
@@ -85,7 +105,9 @@ public class StrategyStarter {
                 boolean point = true;
             }
 
-            if (event.getDestination().equals(EventDestination.EXCHANGE)) {
+            if (event.getDestination().equals(EventDestination.LOCAL)) {
+                localHandler.onEvent(event);
+            } else {
                 if (event.getType().equals(EventType.TRANSACTION)) {
                     LatencyProcessor.calculateLatency(event); // Calculate next latency
 
@@ -102,13 +124,13 @@ public class StrategyStarter {
 
                         UserAssets assets = exchangeHandler.getUserAssets();
                         double endOfDayUSDT = assets.getFreeUSDT().add(assets.getLockedUSDT()).subtract(assets.getTotalBorrowedUSDT())
-                                .add(assets.getFreeBTC().add(assets.getLockedBTC()).subtract(assets.getTotalBorrowedBTC()).multiply(transactionList.get(0).price())).doubleValue();
+                                .add(assets.getFreeBTC().add(assets.getLockedBTC()).subtract(assets.getTotalBorrowedBTC()).multiply(BigDecimal.valueOf(transactionList.get(0).price()))).doubleValue();
 
                         double dayDiffPct = (endOfDayUSDT - previousDayUSDT) / previousDayUSDT * 100;
 
-                        previousDayUSDT = endOfDayUSDT;
+                        System.out.printf("Day %d done. Balance: $%.2f, profit: $%.2f, pct change: %.2f\n", currentDay, endOfDayUSDT, (endOfDayUSDT - previousDayUSDT), dayDiffPct);
 
-                        System.out.printf("Day %d done. Profit: $%.2f, pct change: %.2f\n", currentDay, endOfDayUSDT, dayDiffPct);
+                        previousDayUSDT = endOfDayUSDT;
 
                         if (--fileCounter <= 0) {
                             //TODO: No more days to load, exit strategy
@@ -124,18 +146,20 @@ public class StrategyStarter {
                     }
                 }
                 exchangeHandler.onEvent(event);
-            } else {
-                localHandler.onEvent(event);
             }
         }
+
+        return exchangeHandler.getUserAssetsList();
 
         //ArrayList<Double> portfolioList = exchangeHandler.terminateAndReport(outputCSVPath);
     }
 
+
+
     private void dailyReport(int day, SingleTransaction transaction) {
         UserAssets assets = exchangeHandler.getUserAssets();
         double endOfDayUSDT = assets.getFreeUSDT().add(assets.getLockedUSDT()).subtract(assets.getTotalBorrowedUSDT())
-                .add(assets.getFreeBTC().add(assets.getLockedBTC()).subtract(assets.getTotalBorrowedBTC()).multiply(transaction.price())).doubleValue();
+                .add(assets.getFreeBTC().add(assets.getLockedBTC()).subtract(assets.getTotalBorrowedBTC()).multiply(BigDecimal.valueOf(transaction.price()))).doubleValue();
 
         double dayDiffPct = (endOfDayUSDT - previousDayUSDT) / previousDayUSDT * 100;
 

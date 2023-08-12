@@ -1,6 +1,10 @@
 Todo:
-    Introduce BigDecimal
-    Remove Maps from Event
+    Introduce BigDecimal done
+    Remove Maps from Event done
+
+    Optimize BigDecimal
+    Solve bugs
+    Add [constant?] latency to exchange and local processing [both take time to execute code]
 
 
 Todo:

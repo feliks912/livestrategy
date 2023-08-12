@@ -1,5 +1,7 @@
 package com.localstrategy;
 
+import com.localstrategy.util.enums.OrderSide;
+import com.localstrategy.util.indicators.ZigZag;
 import com.localstrategy.util.types.Candle;
 import com.localstrategy.util.types.Position;
 import com.localstrategy.util.types.SingleTransaction;
@@ -15,6 +17,9 @@ public class Strategy2 {
     private List<Position> inactivePositions;
     private SingleTransaction transaction;
     private ArrayList<Candle> candles;
+
+    private ZigZag zz = new ZigZag(2, 0, 0, 0);
+
     public Strategy2(LocalHandler localHandler, ArrayList<Candle> candles, ArrayList<Position> activePositions, ArrayList<Position> inactivePositions){
         this.handler = localHandler;
 
@@ -37,13 +42,15 @@ public class Strategy2 {
     public void candleUpdate(Candle lastCandle){
         if(lastCandle.tick() <= -distance){ // New lows for long
             packingLow = true;
-            if(lastCandle.low().doubleValue() < stopPriceLow){
-                stopPriceLow = lastCandle.low().doubleValue();
+            if(lastCandle.low() < stopPriceLow){
+                stopPriceLow = lastCandle.low();
             }
         } else if (packingLow){
 
             for(Position position : activePositions){
-                handler.closePosition(position);
+                if(position.getDirection().equals(OrderSide.SELL)){
+                    handler.closePosition(position);
+                }
             }
 
             handler.activateStopLoss(handler.executeMarketOrder(BigDecimal.valueOf(stopPriceLow)));
@@ -54,13 +61,14 @@ public class Strategy2 {
 
         if(lastCandle.tick() >= distance){ // New highs for short
             packingHigh = true;
-            if(lastCandle.high().doubleValue() > stopPriceHigh){
-                stopPriceHigh = lastCandle.high().doubleValue();
+            if(lastCandle.high() > stopPriceHigh){
+                stopPriceHigh = lastCandle.high();
             }
         } else if (packingHigh){
-
             for(Position position : activePositions){
-                handler.closePosition(position);
+                if(position.getDirection().equals(OrderSide.BUY)){
+                    handler.closePosition(position);
+                }
             }
 
             handler.activateStopLoss(handler.executeMarketOrder(BigDecimal.valueOf(stopPriceHigh)));

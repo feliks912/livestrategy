@@ -4,8 +4,6 @@ import com.localstrategy.StrategyStarter;
 import com.localstrategy.util.types.SingleTransaction;
 
 import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.nio.ByteBuffer;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -99,11 +97,11 @@ public class BinaryTransactionLoader {
                 timestamp = buffer.getInt() + firstTimestamp;
             }
 
-            BigDecimal formattedPrice = BigDecimal.valueOf(price / 100.).setScale(2, RoundingMode.HALF_UP);
+            double formattedPrice = price / 100.;
 
             SingleTransaction transaction = new SingleTransaction(
                     formattedPrice,
-                    (formattedPrice.multiply(BigDecimal.valueOf(quantity)).divide(BigDecimal.valueOf(10_000_000), 8, RoundingMode.HALF_UP)),
+                    formattedPrice * quantity / 10_000_000,
                     timestamp
             );
 
