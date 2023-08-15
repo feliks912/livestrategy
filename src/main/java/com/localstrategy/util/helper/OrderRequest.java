@@ -17,7 +17,7 @@ public class OrderRequest {
     public int totalProgrammaticOrderLimit;
 
     private final ArrayList<Position> activePositions;
-    private final UserAssets userAssets;
+    private UserAssets userAssets;
     private final double risk;
     private final TierManager riskManager;
     private final BigDecimal slippagePct;
@@ -30,14 +30,12 @@ public class OrderRequest {
     public OrderRequest(
         ArrayList<Position> activePositions,
         TierManager riskManager,
-        UserAssets userAssets,
         double risk, 
         int totalOrderLimit,
         int slippagePct){
 
             this.activePositions = activePositions;
             this.riskManager = riskManager;
-            this.userAssets = userAssets;
             this.risk = risk;
             this.totalProgrammaticOrderLimit = totalOrderLimit;
             this.slippagePct = BigDecimal.valueOf(slippagePct);
@@ -147,12 +145,12 @@ public class OrderRequest {
                         if(position.getEntryOrder().getType().equals(OrderType.LIMIT) && position.getEntryOrder().getStatus() == OrderStatus.NEW){
                             programmaticCounter++;
                         }
-                        if(position.isActiveStopLoss()){
+                        if(position.isStopLossActive()){
                             programmaticCounter++;
                         }
                     }
                     case FILLED -> {
-                        if(position.isActiveStopLoss()){
+                        if(position.isStopLossActive()){
                             programmaticCounter++;
                         }
                     }
@@ -163,5 +161,9 @@ public class OrderRequest {
                     programmaticCounter < totalProgrammaticOrderLimit;
         }
         return false;
+    }
+
+    public void setUserAssets(UserAssets assets){
+        this.userAssets = assets;
     }
 }

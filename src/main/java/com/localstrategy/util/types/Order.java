@@ -66,8 +66,8 @@ public class Order implements Cloneable {
         this.positionId = positionId;
 
         this.hourlyInterestRate = direction.equals(OrderSide.BUY)
-                ? TierManager.HOURLY_USDT_INTEREST_RATE.divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP)
-                : TierManager.HOURLY_BTC_INTEREST_RATE.divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP);
+                ? TierManager.HOURLY_USDT_INTEREST_RATE_PCT.divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP)
+                : TierManager.HOURLY_BTC_INTEREST_RATE_PCT.divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP);
     }
 
     public long getPositionId(){
@@ -79,11 +79,11 @@ public class Order implements Cloneable {
     }
 
     public void initializeInterest() {
-        this.totalUnpaidInterest = this.appropriateUnitPositionValue.multiply(this.hourlyInterestRate).setScale(PRECISION_GENERAL, RoundingMode.HALF_UP);
+        this.totalUnpaidInterest = this.appropriateUnitPositionValue.multiply(this.hourlyInterestRate).divide(BigDecimal.valueOf(100), PRECISION_GENERAL, RoundingMode.HALF_UP);
     }
 
     public void increaseUnpaidInterest() {
-        this.totalUnpaidInterest = this.totalUnpaidInterest.add(this.appropriateUnitPositionValue.multiply(this.hourlyInterestRate)).setScale(PRECISION_GENERAL, RoundingMode.HALF_UP);
+        this.totalUnpaidInterest = this.totalUnpaidInterest.add(this.appropriateUnitPositionValue.multiply(this.hourlyInterestRate).divide(BigDecimal.valueOf(100), PRECISION_GENERAL, RoundingMode.HALF_UP));
     }
 
     @Override

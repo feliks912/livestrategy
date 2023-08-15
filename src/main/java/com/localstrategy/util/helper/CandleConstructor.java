@@ -75,7 +75,7 @@ public class CandleConstructor {
             transactionCount++;
             totalVolume += currentVolume;
             candleHigh = Math.max(candleHigh, currentPrice);
-            candleLow = Math.max(candleLow, currentPrice);
+            candleLow = Math.min(candleLow, currentPrice);
 
             //lastTransactionId = transactionEvent.getTransactionId(); //FIXME: Uncomment lastTransactionId during live testing
         } else {
@@ -128,38 +128,38 @@ public class CandleConstructor {
     }
 
     public int calculateDistance(double candleHigh, double candleLow) {
-        int highDistance = 0;
-        int lowDistance = 0;
+        int highDistance = -1;
+        int lowDistance = -1;
 
         //for (int i = 1; candleIndex - i >= 0; i++) { //THis is when we don't shave off candles in the list
 
-        int i = 1;
+        int i = 0;
 
         for (; i < candles.size(); i++) {
             Candle leftCandle = candles.get(candles.size() - 1 - i);
 
-            if (highDistance == 0 && candleHigh < leftCandle.high()) {
+            if (highDistance == -1 && candleHigh < leftCandle.high()) {
                 highDistance = i;
             }
-            if (lowDistance == 0 && candleLow > leftCandle.low()) {
+            if (lowDistance == -1 && candleLow > leftCandle.low()) {
                 lowDistance = -i;
             }
-            if (highDistance != 0 && lowDistance != 0) {
+            if (highDistance != -1 && lowDistance != -1) {
                 break;
             }
         }
 
         if (i == candles.size()) { //Went through all candles
-            if (highDistance == 0) {
+            if (highDistance == -1) {
                 highDistance = i;
             }
-            if (lowDistance == 0) {
+            if (lowDistance == -1) {
                 lowDistance = -i;
             }
         }
 
         if (highDistance > -lowDistance) {
-            return highDistance;
+            return highDistance; //FIXME: HighDistance is prioritized. How to bring this to balance (probably will never be a problem) ?
         }
 
         return lowDistance;

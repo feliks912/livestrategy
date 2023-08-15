@@ -38,10 +38,10 @@ public class ResultConsolidator {
                             .add(String.valueOf(position.getCloseTimestamp()))
                             .add(String.valueOf(position.getClosingPrice()))
                             .add(String.valueOf(position.getProfit()))
-                            .add(String.valueOf(position.calculateRR(position.getClosingPrice())))
+                            .add(String.valueOf(position.calculateRR()))
                             .add(String.valueOf(position.getStopLossPrice()))
                             .add(String.valueOf(position.getSize()))
-                            .add(String.valueOf(position.isBreakEven()))
+                            .add(String.valueOf(position.isBreakEvenActive()))
                             .add(String.valueOf(position.isFilled()));
     
                     writer.write(joiner.toString() + "\n");

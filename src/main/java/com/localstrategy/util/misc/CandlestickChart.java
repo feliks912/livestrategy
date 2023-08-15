@@ -1,7 +1,5 @@
 package com.localstrategy.util.misc;
 
-import com.localstrategy.util.helper.BinaryTransactionLoader;
-import com.localstrategy.util.helper.CandleConstructor;
 import com.localstrategy.util.types.Candle;
 import com.localstrategy.util.types.Position;
 import com.localstrategy.util.types.SingleTransaction;
@@ -48,19 +46,18 @@ public class CandlestickChart extends JFrame {
     private long startingTimestamp = 0;
     private PositionsTable positionsTable;
     boolean isButtonPressed = false;
-    CandleConstructor candleConstructor;
-    private int distanceSet = 200;
+    private int distanceSet;
     private String startDate;
     private String endDate;
 
-    public CandlestickChart(int candleVolume, PositionsTable positionsTable, boolean visible, String startDate, String endDate) {
+    ArrayList<Position> activePositions;
+
+    public CandlestickChart(int distance, PositionsTable positionsTable, ArrayList<Position> activePositions, boolean visible) {
         super("Candlestick Chart Demo");
         this.positionsTable = positionsTable;
 
-        this.startDate = startDate;
-        this.endDate = endDate;
-
-        this.candleConstructor = new CandleConstructor(candleVolume);
+        this.distanceSet = distance;
+        this.activePositions = activePositions;
 
         calendar.set(1970, Calendar.JANUARY, 1, 0, 0, 0);
 
@@ -182,87 +179,61 @@ public class CandlestickChart extends JFrame {
         return chart;
     }
 
-    public void executor(){
-        ArrayList<SingleTransaction> transactionList;
+    public void newCandle(double totalPortfolioValue, Candle candle, SingleTransaction lastTransaction){
+        if(startingTimestamp == 0){
+            startingTimestamp = lastTransaction.timestamp();
+        }
 
-        BinaryTransactionLoader transactionLoader = new BinaryTransactionLoader("C:\\--- BTCUSDT",
-        startDate, 
-        endDate);
+        //TODO: Update chart and set boolean flag to wait
+        eventUpdateAction(totalPortfolioValue, candle);
+        positionsTable.refreshTableData();
 
-        int fileCount = transactionLoader.getTotalFileCount();
-
-        for(int i = 1; i <= fileCount; i++){
-
-            transactionList = new ArrayList<>(transactionLoader.loadNextDay());
-
-            for(SingleTransaction transaction : transactionList){
-                if(startingTimestamp == 0){
-                    startingTimestamp = transaction.timestamp();
+        if(isButtonPressed){
+            isButtonPressed = false;
+            while (!isButtonPressed) {
+                try {
+                    // Wait for 100ms before checking again
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
                 }
-
-                Candle candle = candleConstructor.processTradeEvent(transaction);
-
-                if(candle == null && candleConstructor.getLastCandleIndex() != 0){ //New trasaction
-                    //zigZagStrat.priceUpdate(i, transaction, candleConstructor.getLastCandle());
-                } 
-                else if(candle != null){ // New candle is formed
-
-                    //zigZagStrat.newCandle(transactiodn, candleConstructor.getCandles());
-
-                    //TODO: Update chart and set boolean flag to wait
-                    eventUpdateAction();
-                    //positionsTable.refreshTableData(zigZagStrat.getClosedPositions());
-
-                    //zigZagStrat.resetTemporaryProfit();
-
-                    if(isButtonPressed){
-                        isButtonPressed = false;
-                        while (!isButtonPressed) {
-                            try {
-                                // Wait for 100ms before checking again
-                                Thread.sleep(100);
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
-                        }
-                        isButtonPressed = false;
-                    } else {
-                        try{
-                            Thread.sleep(30);
-                        } catch(Exception e){
-                            System.out.println(e);
-                        }
-                    } 
-                }
+            }
+            isButtonPressed = false;
+        } else {
+            try{
+                Thread.sleep(30);
+            } catch(Exception e){
+                System.out.println(e);
             }
         }
     }
 
-    public void eventUpdateAction(){
+    public void eventUpdateAction(double totalPortfolioValue, Candle candle){
 
-        addNewCandle();
-        currentIndex++;
+        addNewCandle(candle);
 
         // Update the value markers with the new candle's high and low values
-        //updateValueMarkers(zigZagStrat.getPositions());
+        updateValueMarkers(activePositions);
 
         // Update the info box with the current index information
-        //updateInfoBox(infoBox, "Position count: " + Integer.toString(zigZagStrat.getPositions().size()), 0);
+        updateInfoBox(infoBox, "Position count: " + activePositions.size(), 0);
 
         //FIXME: Add temporaryProfit
-        //double profit = zigZagStrat.getTemporaryProfit();
+        double lastPositionProfit = activePositions.isEmpty() ?
+                0 : activePositions.get(activePositions.size() - 1).getFillPrice() == null ?
+                0 : activePositions.get(activePositions.size() - 1).calculateProfit(candle.close());
 
-        /* if(profit != 0){
-            updateInfoBox(infoBox2, "last Profit: " + String.format("%.2f", profit), 0.02);
-            previousProfit = profit;
+         if(lastPositionProfit != 0){
+            updateInfoBox(infoBox2, "last Profit: " + String.format("%.2f", lastPositionProfit), 0.02);
+            previousProfit = lastPositionProfit;
         } else {
             updateInfoBox(infoBox2, "last Profit: " + String.format("%.2f", previousProfit), 0.02);
-        } */
+        }
         
-        //updateInfoBox(infoBox3, "Porftolio value: " + String.format("%.2f", zigZagStrat.getPortfolio()) , 0.04);
+        updateInfoBox(infoBox3, "Porftolio value: " + String.format("%.2f", totalPortfolioValue) , 0.04);
 
         //FIXME: Current candle timestamp, add candles to candles
-        long currentTimestamp = candleConstructor.getLastCandle().timestamp();
+        long currentTimestamp = candle.timestamp();
 
         LocalDateTime currentDateTime = Instant.ofEpochMilli(currentTimestamp)
             .atZone(ZoneId.systemDefault())
@@ -285,8 +256,8 @@ public class CandlestickChart extends JFrame {
         updateInfoBox(infoBox5, "Elapsed time: " + formattedDuration , 0.08);
     }
 
-    private void addNewCandle() {
-        if (currentIndex >= MAX_CANDLES) {
+    private void addNewCandle(Candle tempCandle) {
+        if (currentIndex >= MAX_CANDLES + 1) {
             // Remove the oldest candle from the dataset
             dataset.removeFirstItem();
         }
@@ -294,18 +265,16 @@ public class CandlestickChart extends JFrame {
         // Create a new candle and add it to the dataset
         calendar.add(Calendar.MINUTE, 1);
 
-        Candle tempCandle = candleConstructor.getLastCandle();
-
         OHLCDataItem candle = new OHLCDataItem(
             calendar.getTime(),
             tempCandle.open(),
             tempCandle.high(),
             tempCandle.low(),
             tempCandle.close(),
-            Math.abs(tempCandle.tick()) < distanceSet ? -1 : 1
+            Math.abs(tempCandle.tick()) <= distanceSet ? -1 : 1
         );
         dataset.addCandle(candle);
-        //currentIndex++;
+        currentIndex++;
 
         // Update the chart
         ChartPanel chartPanel = (ChartPanel) getContentPane().getComponent(0);
@@ -340,8 +309,8 @@ public class CandlestickChart extends JFrame {
 
         // Add new annotations for each position
         for (Position position : positions) {
-            double priceEntry = position.getOpenPrice().doubleValue();
-            double stopLossPrice = position.getStopLossPrice().doubleValue();
+            double priceEntry = position.getEntryOrder().getOpenPrice().doubleValue();
+            double stopLossPrice = position.getStopOrder().getOpenPrice().doubleValue();
             int entryIndex = 0; // position.getEntryPriceIndex();
             int stopLossIndex = 0; // position.getInitialStopLossIndex();
 

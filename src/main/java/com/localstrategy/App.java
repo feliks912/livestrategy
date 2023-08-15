@@ -3,14 +3,14 @@ package com.localstrategy;
 import com.localstrategy.util.helper.PortfolioPlotter;
 import com.localstrategy.util.types.UserAssets;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public class App {
 
     public static void main(String[] args) {
-
-//         new TradingGUI(2000000, "2022-11-03", null);
 
         StrategyStarter starter = new StrategyStarter(
                 "C:\\--- BTCUSDT",
@@ -22,7 +22,9 @@ public class App {
 
          ArrayList<UserAssets> assets = starter.execute(null);
 
-         ArrayList<Double> assetsUSDT = assets.stream().map(UserAssets::getMomentaryOwnedAssets).collect(Collectors.toCollection(ArrayList::new));
+        ArrayList<Map.Entry<Long, Double>> assetsUSDT = assets.stream()
+                .map(a -> new AbstractMap.SimpleEntry<>(a.getTimestamp(), a.getMomentaryOwnedAssets()))
+                .collect(Collectors.toCollection(ArrayList::new));
 
          PortfolioPlotter.plot(assetsUSDT);
 }

@@ -228,6 +228,10 @@ public class BinanceHandler {
         for (Order order : newOrders) {
             if (order.getStatus().equals(OrderStatus.NEW)) { //FIXME: Status field is mutable by the client. We're not editing it too much but still not good practice
 
+                if(order.getId() == 6255){
+                    boolean point = true;
+                }
+
                 boolean isMarketOrder = order.getType().equals(OrderType.MARKET);
                 boolean isLong = order.getDirection().equals(OrderSide.BUY);
 
@@ -352,12 +356,14 @@ public class BinanceHandler {
 
                 userAssets.setRemainingInterestBTC(
                         userAssets.getRemainingInterestBTC()
-                                .add(userAssets.getTotalBorrowedBTC().multiply(TierManager.HOURLY_BTC_INTEREST_RATE))
+                                .add(userAssets.getTotalBorrowedBTC().multiply(TierManager.HOURLY_BTC_INTEREST_RATE_PCT)
+                                        .divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP))
                 );
 
                 userAssets.setRemainingInterestUSDT(
                         userAssets.getRemainingInterestUSDT()
-                                .add(userAssets.getTotalBorrowedUSDT().multiply(TierManager.HOURLY_USDT_INTEREST_RATE))
+                                .add(userAssets.getTotalBorrowedUSDT().multiply(TierManager.HOURLY_USDT_INTEREST_RATE_PCT)
+                                        .divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP))
                 );
 
                 userAssetsUpdated = true;

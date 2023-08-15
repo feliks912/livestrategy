@@ -49,6 +49,9 @@ public class Position implements Cloneable {
 
     private Order closeOrder;
 
+    private boolean repaid = false;
+    private boolean repaidRequestSent = false;
+
     private PositionGroup group = PositionGroup.NEW;
 
     private static long positionId = 0;
@@ -84,7 +87,7 @@ public class Position implements Cloneable {
                 appropriateUnitPositionValue,
                 openTimestamp,
                 OrderPurpose.ENTRY,
-                positionId
+                id
         );
 
         this.stopLossOrder = new Order(
@@ -98,7 +101,7 @@ public class Position implements Cloneable {
                 appropriateUnitPositionValue,
                 openTimestamp,
                 OrderPurpose.STOP,
-                positionId
+                id
         );
     }
 
@@ -114,7 +117,7 @@ public class Position implements Cloneable {
                 appropriateUnitPositionValue,
                 transaction.timestamp(),
                 OrderPurpose.CLOSE,
-                positionId
+                id
         );
         return closeOrder;
     }
@@ -149,6 +152,7 @@ public class Position implements Cloneable {
 
 
     public double closePosition(long closeTimestamp) {
+
         if (closed || !entryOrder.getStatus().equals(OrderStatus.FILLED)) {
             return 0;
         }
@@ -172,8 +176,38 @@ public class Position implements Cloneable {
                 .multiply(direction.equals(OrderSide.BUY) ? BigDecimal.ONE : BigDecimal.ONE.negate()).doubleValue();
     }
 
-    public double calculateRR(double closePrice) {
-        return BigDecimal.valueOf(closePrice).subtract(fillPrice).divide(fillPrice.subtract(initialStopLossPrice), PRECISION_PRICE, RoundingMode.HALF_UP).doubleValue();
+    public boolean isRepaid() {
+        return repaid;
+    }
+
+    public void setRepaid(boolean repaid) {
+        this.repaid = repaid;
+    }
+
+    public boolean isRepaidRequestSent() {
+        return repaidRequestSent;
+    }
+
+    public void setRepayRequestSent(boolean repaidRequestSent) {
+        this.repaidRequestSent = repaidRequestSent;
+    }
+
+    public double calculateRR() {
+        Order respectiveOrder;
+
+        if(stopLossOrder.getStatus().equals(OrderStatus.FILLED)){
+            respectiveOrder = stopLossOrder;
+        } else if(closeOrder != null){
+            respectiveOrder = closeOrder;
+        } else {
+            return 0.0;
+        }
+
+        if(fillPrice.subtract(initialStopLossPrice).compareTo(BigDecimal.ZERO) == 0){
+            return 0.0;
+        }
+
+        return respectiveOrder.getFillPrice().subtract(fillPrice).divide(fillPrice.subtract(initialStopLossPrice), PRECISION_PRICE, RoundingMode.HALF_UP).doubleValue();
     }
 
     public boolean isStopLoss() {
@@ -272,7 +306,7 @@ public class Position implements Cloneable {
         this.direction = direction;
     }
 
-    public boolean isBreakEven() {
+    public boolean isBreakEvenActive() {
         return this.breakEven;
     }
 
@@ -280,7 +314,7 @@ public class Position implements Cloneable {
         return this.breakEven;
     }
 
-    public void setBreakEven(boolean breakEven) {
+    public void setBreakEvenStatus(boolean breakEven) {
         this.breakEven = breakEven;
     }
 
@@ -372,7 +406,7 @@ public class Position implements Cloneable {
         this.closeTimestamp = closeTimestamp;
     }
 
-    public boolean isActiveStopLoss() {
+    public boolean isStopLossActive() {
         return this.activeStopLoss;
     }
 

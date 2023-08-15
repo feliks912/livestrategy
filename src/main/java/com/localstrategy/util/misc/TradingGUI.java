@@ -1,9 +1,12 @@
 package com.localstrategy.util.misc;
 
+import com.localstrategy.util.types.Position;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
+import java.util.ArrayList;
 
 public class TradingGUI extends JFrame {
 
@@ -13,13 +16,13 @@ public class TradingGUI extends JFrame {
     private double currentPortfolio = 0;
 
 
-    public TradingGUI(int candleVolume, String startDate, String endDate) {
+    public TradingGUI(ArrayList<Position> activePositions, ArrayList<Position> inactivePositions, int distance) {
         // Set the layout manager for the frame
         setLayout(new BorderLayout());
 
         // Create a candlestick chart
-        positionsTable = new PositionsTable(false);
-        candlestickChart = new CandlestickChart(candleVolume, positionsTable, false, startDate, endDate);
+        positionsTable = new PositionsTable(inactivePositions, false);
+        candlestickChart = new CandlestickChart(distance, positionsTable, activePositions, false);
         
 
         // Get initial portfolio values
@@ -66,10 +69,9 @@ public class TradingGUI extends JFrame {
         setVisible(true);
 
         requestFocus();
-
-        candlestickChart.executor();
     }
 
-    // other methods...
-
+    public CandlestickChart getCandlestickChart(){
+        return this.candlestickChart;
+    }
 }

@@ -6,16 +6,20 @@ import com.localstrategy.util.types.Position;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.List;
 
 public class PositionsTable extends JFrame {
 
     private JTable positionTable;
     private DefaultTableModel tableModel;
 
-    public PositionsTable(boolean visible) {
+    ArrayList<Position> inactivePositions;
+
+    public PositionsTable(ArrayList<Position> inactivePositions, boolean visible) {
+
+        this.inactivePositions = inactivePositions;
 
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setSize(new Dimension(800, 600));
@@ -31,30 +35,32 @@ public class PositionsTable extends JFrame {
         setVisible(visible);
     }
 
-    public void refreshTableData(List<Position> closedPositions) {
+    public void refreshTableData() {
         tableModel.setRowCount(0);  // clear current data
 
-        if(closedPositions.isEmpty()){
+        if(inactivePositions.isEmpty()){
             return;
         }
 
-        Collections.sort(closedPositions, Comparator.comparingLong(Position::getId).reversed());
+        Collections.sort(inactivePositions, Comparator.comparingLong(Position::getId).reversed());
 
-        for (Position position : closedPositions) {
-            Object[] rowData = {
-                    position.getId(),
-                    position.getOrderType(),
-                    position.getOpenPrice(),
-                    position.getInitialStopLossPrice(),
-                    position.getStopLossPrice(),
-                    String.format("%.5f", position.getSize()),
-                    position.getClosingPrice(),
-                    position.getDirection().equals(OrderSide.BUY) ? "long" : "short",
-                    position.calculateRR(position.getClosingPrice()),
-                    String.format("%.2f", position.getProfit()),
-                    position.isFilled()
-            };
-            tableModel.addRow(rowData);
+        for (Position position : inactivePositions) {
+            if(position.getFillPrice() != null){
+                Object[] rowData = {
+                        position.getId(),
+                        position.getOrderType(),
+                        position.getOpenPrice(),
+                        position.getInitialStopLossPrice(),
+                        position.getStopLossPrice(),
+                        String.format("%.5f", position.getSize()),
+                        position.getClosingPrice(),
+                        position.getDirection().equals(OrderSide.BUY) ? "long" : "short",
+                        position.calculateRR(),
+                        String.format("%.2f", position.getProfit()),
+                        position.isFilled()
+                };
+                tableModel.addRow(rowData);
+            }
         }
         tableModel.fireTableDataChanged();  // signal the JTable to update
     }

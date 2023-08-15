@@ -2,7 +2,6 @@ package com.localstrategy;
 
 import com.localstrategy.util.enums.EventDestination;
 import com.localstrategy.util.enums.EventType;
-import com.localstrategy.util.enums.OrderPurpose;
 import com.localstrategy.util.helper.BinaryTransactionLoader;
 import com.localstrategy.util.helper.EventScheduler;
 import com.localstrategy.util.types.Event;
@@ -59,51 +58,18 @@ public class StrategyStarter {
         while (true) {
             Event event = scheduler.getNextEvent();
 
-            if (event.getId() >= 212756146) {
-                boolean point = true;
-            }
-
-            currentDay = initialFileCounter - fileCounter + 1;
-
-
-//            if(currentDay == 52) {
-//                if (!event.getType().equals(EventType.TRANSACTION)) {
-//                    System.out.println(counter + " " + event);
-//                    counter = 0;
-//                } else if(event.getDestination().equals(EventDestination.EXCHANGE)){
-//                    counter++;
-//                }
-//            }
-
-
-            if(currentDay == 52 && event.getType().equals(EventType.USER_DATA_STREAM)) {
-                boolean point = true;
-
-                UserAssets assets = event.getUserDataStream().userAssets();
-
-                //System.out.println("Day " + currentDay + ", Event Id " + event.getId() + ", " + assets.toString());
-            }
-
-//            if(currentDay == 53){
-//                break;
-//            }
-
-            if(event.getType().equals(EventType.ACTION_REQUEST)){
-//                System.out.println(event.getActionRequest().entrySet().iterator().next().getValue().getPurpose());
-            }
-
+            //First position 26 had issues, now we're testing position 28
             if (event.getType().equals(EventType.ACTION_REQUEST)
-                    && event.getOrder().getId() == 8691) {
-                boolean point = true;
-            }
-
-            if(event.getType().equals(EventType.ACTION_REQUEST) && event.getOrder().getPurpose().equals(OrderPurpose.REPAY)){
+                    && event.getOrder().getPositionId() == 2912) {
                 boolean point = true;
             }
 
             if (!event.getType().equals(EventType.TRANSACTION)) {
                 boolean point = true;
             }
+
+
+
 
             if (event.getDestination().equals(EventDestination.LOCAL)) {
                 localHandler.onEvent(event);

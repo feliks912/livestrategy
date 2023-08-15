@@ -57,11 +57,9 @@ public class BinaryCreator {
 
             String[] firstValues = firstLine.split(",");
 
-            double firstPriceUnadjusted = Double.parseDouble(firstValues[0]);
-
-            int firstPrice = customRoundToInt(Double.parseDouble(firstValues[0]) * 100);
-            int quantity = Integer.parseInt(firstValues[1]);
-            long firstTimestamp = Long.parseLong(firstValues[2]);
+            int firstPrice = customRoundToInt(Double.parseDouble(firstValues[1]) * 100);
+            int quantity = (int) (Double.parseDouble(firstValues[2]) * 10_000_000);
+            long firstTimestamp = Long.parseLong(firstValues[4]);
 
             dos.write(ByteBuffer.allocate(4).putInt(firstPrice).array());
             dos.write(ByteBuffer.allocate(4).putInt(quantity).array());
@@ -72,10 +70,10 @@ public class BinaryCreator {
 
                 String[] values = line.split(",");
 
-                int price = customRoundToInt((Double.parseDouble(values[0]) + firstPriceUnadjusted) * 100);
+                int price = customRoundToInt((Double.parseDouble(values[1])) * 100);
+                quantity = (int) (Double.parseDouble(values[2]) * 10_000_000);
 
-                quantity = Integer.parseInt(values[1]);
-                int deltaTimestamp = Integer.parseInt(values[2]);
+                int deltaTimestamp = (int) (Long.parseLong(values[4]) - firstTimestamp);
 
                 dos.write(ByteBuffer.allocate(4).putInt(price).array());
                 dos.write(ByteBuffer.allocate(4).putInt(quantity).array());

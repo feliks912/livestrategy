@@ -14,6 +14,7 @@ public class SlippageHandler {
     private static final long BTCUSDT_DAILY_VOLUME = 8_570_000_000L;
 
     public static BigDecimal getSlippageFillPrice(BigDecimal price, BigDecimal orderSize, OrderSide orderSide) {
+
         BigDecimal direction = (orderSide.equals(OrderSide.BUY) ? BigDecimal.ONE : BigDecimal.ONE.negate());
         BigDecimal fillPrice = price.multiply(BigDecimal.ONE.add(ORDERBOOK_PCT.divide(BigDecimal.valueOf(100))
                 .divide(ORDERBOOK_QTY, RoundingMode.HALF_UP).divide(BigDecimal.valueOf(Math.sqrt(2)))
@@ -24,6 +25,7 @@ public class SlippageHandler {
 
     public static BigDecimal getMaximumOrderSize(BigDecimal price, BigDecimal priceDifference,
                                                  BigDecimal percentage, OrderSide orderSide) {
+
         BigDecimal direction = (orderSide.equals(OrderSide.BUY) ? BigDecimal.ONE : BigDecimal.ONE.negate());
         BigDecimal fillingPrice = price.add(direction.multiply(percentage.divide(BigDecimal.valueOf(100))
                 .multiply(priceDifference)));
@@ -37,6 +39,7 @@ public class SlippageHandler {
 
     public static BigDecimal getRootSlippageFillPrice(BigDecimal price, BigDecimal volatility,
                                                       BigDecimal orderSize, OrderSide orderSide) {
+
         BigDecimal deltaPrice = volatility.multiply(SQUARE_ROOT_MODEL_CONSTANT)
                 .multiply(BigDecimal.valueOf(Math.sqrt(orderSize.multiply(price).divide(BigDecimal.valueOf(2).multiply(BigDecimal.valueOf(BTCUSDT_DAILY_VOLUME)), RoundingMode.HALF_UP).doubleValue())));
         deltaPrice = deltaPrice.multiply(orderSide.equals(OrderSide.BUY) ? BigDecimal.ONE : BigDecimal.ONE.negate());
