@@ -61,6 +61,9 @@ public class Strategy2 {
     private boolean previouslyPackedLow = false;
     private boolean previouslyPackedHigh = false;
 
+    private boolean shortOnEmptyActivePositions = false;
+    private boolean longOnEmptyActivePositions = false;
+
     ArrayList<Position> summedPositions = new ArrayList<>();
 
     boolean packingForLong = false;
@@ -82,7 +85,35 @@ public class Strategy2 {
         this.transaction = transaction;
         //TODO: Fix when forming candle would become the new high / low, executing two orders. Also, some long orders don't long?
 
+        if(longOnEmptyActivePositions && activePositions.isEmpty()){
 
+            Position newMarketPosition = handler.executeMarketOrder(longRangeLowStop);
+
+            if(newMarketPosition != null){
+                handler.activateStopLoss(newMarketPosition);
+            }
+
+            packingForLong = false;
+            longRangeLowStop = Double.MAX_VALUE;
+            longRangeHighEntry = 0;
+            waitForNextCandle = true;
+
+            longOnEmptyActivePositions = false;
+        } else if (shortOnEmptyActivePositions && activePositions.isEmpty()){
+
+            Position newMarketPosition = handler.executeMarketOrder(shortRangeHighStop);
+
+            if(newMarketPosition != null){
+                handler.activateStopLoss(newMarketPosition);
+            }
+
+            packingForShort = false;
+            shortRangeHighStop = 0;
+            shortRangeLowEntry = Double.MAX_VALUE;
+            waitForNextCandle = true;
+
+            shortOnEmptyActivePositions = false;
+        }
 
         // --- LONG ---
         if(packingForLong){
@@ -95,16 +126,8 @@ public class Strategy2 {
                     }
                 }
 
-                Position newMarketPosition = handler.executeMarketOrder(longRangeLowStop);
+                longOnEmptyActivePositions = true;
 
-                if(newMarketPosition != null){
-                    handler.activateStopLoss(newMarketPosition);
-                }
-
-                packingForLong = false;
-                longRangeLowStop = Double.MAX_VALUE;
-                longRangeHighEntry = 0;
-                waitForNextCandle = true;
             } else if(transaction.price() <= longRangeLowStop){
                 longRangeLowStop = transaction.price();
             }
@@ -121,20 +144,8 @@ public class Strategy2 {
                     }
                 }
 
-                Position newMarketPosition = handler.executeMarketOrder(shortRangeHighStop);
+                shortOnEmptyActivePositions = true;
 
-
-                if(newMarketPosition != null){
-                    if(newMarketPosition.getId() == 26){
-                        boolean variable = true;
-                    }
-                    handler.activateStopLoss(newMarketPosition);
-                }
-
-                packingForShort = false;
-                shortRangeHighStop = 0;
-                shortRangeLowEntry = Double.MAX_VALUE;
-                waitForNextCandle = true;
             } else if(transaction.price() >= shortRangeHighStop) {
                 shortRangeHighStop = transaction.price();
             }

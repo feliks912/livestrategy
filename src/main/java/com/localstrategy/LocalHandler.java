@@ -17,7 +17,7 @@ import java.util.TreeMap;
 public class LocalHandler {
 
     private static final int CANDLE_VOLUME = 500_000;
-    private static final double RISK_PCT = 0.15;
+    private static final double RISK_PCT = 0.1;
 
     //In relation to the difference between our entry and stop-loss price difference, how much in percentage of slippage are we ready to accept (total, not the average fill price)
     private static final int SLIPPAGE_PCT = 15;
@@ -35,6 +35,8 @@ public class LocalHandler {
     private long previousInterestTimestamp = 0;
 
     private ArrayList<Candle> candles = candleConstructor.getCandles();
+
+    private ArrayList<SingletonMap<Long, Double>> candleCloseList = new ArrayList<>();
 
     private Event currentEvent;
     private SingleTransaction transaction;
@@ -1567,10 +1569,15 @@ public class LocalHandler {
         if (candle != null) { // New candle
             lastCandle = candle;
             candles = candleConstructor.getCandles();
+            candleCloseList.add(new SingletonMap<>(candle.timestamp(), candle.close()));
             newCandle(lastCandle);
         }
 
         priceUpdate(transaction);
+    }
+
+    public ArrayList<SingletonMap<Long, Double>> getCandleCloseList(){
+        return this.candleCloseList;
     }
 
     public UserAssets getUserAssets() {

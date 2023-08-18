@@ -97,7 +97,7 @@ public class OrderRequest {
 
 
             positionSize = totalFreeUsdt.multiply(BigDecimal.valueOf(risk))
-                    .divide(BigDecimal.valueOf(100))
+                    .divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP)
                     .divide(absPriceDiff, 6, RoundingMode.HALF_UP);
 
             BigDecimal slippageLimitedPositionSize = SlippageHandler.getMaximumOrderSize(entryPrice, absPriceDiff, slippagePct, (entryPrice.compareTo(stopLossPrice) > 0 ? OrderSide.BUY : OrderSide.SELL))
@@ -122,6 +122,7 @@ public class OrderRequest {
                 amountToBorrow = amountToBorrow.multiply(entryPrice);
 
                 if(borrowedUSDT.add(amountToBorrow).compareTo(TierManager.MAX_BORROW_USDT) > 0){
+                    System.out.println("No bueno borrow USDT.");
                     return false;
                 }
 
@@ -140,6 +141,7 @@ public class OrderRequest {
             }
             else {
                 if(borrowedBTC.add(amountToBorrow).compareTo(TierManager.MAX_BORROW_BTC) > 0){
+                    System.out.println("No bueno borrow BTC.");
                     return false;
                 }
 

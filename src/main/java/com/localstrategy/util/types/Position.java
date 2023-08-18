@@ -167,9 +167,9 @@ public class Position implements Cloneable {
         if (stopLossOrder.getStatus().equals(OrderStatus.FILLED)) {
             this.profit = (stopLossOrder.getFillPrice().subtract(entryOrder.getFillPrice())).multiply(size)
                     .multiply(direction.equals(OrderSide.BUY) ? BigDecimal.ONE : BigDecimal.ONE.negate());
-//            if(profit.doubleValue() >= 0){
-//                System.out.println("Stoplossed position resulted in positive profit of " + profit);
-//            }
+            if(profit.doubleValue() >= 0){
+                System.out.println("Stoplossed position resulted in positive profit of " + profit);
+            }
             this.closingPrice = stopLossOrder.getFillPrice().doubleValue();
         } else if (closeOrder != null && closeOrder.getStatus().equals(OrderStatus.FILLED)) {
             this.profit = (closeOrder.getFillPrice().subtract(entryOrder.getFillPrice())).multiply(size)

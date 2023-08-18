@@ -39,7 +39,7 @@ public class StrategyStarter {
 
     long counter = 0;
 
-    public ArrayList<UserAssets> execute(String outputCSVPath) {
+    public void execute(String outputCSVPath) {
 
         int fileCounter = transactionLoader.getTotalFileCount();
 
@@ -139,12 +139,18 @@ public class StrategyStarter {
 
         System.out.println(localHandler.getUserAssets().toString());
 
-        return exchangeHandler.getUserAssetsList();
+        return;
 
         //ArrayList<Double> portfolioList = exchangeHandler.terminateAndReport(outputCSVPath);
     }
 
+    public LocalHandler getLocalHandler(){
+        return this.localHandler;
+    }
 
+    public BinanceHandler getBinanceHandler(){
+        return this.exchangeHandler;
+    }
 
     private void dailyReport(int day, SingleTransaction transaction) {
         UserAssets assets = exchangeHandler.getUserAssets();
