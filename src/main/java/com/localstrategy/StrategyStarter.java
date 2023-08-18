@@ -5,6 +5,7 @@ import com.localstrategy.util.enums.EventType;
 import com.localstrategy.util.helper.BinaryTransactionLoader;
 import com.localstrategy.util.helper.EventScheduler;
 import com.localstrategy.util.types.Event;
+import com.localstrategy.util.types.Position;
 import com.localstrategy.util.types.SingleTransaction;
 import com.localstrategy.util.types.UserAssets;
 
@@ -41,7 +42,6 @@ public class StrategyStarter {
     public ArrayList<UserAssets> execute(String outputCSVPath) {
 
         int fileCounter = transactionLoader.getTotalFileCount();
-        ;
 
         int initialFileCounter = fileCounter;
 
@@ -58,18 +58,26 @@ public class StrategyStarter {
         while (true) {
             Event event = scheduler.getNextEvent();
 
+
+
             //First position 26 had issues, now we're testing position 28
-            if (event.getType().equals(EventType.ACTION_REQUEST)
-                    && event.getOrder().getPositionId() == 2912) {
-                boolean point = true;
-            }
-
-            if (!event.getType().equals(EventType.TRANSACTION)) {
-                boolean point = true;
-            }
-
-
-
+//            if (event.getOrder() != null
+//                    && (event.getOrder().getPositionId() == 9792)) {
+//                boolean point = true;
+//            } else if(event.getUserDataStream() != null) {
+//                for(Order order : event.getUserDataStream().updatedOrders()){
+//                    if(order.getPositionId() == 9792) {
+//
+//                        boolean point = true;
+//                    }
+//                }
+//            }
+//
+//            if (!event.getType().equals(EventType.TRANSACTION)) {
+//                boolean point = true;
+//            } else if(event.getType().equals(EventType.TRANSACTION) && event.getDestination().equals(EventDestination.EXCHANGE)){
+//                boolean point = true;
+//            }
 
             if (event.getDestination().equals(EventDestination.LOCAL)) {
                 localHandler.onEvent(event);
@@ -94,7 +102,17 @@ public class StrategyStarter {
 
                         double dayDiffPct = (endOfDayUSDT - previousDayUSDT) / previousDayUSDT * 100;
 
-                        System.out.printf("Day %d done. Balance: $%.2f, profit: $%.2f, pct change: %.2f\n", currentDay, endOfDayUSDT, (endOfDayUSDT - previousDayUSDT), dayDiffPct);
+                        System.out.printf("Day %d/%d (%s) done. Transaction count: %d, balance: $%.2f, profit: $%.2f, pct change: %.2f%%. %d active positions.\n",
+                                currentDay,
+                                initialFileCounter,
+                                transactionLoader.getCurrentFileName().substring(
+                                        transactionLoader.getCurrentFileName().length() - 14,
+                                        transactionLoader.getCurrentFileName().length() - 4),
+                                transactionList.size(),
+                                endOfDayUSDT,
+                                (endOfDayUSDT - previousDayUSDT),
+                                dayDiffPct,
+                                localHandler.getActivePositions().size());
 
                         previousDayUSDT = endOfDayUSDT;
 
@@ -114,6 +132,12 @@ public class StrategyStarter {
                 exchangeHandler.onEvent(event);
             }
         }
+
+        for(Position position : localHandler.getActivePositions()){
+            System.out.println(position);
+        }
+
+        System.out.println(localHandler.getUserAssets().toString());
 
         return exchangeHandler.getUserAssetsList();
 

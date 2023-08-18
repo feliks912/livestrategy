@@ -1,5 +1,6 @@
 package com.localstrategy;
 
+import com.localstrategy.util.helper.DrawdownCalculator;
 import com.localstrategy.util.helper.PortfolioPlotter;
 import com.localstrategy.util.types.UserAssets;
 
@@ -13,7 +14,7 @@ public class App {
     public static void main(String[] args) {
 
         StrategyStarter starter = new StrategyStarter(
-                "C:\\--- BTCUSDT",
+                "C:\\--- ETHUSDT",
                 "src/main/java/Resources/only_latencies_fixed.csv",
                 null,
                 null,
@@ -27,6 +28,11 @@ public class App {
                 .collect(Collectors.toCollection(ArrayList::new));
 
          PortfolioPlotter.plot(assetsUSDT);
+
+        System.out.println("Max drawdown: " +
+                DrawdownCalculator.calculateMaxDrawdown(assets.stream().map(UserAssets::getMomentaryOwnedAssets).collect(Collectors.toCollection(ArrayList::new))) * 100
+                + "%");
+
 }
 }
 

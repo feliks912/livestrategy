@@ -28,6 +28,10 @@ public class Order implements Cloneable {
     private long fillTimestamp;
     private BigDecimal totalUnpaidInterest = BigDecimal.ZERO;
     private boolean isStopLoss;
+
+    private boolean isCloseReattempted = false;
+
+    boolean repayReattempted = false;
     private RejectionReason rejectionReason;
     private OrderStatus status;
     private boolean automaticBorrow;
@@ -66,8 +70,24 @@ public class Order implements Cloneable {
         this.positionId = positionId;
 
         this.hourlyInterestRate = direction.equals(OrderSide.BUY)
-                ? TierManager.HOURLY_USDT_INTEREST_RATE_PCT.divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP)
-                : TierManager.HOURLY_BTC_INTEREST_RATE_PCT.divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP);
+                ? TierManager.HOURLY_USDT_INTEREST_RATE_PCT.divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP)
+                : TierManager.HOURLY_BTC_INTEREST_RATE_PCT.divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP);
+    }
+
+    public boolean isCloseReattempted() {
+        return isCloseReattempted;
+    }
+
+    public void setCloseReattempted(boolean closeReattempted) {
+        isCloseReattempted = closeReattempted;
+    }
+
+    public boolean isRepayReattempted() {
+        return repayReattempted;
+    }
+
+    public void setRepayReattempted(boolean repayReattempted) {
+        this.repayReattempted = repayReattempted;
     }
 
     public long getPositionId(){
@@ -79,11 +99,11 @@ public class Order implements Cloneable {
     }
 
     public void initializeInterest() {
-        this.totalUnpaidInterest = this.appropriateUnitPositionValue.multiply(this.hourlyInterestRate).divide(BigDecimal.valueOf(100), PRECISION_GENERAL, RoundingMode.HALF_UP);
+        this.totalUnpaidInterest = this.appropriateUnitPositionValue.multiply(this.hourlyInterestRate).divide(BigDecimal.valueOf(100), PRECISION_GENERAL + 2, RoundingMode.HALF_UP);
     }
 
     public void increaseUnpaidInterest() {
-        this.totalUnpaidInterest = this.totalUnpaidInterest.add(this.appropriateUnitPositionValue.multiply(this.hourlyInterestRate).divide(BigDecimal.valueOf(100), PRECISION_GENERAL, RoundingMode.HALF_UP));
+        this.totalUnpaidInterest = this.totalUnpaidInterest.add(this.appropriateUnitPositionValue.multiply(this.hourlyInterestRate).divide(BigDecimal.valueOf(100), PRECISION_GENERAL + 2, RoundingMode.HALF_UP));
     }
 
     @Override
@@ -256,5 +276,25 @@ public class Order implements Cloneable {
             newList.add(newPos);
         }
         return newList;
+    }
+
+    @Override
+    public String toString() {
+        return "Order{" +
+                "id=" + id +
+                ", size=" + size +
+                ", direction=" + direction +
+                ", orderType=" + orderType +
+                ", openTimestamp=" + openTimestamp +
+                ", borrowCollateral=" + borrowCollateral +
+                ", appropriateUnitPositionValue=" + appropriateUnitPositionValue +
+                ", marginBuyBorrowAmount=" + marginBuyBorrowAmount +
+                ", fillPrice=" + fillPrice +
+                ", rejectionReason=" + rejectionReason +
+                ", status=" + status +
+                ", automaticBorrow=" + automaticBorrow +
+                ", positionId=" + positionId +
+                ", purpose=" + purpose +
+                '}';
     }
 }

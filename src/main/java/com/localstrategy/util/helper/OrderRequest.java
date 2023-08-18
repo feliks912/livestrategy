@@ -114,21 +114,58 @@ public class OrderRequest {
 
             amountToBorrow = positionSize.setScale(8, RoundingMode.HALF_UP);
 
-            if(entryPrice.compareTo(stopLossPrice) > 0){
+            double totalAssetValue;
+
+            double totalBorrowAndInterestValue;
+
+            if(entryPrice.compareTo(stopLossPrice) > 0){ //Buy
                 amountToBorrow = amountToBorrow.multiply(entryPrice);
 
                 if(borrowedUSDT.add(amountToBorrow).compareTo(TierManager.MAX_BORROW_USDT) > 0){
                     return false;
                 }
 
+                //FIXME: Tiss a bit hacky - discard position if we wouldn't borrow
+                if(amountToBorrow.compareTo(userAssets.getFreeUSDT()) <= 0 && activePositions.size() > 1){
+                    return false;
+                }
+
+                totalAssetValue = userAssets.getFreeUSDT().add(amountToBorrow).add(userAssets.getLockedUSDT())
+                        .add(userAssets.getFreeBTC().add(userAssets.getLockedBTC()).multiply(entryPrice)).doubleValue();
+
+                totalBorrowAndInterestValue = userAssets.getTotalBorrowedUSDT().add(amountToBorrow).add(userAssets.getTotalBorrowedBTC().multiply(entryPrice))
+                        .add(userAssets.getRemainingInterestUSDT()).add(userAssets.getRemainingInterestBTC().multiply(entryPrice)).doubleValue();
+
                 riskManager.checkAndUpdateTier(borrowedUSDT.add(amountToBorrow).doubleValue(), borrowedBTC.doubleValue());
             }
             else {
                 if(borrowedBTC.add(amountToBorrow).compareTo(TierManager.MAX_BORROW_BTC) > 0){
                     return false;
-                } 
-                
+                }
+
+                if(amountToBorrow.compareTo(userAssets.getFreeBTC()) <= 0 && activePositions.size() > 1){
+                    return false;
+                }
+
+                totalAssetValue = userAssets.getFreeUSDT().add(userAssets.getLockedUSDT())
+                        .add(userAssets.getFreeBTC().add(userAssets.getLockedBTC().add(amountToBorrow)).multiply(entryPrice)).doubleValue();
+
+                totalBorrowAndInterestValue = userAssets.getTotalBorrowedUSDT().add((userAssets.getTotalBorrowedBTC().add(amountToBorrow)).multiply(entryPrice))
+                        .add(userAssets.getRemainingInterestUSDT()).add(userAssets.getRemainingInterestBTC().multiply(entryPrice)).doubleValue();
+
                 riskManager.checkAndUpdateTier(borrowedUSDT.doubleValue(), borrowedBTC.add(amountToBorrow).doubleValue());
+            }
+
+            double marginLevel;
+
+            if (totalBorrowAndInterestValue <= 0) {
+                marginLevel = 999;
+            } else {
+                marginLevel = Math.min(999, totalAssetValue / totalBorrowAndInterestValue);
+            }
+
+            if (marginLevel <= 1.1) {
+                return false; // Just discard the position if our margin level would be less than 1.1 after execution
             }
 
             requiredMargin = positionSize.multiply(entryPrice).divide(BigDecimal.valueOf(riskManager.getCurrentLeverage()), 8, RoundingMode.HALF_UP);
@@ -157,9 +194,14 @@ public class OrderRequest {
                 }
             }
 
-            return userAssets.getFreeUSDT().compareTo(requiredMargin) > 0 &&
-                    programmaticCounter < totalProgrammaticOrderLimit;
+            if(userAssets.getFreeUSDT().compareTo(requiredMargin) > 0 &&
+                    programmaticCounter < totalProgrammaticOrderLimit){
+                return true;
+            } else {
+                System.out.println("Not - margin or prog counter");
+            }
         }
+
         return false;
     }
 

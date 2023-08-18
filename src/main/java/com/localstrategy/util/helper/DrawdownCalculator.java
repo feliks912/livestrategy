@@ -1,4 +1,4 @@
-package com.localstrategy.util.old;
+package com.localstrategy.util.helper;
 
 import java.util.ArrayList;
 

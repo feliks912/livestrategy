@@ -7,6 +7,7 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
+import java.util.LinkedList;
 
 public class TradingGUI extends JFrame {
 
@@ -16,7 +17,7 @@ public class TradingGUI extends JFrame {
     private double currentPortfolio = 0;
 
 
-    public TradingGUI(ArrayList<Position> activePositions, ArrayList<Position> inactivePositions, int distance) {
+    public TradingGUI(ArrayList<Position> activePositions, LinkedList<Position> inactivePositions, int distance) {
         // Set the layout manager for the frame
         setLayout(new BorderLayout());
 

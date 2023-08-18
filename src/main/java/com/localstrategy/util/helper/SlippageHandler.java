@@ -9,7 +9,6 @@ public class SlippageHandler {
 
     private static final BigDecimal ORDERBOOK_PCT = BigDecimal.valueOf(0.4); // 0.4%
     private static final BigDecimal ORDERBOOK_QTY = BigDecimal.valueOf(150); // 150 BTC
-
     private static final BigDecimal SQUARE_ROOT_MODEL_CONSTANT = BigDecimal.valueOf(0.5);
     private static final long BTCUSDT_DAILY_VOLUME = 8_570_000_000L;
 

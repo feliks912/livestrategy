@@ -52,7 +52,11 @@ public class Position implements Cloneable {
     private boolean repaid = false;
     private boolean repaidRequestSent = false;
 
+    private double RR = 0;
+
     private PositionGroup group = PositionGroup.NEW;
+
+    private boolean buyBackExecuted = false;
 
     private static long positionId = 0;
 
@@ -119,6 +123,9 @@ public class Position implements Cloneable {
                 OrderPurpose.CLOSE,
                 id
         );
+
+        this.closeOrder = closeOrder;
+
         return closeOrder;
     }
 
@@ -160,20 +167,40 @@ public class Position implements Cloneable {
         if (stopLossOrder.getStatus().equals(OrderStatus.FILLED)) {
             this.profit = (stopLossOrder.getFillPrice().subtract(entryOrder.getFillPrice())).multiply(size)
                     .multiply(direction.equals(OrderSide.BUY) ? BigDecimal.ONE : BigDecimal.ONE.negate());
+//            if(profit.doubleValue() >= 0){
+//                System.out.println("Stoplossed position resulted in positive profit of " + profit);
+//            }
+            this.closingPrice = stopLossOrder.getFillPrice().doubleValue();
         } else if (closeOrder != null && closeOrder.getStatus().equals(OrderStatus.FILLED)) {
             this.profit = (closeOrder.getFillPrice().subtract(entryOrder.getFillPrice())).multiply(size)
                     .multiply(direction.equals(OrderSide.BUY) ? BigDecimal.ONE : BigDecimal.ONE.negate());
+            this.closingPrice = closeOrder.getFillPrice().doubleValue();
         }
         closed = true;
 
         this.closeTimestamp = closeTimestamp;
+
+        calculateRR();
+
         return profit.doubleValue();
+    }
+
+    public double getRR() {
+        return RR;
     }
 
     public double calculateProfit(double closePrice) {
         BigDecimal closePriceBigDecimal = BigDecimal.valueOf(closePrice);
         return (closePriceBigDecimal.subtract(fillPrice)).multiply(size)
                 .multiply(direction.equals(OrderSide.BUY) ? BigDecimal.ONE : BigDecimal.ONE.negate()).doubleValue();
+    }
+
+    public boolean isBuyBackExecuted() {
+        return buyBackExecuted;
+    }
+
+    public void setBuyBackExecuted(boolean buyBackExecuted) {
+        this.buyBackExecuted = buyBackExecuted;
     }
 
     public boolean isRepaid() {
@@ -184,7 +211,7 @@ public class Position implements Cloneable {
         this.repaid = repaid;
     }
 
-    public boolean isRepaidRequestSent() {
+    public boolean isRepayRequestSent() {
         return repaidRequestSent;
     }
 
@@ -200,14 +227,18 @@ public class Position implements Cloneable {
         } else if(closeOrder != null){
             respectiveOrder = closeOrder;
         } else {
+            this.RR = 0.0;
             return 0.0;
         }
 
         if(fillPrice.subtract(initialStopLossPrice).compareTo(BigDecimal.ZERO) == 0){
+            this.RR = 0.0;
             return 0.0;
         }
 
-        return respectiveOrder.getFillPrice().subtract(fillPrice).divide(fillPrice.subtract(initialStopLossPrice), PRECISION_PRICE, RoundingMode.HALF_UP).doubleValue();
+        this.RR = respectiveOrder.getFillPrice().subtract(fillPrice).divide(fillPrice.subtract(initialStopLossPrice), PRECISION_PRICE, RoundingMode.HALF_UP).doubleValue();
+
+        return RR;
     }
 
     public boolean isStopLoss() {
@@ -526,5 +557,49 @@ public class Position implements Cloneable {
             newList.add(newPos);
         }
         return newList;
+    }
+
+    @Override
+    public String toString() {
+        return "Position{" +
+                "id=" + id +
+                ", openPrice=" + openPrice +
+                ", stopLossPrice=" + stopLossPrice +
+                ", initialStopLossPrice=" + initialStopLossPrice +
+                ", size=" + size +
+                ", closingPrice=" + closingPrice +
+                ", direction=" + direction +
+                ", breakEven=" + breakEven +
+                ", borrowCollateral=" + borrowCollateral +
+                ", filled=" + filled +
+                ", closed=" + closed +
+                ", profit=" + profit +
+                ", partiallyClosed=" + partiallyClosed +
+                ", orderType=" + orderType +
+                ", openTimestamp=" + openTimestamp +
+                ", hourlyInterestRate=" + hourlyInterestRate +
+                ", appropriateUnitPositionValue=" + appropriateUnitPositionValue +
+                ", fillPrice=" + fillPrice +
+                ", fillTimestamp=" + fillTimestamp +
+                ", closeTimestamp=" + closeTimestamp +
+                ", activeStopLoss=" + activeStopLoss +
+                ", closedBeforeStopLoss=" + closedBeforeStopLoss +
+                ", totalUnpaidInterest=" + totalUnpaidInterest +
+                ", reversed=" + reversed +
+                ", isStopLoss=" + isStopLoss +
+                ", rejectionReason=" + rejectionReason +
+                ", stopLossRequestSent=" + stopLossRequestSent +
+                ", automaticBorrow=" + automaticBorrow +
+                ", autoRepayAtCancel=" + autoRepayAtCancel +
+                ", marginBuyBorrowAmount=" + marginBuyBorrowAmount +
+                ", cancelled=" + cancelled +
+                ", entryOrder=" + entryOrder +
+                ", stopLossOrder=" + stopLossOrder +
+                ", closeOrder=" + closeOrder +
+                ", repaid=" + repaid +
+                ", repaidRequestSent=" + repaidRequestSent +
+                ", RR=" + RR +
+                ", group=" + group +
+                '}';
     }
 }

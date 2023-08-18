@@ -27,7 +27,20 @@ public class EventScheduler {
                 event.setEventLatency(currentLatency);
             }
             case ACTION_RESPONSE, USER_DATA_STREAM -> event.setEventLatency(currentLatency + EXCHANGE_PROCESSING_TIME);
-            case ACTION_REQUEST -> event.setEventLatency(currentLatency + LOCAL_PROCESSING_TIME);
+            case ACTION_REQUEST -> {
+
+                int totalLatency = LOCAL_PROCESSING_TIME;
+
+                //TODO: This break stuff. We're checking if stoploss is created before an entry order, and this makes it not so.
+//                if(event.getActionRequest().equals(OrderAction.CREATE_ORDER)
+//                        && event.getOrder().isAutomaticBorrow()
+//                        && event.getOrder().getPurpose().equals(OrderPurpose.ENTRY)){
+//                    totalLatency += EXCHANGE_PROCESSING_TIME; //Compensating for borrowing
+//                }
+
+                event.setEventLatency(currentLatency + totalLatency);
+
+            }
         }
 
         eventQueue.add(event);

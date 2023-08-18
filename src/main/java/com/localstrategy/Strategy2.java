@@ -10,9 +10,14 @@ import com.localstrategy.util.types.SingleTransaction;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
 
 public class Strategy2 {
+    private final static boolean DISPLAY_TRADING_GUI = false;
+
+
+
     private LocalHandler handler;
     private List<Position> activePositions;
     private List<Position> inactivePositions;
@@ -23,9 +28,7 @@ public class Strategy2 {
 
     int DISTANCE = 300;
 
-    private final static boolean DISPLAY_TRADING_GUI = true;
-
-    public Strategy2(LocalHandler localHandler, ArrayList<Candle> candles, ArrayList<Position> activePositions, ArrayList<Position> inactivePositions){
+    public Strategy2(LocalHandler localHandler, ArrayList<Candle> candles, ArrayList<Position> activePositions, LinkedList<Position> inactivePositions){
         this.handler = localHandler;
         this.candles = candles;
         this.activePositions = Collections.unmodifiableList(activePositions);
@@ -36,7 +39,7 @@ public class Strategy2 {
         }
 
         // Your code
-        System.out.println("Distace: " + DISTANCE);
+        System.out.println("Distance: " + DISTANCE);
     }
 
     Candle lastCandle;

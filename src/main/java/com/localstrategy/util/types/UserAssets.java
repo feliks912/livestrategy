@@ -143,16 +143,16 @@ public class UserAssets {
     @Override
     public String toString() {
         return "UserAssets{" +
-                // "timestamp=" + timestamp +
-                ", freeUSDT=" + freeUSDT +
-                ", lockedUSDT=" + lockedUSDT +
-                ", freeBTC=" + freeBTC +
-                ", lockedBTC=" + lockedBTC +
-                ", totalBorrowedUSDT=" + totalBorrowedUSDT +
-                ", totalBorrowedBTC=" + totalBorrowedBTC +
-                // ", marginLevel=" + marginLevel +
-                // ", totalUnpaidBTCInterest=" + totalUnpaidBTCInterest +
-                // ", totalUnpaidUSDTInterest=" + totalUnpaidUSDTInterest +
+                "timestamp=" + timestamp +
+                ", freeUSDT=" + freeUSDT.doubleValue() +
+                ", lockedUSDT=" + lockedUSDT.doubleValue() +
+                ", freeBTC=" + freeBTC.doubleValue() +
+                ", lockedBTC=" + lockedBTC.doubleValue() +
+                ", totalBorrowedUSDT=" + totalBorrowedUSDT.doubleValue() +
+                ", totalBorrowedBTC=" + totalBorrowedBTC.doubleValue() +
+                ", marginLevel=" + marginLevel +
+                ", totalUnpaidBTCInterest=" + totalUnpaidBTCInterest.doubleValue() +
+                ", totalUnpaidUSDTInterest=" + totalUnpaidUSDTInterest.doubleValue() +
                 '}';
     }
 }

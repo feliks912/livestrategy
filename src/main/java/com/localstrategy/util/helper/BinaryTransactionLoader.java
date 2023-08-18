@@ -20,6 +20,8 @@ public class BinaryTransactionLoader {
 
     private final Queue<Path> filesQueue;
 
+    private String currentFileName;
+
     public BinaryTransactionLoader(String folderPath, String inputFromDate, String inputToDate) {
         this.filesQueue = new PriorityQueue<>();
 
@@ -70,7 +72,11 @@ public class BinaryTransactionLoader {
         }
 
         try {
-            return readBinaryData(filesQueue.poll());
+            Path filePath = filesQueue.poll();
+
+            currentFileName = filePath.getFileName().toString();
+
+            return readBinaryData(filePath);
         } catch (IOException e) {
             e.printStackTrace();
             return null;
@@ -113,5 +119,9 @@ public class BinaryTransactionLoader {
 
     public int getTotalFileCount() {
         return filesQueue.size();
+    }
+
+    public String getCurrentFileName(){
+        return this.currentFileName;
     }
 }

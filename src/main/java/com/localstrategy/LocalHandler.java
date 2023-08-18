@@ -10,12 +10,14 @@ import org.apache.commons.collections4.map.SingletonMap;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.Map;
+import java.util.TreeMap;
 
 public class LocalHandler {
 
     private static final int CANDLE_VOLUME = 500_000;
-    private static final double RISK_PCT = 0.1;
+    private static final double RISK_PCT = 0.15;
 
     //In relation to the difference between our entry and stop-loss price difference, how much in percentage of slippage are we ready to accept (total, not the average fill price)
     private static final int SLIPPAGE_PCT = 15;
@@ -24,7 +26,7 @@ public class LocalHandler {
     private final CandleConstructor candleConstructor = new CandleConstructor(CANDLE_VOLUME);
 
     private final ArrayList<Position> activePositions = new ArrayList<>();
-    private final ArrayList<Position> inactivePositions = new ArrayList<>();
+    private final LinkedList<Position> inactivePositions = new LinkedList<>();
 
     private UserAssets userAssets = new UserAssets();
     private final OrderRequest orderRequest;
@@ -44,22 +46,32 @@ public class LocalHandler {
     private boolean repayUSDTRequestSent = false;
     private boolean repayBTCRequestSent = false;
 
-    private long buyBackOrderId = Long.MAX_VALUE;
-    private long reattemptRepayOrderId = Long.MAX_VALUE;
+    private long buyBackOrderId = -1;
+    private long reattemptRepayOrderId = -1;
 
-    private long BTCInterestRepayOrderId = Long.MAX_VALUE;
+    private long BTCInterestRepayOrderId = -1;
 
-    private long USDTInterestRepayOrderId = Long.MAX_VALUE;
+    private long USDTInterestRepayOrderId = -1;
 
-    private boolean illegalExecutionCorrectionInProgress = false;
-    private long illegalExecutionOrderId = -1;
+
+    private final TreeMap<Long, ArrayList<Map<Order, OrderAction>>> waitForRepayToRepeatActionsList = new TreeMap<>();
+    private final TreeMap<Long, ArrayList<Map<Order, OrderAction>>> closeFilledAfterStopFilledCorrectionActionsList = new TreeMap<>();
+    private final TreeMap<Long, ArrayList<Map<Order, OrderAction>>> illegalExecutionCorrectionActionsList = new TreeMap<>();
+
 
     private boolean marginCallPositionCloseRequestSent = false;
+    private long marginCallPositionId = -1;
+
 
     private final ArrayList<Map<Order, OrderAction>> waitForRepayToRepeatActionList = new ArrayList<>();
 
-    private long marginCallPositionId = -1;
 
+    private long closeFilledAfterStopFilledOrderId = -1;
+    private final ArrayList<Map<Order, OrderAction>> closeFilledAfterStopFilledCorrectionActionList = new ArrayList<>();
+
+
+    private boolean illegalExecutionCorrectionInProgress = false;
+    private long illegalExecutionCorrectionOrderId = -1;
     private final ArrayList<Map<Order, OrderAction>> illegalExecutionCorrectionActionStorageList = new ArrayList<>();
 
 
@@ -182,12 +194,16 @@ public class LocalHandler {
     }
 
     public boolean closePosition(Position position) {
-        if (position == null || position.getCloseOrder() != null || position.isClosedBeforeStopLoss() || !position.getGroup().equals(PositionGroup.FILLED)) {
+
+        if (position == null || position.isRepayRequestSent()) {
+            return true;
+        }
+
+        if (position.isClosedBeforeStopLoss() || !position.getGroup().equals(PositionGroup.FILLED) || (position.getCloseOrder() != null && position.getCloseOrder().getRejectionReason() == null)) {
             return true;
         }
 
         Order closeOrder = position.createCloseOrder(transaction);
-        position.setCloseOrder(closeOrder);
 
         scheduler.addEvent(new Event(
                 currentEvent.getDelayedTimestamp(),
@@ -219,21 +235,21 @@ public class LocalHandler {
                 orderRequest.setUserAssets(userAssets);
 
                 //Repay interest and handle the response, we do that by setting total Unpaid interest and everything else to 0
-                if(!repayUSDTRequestSent
-                        && userAssets.getRemainingInterestUSDT().compareTo(BigDecimal.valueOf(10)) >= 0){
+                if (!repayUSDTRequestSent
+                        && userAssets.getRemainingInterestUSDT().compareTo(BigDecimal.valueOf(10)) >= 0) {
                     // Repay 10 USDT
 
                     Order repayOrderUSDT = new Order(
-                        BigDecimal.valueOf(transaction.price()),
-                        OrderSide.BUY,
-                        false,
-                        false,
+                            BigDecimal.valueOf(transaction.price()),
+                            OrderSide.BUY,
+                            false,
+                            false,
                             BigDecimal.ZERO,
-                        OrderType.MARKET,
+                            OrderType.MARKET,
                             BigDecimal.ZERO,
                             BigDecimal.ZERO,
-                        event.getDelayedTimestamp(),
-                        OrderPurpose.REPAY,
+                            event.getDelayedTimestamp(),
+                            OrderPurpose.REPAY,
                             -1
                     );
 
@@ -252,22 +268,22 @@ public class LocalHandler {
                     repayUSDTRequestSent = true;
                 }
 
-                if(!repayBTCRequestSent
+                if (!repayBTCRequestSent
                         && userAssets.getRemainingInterestBTC().multiply(BigDecimal.valueOf(transaction.price())).compareTo(BigDecimal.valueOf(10)) >= 0
-                        && userAssets.getRemainingInterestBTC().compareTo(BigDecimal.valueOf(0.00001)) >= 0){
+                        && userAssets.getRemainingInterestBTC().compareTo(BigDecimal.valueOf(0.00001)) >= 0) {
                     // Repay remaining BTC by first buying them on market, handle repay response on order fill
 
                     Order rebuyOrderBTC = new Order(
-                        BigDecimal.valueOf(transaction.price()),
-                        OrderSide.BUY,
-                        false,
-                        false,
-                        userAssets.getRemainingInterestBTC(),
-                        OrderType.MARKET,
+                            BigDecimal.valueOf(transaction.price()),
+                            OrderSide.BUY,
+                            false,
+                            false,
+                            userAssets.getRemainingInterestBTC(),
+                            OrderType.MARKET,
                             BigDecimal.ZERO,
                             BigDecimal.ZERO,
-                        event.getDelayedTimestamp(),
-                        OrderPurpose.REPAY,
+                            event.getDelayedTimestamp(),
+                            OrderPurpose.REPAY,
                             -1
                     );
 
@@ -295,20 +311,22 @@ public class LocalHandler {
                     Position maximumBorrowPosition = null;
                     double maximumNotionalBorrowValue = 0;
 
-                    for(Position position : activePositions){
-                        if(position.getGroup().equals(PositionGroup.FILLED)) {
+                    for (Position position : activePositions) {
+                        if (position.getGroup().equals(PositionGroup.FILLED)) {
                             if (position.getDirection().equals(OrderSide.BUY) && position.getMarginBuyBorrowAmount().doubleValue() > maximumNotionalBorrowValue) {
                                 maximumNotionalBorrowValue = position.getMarginBuyBorrowAmount().doubleValue();
                                 maximumBorrowPosition = position;
+                                break;
                             } else if (position.getDirection().equals(OrderSide.SELL)
                                     && position.getMarginBuyBorrowAmount().multiply(BigDecimal.valueOf(transaction.price())).doubleValue() > maximumNotionalBorrowValue) {
                                 maximumNotionalBorrowValue = position.getMarginBuyBorrowAmount().multiply(BigDecimal.valueOf(transaction.price())).doubleValue();
                                 maximumBorrowPosition = position;
+                                break;
                             }
                         }
                     }
 
-                    if(maximumBorrowPosition != null){
+                    if (maximumBorrowPosition != null) {
                         closePosition(maximumBorrowPosition);
                         marginCallPositionCloseRequestSent = true;
                         marginCallPositionId = maximumBorrowPosition.getId();
@@ -325,12 +343,14 @@ public class LocalHandler {
                                 case INSUFFICIENT_FUNDS, INSUFFICIENT_MARGIN -> {
 
                                     //Insufficient funds? Discard the position.
-                                    if(!order.getPurpose().equals(OrderPurpose.ENTRY)){
+                                    if (!order.getPurpose().equals(OrderPurpose.ENTRY)) {
                                         //System.out.println(currentEvent.getId() + "Local Error - insufficient funds | margin action rejection but it's not an entry order - pls fix");
                                     }
 
-                                    boolean issue = true;
-                                    for (Position position : activePositions) {
+                                    boolean isInActivePositions = false;
+                                    boolean isInInactivePositions = false;
+
+                                    loop: for (Position position : activePositions) {
                                         switch (position.getGroup()) {
                                             case PENDING, NEW, FILLED -> {
                                                 if (position.getEntryOrder().getId() == order.getId()) {
@@ -345,22 +365,42 @@ public class LocalHandler {
                                                         ));
                                                     }
 
-                                                    issue = false;
+                                                    isInActivePositions = true;
                                                 } else if (position.getStopOrder().getId() == order.getId()) { // Might focus on this as it's handling stoplosses
                                                     position.setStopOrder(order.clone());
-                                                    issue = false;
+
+                                                    isInActivePositions = true;
                                                 } else if (position.getCloseOrder() != null && position.getCloseOrder().getId() == order.getId()) {
 
                                                     delayedRepayOrderRejectionReasonMethod(order, position);
 
                                                     position.setCloseOrder(order.clone());
-                                                    issue = false;
+                                                    isInActivePositions = true;
+                                                }
+
+                                                if(isInActivePositions){
+                                                    break loop;
                                                 }
                                             }
                                         }
                                     }
-                                    if (issue) {
-                                        System.out.println(currentEvent.getId() + "Local Error - it's not even in active positions.");
+
+                                    if (!isInActivePositions) {
+                                        for (Position position : inactivePositions) {
+                                            if (position.getStopOrder().getId() == order.getId()) {
+                                                isInInactivePositions = true;
+                                                if (position.getCloseOrder() != null && position.getCloseOrder().getStatus().equals(OrderStatus.FILLED)) {
+                                                    position.setStopOrder(order.clone());
+                                                } else {
+                                                    System.out.println("Local Error - stop order rejected, position is in inactive positions, close order is sent but not filled.");
+                                                }
+                                                break;
+                                            }
+                                        }
+                                    }
+
+                                    if (!isInActivePositions && !isInInactivePositions) {
+                                        System.out.println("Local Error - rejected order (not action) is not in active nor inactive orders.");
                                     }
                                 }
                                 case EXCESS_BORROW, INVALID_ORDER_STATE, WOULD_TRIGGER_IMMEDIATELY, MAX_NUM_ALGO_ORDERS -> {
@@ -370,16 +410,20 @@ public class LocalHandler {
                         } // DONE
 
                         case FILLED -> { // DONE
-
-                            if(order.getId() == 26896){
-                                boolean point = true;
-                            }
-
                             ArrayList<Position> tempPositions = new ArrayList<>();
-                            for (Position position : activePositions) {
+                            boolean isInActivePositions = false;
+                            loop: for (Position position : activePositions) {
                                 switch (position.getGroup()) {
                                     case PENDING, NEW, FILLED -> {
                                         if (position.getEntryOrder().getId() == order.getId()) {
+
+                                            isInActivePositions = true;
+
+//                                            if(position.getDirection().equals(OrderSide.BUY) && order.getFillPrice().doubleValue() <= position.getStopOrder().getOpenPrice().doubleValue()){
+//                                                System.out.println("fucked on BUY. Difference " + (order.getFillPrice().doubleValue() - position.getStopOrder().getOpenPrice().doubleValue()));
+//                                            } else if(position.getDirection().equals(OrderSide.SELL) && order.getFillPrice().doubleValue() >= position.getStopOrder().getOpenPrice().doubleValue()){
+//                                                System.out.println("fucked on SELL. Difference " + (order.getFillPrice().doubleValue() - position.getStopOrder().getOpenPrice().doubleValue()));
+//                                            }
 
                                             if (position.getGroup().equals(PositionGroup.FILLED)) {
                                                 System.out.println(currentEvent.getId() + "Local Error - double filled the position entry order.");
@@ -395,10 +439,18 @@ public class LocalHandler {
                                                 illegalExecutionRoutine(order, position);
                                             }
 
+                                            break loop;
 
                                         } else if (position.getStopOrder().getId() == order.getId()) {
 
+                                            isInActivePositions = true;
+
                                             position.setStopOrder(order.clone());
+
+                                            //FIXME: ABCD
+                                            if (position.getEntryOrder().getStatus().equals(OrderStatus.REJECTED)) {
+                                                break;
+                                            }
 
                                             if (position.getEntryOrder().getStatus().equals(OrderStatus.NEW)) {
                                                 //TODO: Stoplossed before entry trigger - shouldn't be possible since funds weren't borrowed. This fucked our asset management.
@@ -406,7 +458,7 @@ public class LocalHandler {
                                             }
 
                                             //If we borrowed for the position, but the stop order isn't a market compensation for immediate trigger (
-                                            if (position.getMarginBuyBorrowAmount().compareTo(BigDecimal.ZERO) != 0) {
+                                            if (position.getMarginBuyBorrowAmount().doubleValue() > 0e-7) {
 
                                                 position.getEntryOrder().setTotalUnpaidInterest(BigDecimal.ZERO); // Null the unpaid interest we do that elsewhere
 
@@ -423,7 +475,8 @@ public class LocalHandler {
 
                                                 if (position.getGroup().equals(PositionGroup.FILLED)) {
                                                     position.setGroup(PositionGroup.CLOSED);
-                                                    if(position.getId() == marginCallPositionId){
+                                                    checkFuckedness(position);
+                                                    if (position.getId() == marginCallPositionId) {
                                                         marginCallPositionCloseRequestSent = false;
                                                     }
                                                 } else {
@@ -433,11 +486,41 @@ public class LocalHandler {
                                                 tempPositions.add(position);
                                             }
 
+                                            break loop;
+
                                         } else if (position.getCloseOrder() != null && position.getCloseOrder().getId() == order.getId()) {
+
+                                            isInActivePositions = true;
+
+                                            if (order.getId() == 22165) {
+                                                boolean point = true;
+                                            }
 
                                             position.setCloseOrder(order.clone());
 
-                                            if (position.getMarginBuyBorrowAmount().compareTo(BigDecimal.ZERO) != 0) { //If position has borrowed
+                                            if (position.getStopOrder().getStatus().equals(OrderStatus.FILLED)) {
+                                                System.out.println("closeFilledAfterStopFilled Problem begun.");
+
+                                                order.setStatus(OrderStatus.NEW);
+                                                order.setDirection(order.getDirection().equals(OrderSide.BUY) ? OrderSide.SELL : OrderSide.BUY);
+                                                order.setMarginBuyBorrowAmount(BigDecimal.ZERO);
+                                                order.setFillTimestamp(0);
+                                                order.setRejectionReason(null);
+                                                order.setOpenPrice(BigDecimal.valueOf(transaction.price()));
+                                                order.setOpenTimestamp(transaction.timestamp());
+
+                                                scheduler.addEvent(new Event(
+                                                        currentEvent.getDelayedTimestamp(),
+                                                        EventDestination.EXCHANGE,
+                                                        OrderAction.CREATE_ORDER,
+                                                        order.clone()
+                                                ));
+
+                                                //This is a new key which must be added to the respective map for delayed orders to be stored in.
+                                                addToDelayedActionMap(closeFilledAfterStopFilledCorrectionActionsList, order.getId(), null, null);
+                                            }
+
+                                            if (position.getMarginBuyBorrowAmount().doubleValue() > 0e-7) { //If position has borrowed
 
                                                 position.getEntryOrder().setTotalUnpaidInterest(BigDecimal.ZERO);
 
@@ -451,18 +534,19 @@ public class LocalHandler {
 
                                             } else {
 
-                                                illegalExecutionRoutine(order, position); // check here for that fucking position 28
-
                                                 position.closePosition(currentEvent.getDelayedTimestamp());
 
                                                 if (position.getGroup().equals(PositionGroup.FILLED)) {
                                                     position.setGroup(PositionGroup.CLOSED);
-                                                    if(position.getId() == marginCallPositionId){
+                                                    checkFuckedness(position);
+                                                    if (position.getId() == marginCallPositionId) {
                                                         marginCallPositionCloseRequestSent = false;
                                                     }
                                                 } else {
                                                     position.setGroup(PositionGroup.DISCARDED);
                                                 }
+
+                                                tempPositions.add(position); //Add to inactive positions
                                             }
 
                                             if (position.getStopOrder().getStatus().equals(OrderStatus.NEW)) { //If stoploss is still active cancel it
@@ -472,15 +556,17 @@ public class LocalHandler {
                                                         OrderAction.CANCEL_ORDER,
                                                         position.getStopOrder().clone()
                                                 ));
-                                            } else {
-                                                tempPositions.add(position); //Add to inactive positions
                                             }
+
+                                            illegalExecutionRoutine(order, position);
+
+                                            break loop;
                                         }
                                     }
                                 }
                             }
 
-                            if(order.getId() == BTCInterestRepayOrderId){ // If it's done for repaying purposes
+                            if (order.getId() == BTCInterestRepayOrderId) { // If it's done for repaying purposes
                                 order.setAppropriateUnitPositionValue(BigDecimal.ZERO); // Don't know if this is required
                                 order.setDirection(OrderSide.SELL); // We repay BTC
 
@@ -492,11 +578,11 @@ public class LocalHandler {
                                         OrderAction.REPAY_FUNDS,
                                         order.clone()
                                 ));
-                            } else if(order.getId() == buyBackOrderId){
+                            } else if (order.getId() == buyBackOrderId) {
                                 //Reattempt repay
 
-                                for(Position position : activePositions){
-                                    if(position.getEntryOrder().getId() == reattemptRepayOrderId){
+                                for (Position position : activePositions) {
+                                    if (position.getEntryOrder().getId() == reattemptRepayOrderId) {
 
                                         order.setMarginBuyBorrowAmount(BigDecimal.ZERO);
 
@@ -512,9 +598,85 @@ public class LocalHandler {
                                         break;
                                     }
                                 }
+                            } else if(!isInActivePositions){
+                                for(Position position : inactivePositions){
+                                    if(position.getCloseOrder() != null && position.getCloseOrder().getId() == order.getId()){
+
+                                        position.setCloseOrder(order.clone());
+
+                                        if(position.isBuyBackExecuted()){
+                                            break;
+                                        }
+
+                                        if(position.getStopOrder().getStatus().equals(OrderStatus.FILLED)){
+                                            //Meaning, the close order filled in the same transaction as stop order and we had enough funds to fill it
+
+                                            //TODO Recouperate close order funds
+                                            Order buyBackOrder = order.clone();
+                                            buyBackOrder.setType(OrderType.MARKET);
+                                            buyBackOrder.setStatus(OrderStatus.NEW);
+                                            buyBackOrder.setDirection(order.getDirection().equals(OrderSide.BUY) ? OrderSide.SELL : OrderSide.BUY);
+                                            buyBackOrder.setOpenPrice(BigDecimal.valueOf(transaction.price()));
+
+                                            scheduler.addEvent(new Event(
+                                                    currentEvent.getDelayedTimestamp(),
+                                                    EventDestination.EXCHANGE,
+                                                    OrderAction.CREATE_ORDER,
+                                                    buyBackOrder
+                                            ));
+                                        }
+
+                                        illegalExecutionRoutine(order, position);
+
+                                        if(!position.getGroup().equals(PositionGroup.CLOSED)){
+                                            position.setGroup(PositionGroup.CLOSED);
+                                        }
+
+                                        position.setBuyBackExecuted(true);
+
+                                    } else if(position.getStopOrder().getId() == order.getId()){
+
+                                        position.setStopOrder(order.clone());
+
+                                        if(position.isBuyBackExecuted()){
+                                            break;
+                                        }
+
+                                        if(position.getCloseOrder() != null && position.getCloseOrder().getStatus().equals(OrderStatus.FILLED)){
+
+                                            position.setStopOrder(order.clone());
+
+                                            //Meaning, the stop order filled in the same transaction as close order and we had enough funds to fill it
+
+                                            //TODO Recouperate stop order funds
+                                            Order buyBackOrder = order.clone();
+                                            buyBackOrder.setType(OrderType.MARKET);
+                                            buyBackOrder.setStatus(OrderStatus.NEW);
+                                            buyBackOrder.setDirection(order.getDirection().equals(OrderSide.BUY) ? OrderSide.SELL : OrderSide.BUY);
+                                            buyBackOrder.setOpenPrice(BigDecimal.valueOf(transaction.price()));
+
+                                            scheduler.addEvent(new Event(
+                                                    currentEvent.getDelayedTimestamp(),
+                                                    EventDestination.EXCHANGE,
+                                                    OrderAction.CREATE_ORDER,
+                                                    buyBackOrder
+                                            ));
+                                        }
+
+                                        if(!position.getGroup().equals(PositionGroup.CLOSED)){
+                                            position.setGroup(PositionGroup.CLOSED);
+                                        }
+
+                                        position.setBuyBackExecuted(true);
+                                    }
+                                }
                             }
 
-                            inactivePositions.addAll(tempPositions);
+                            executeDelayedActionsFromMap(closeFilledAfterStopFilledCorrectionActionsList, order.getId());
+
+                            for (Position p : tempPositions) {
+                                inactivePositions.addFirst(p);
+                            }
                             activePositions.removeAll(tempPositions);
                         } // DONE
                     }
@@ -530,7 +692,7 @@ public class LocalHandler {
                     case ORDER_REJECTED -> {
                         switch (order.getRejectionReason()) {
                             case WOULD_TRIGGER_IMMEDIATELY -> {
-                                for (Position position : activePositions) {
+                                loop: for (Position position : activePositions) {
                                     switch (position.getGroup()) {
                                         case PENDING, NEW -> {
                                             if (position.getEntryOrder().getId() == order.getId()) {
@@ -546,6 +708,8 @@ public class LocalHandler {
                                                     //Discard
                                                     position.setGroup(PositionGroup.DISCARDED);
                                                 }
+
+                                                break loop;
 
                                             } else if (position.getStopOrder().getId() == order.getId()) {
 
@@ -567,6 +731,8 @@ public class LocalHandler {
                                                         order.clone()));
 
                                                 position.setClosedBeforeStopLoss(true);
+
+                                                break loop;
                                             }
                                         }
                                         case FILLED -> {
@@ -574,6 +740,8 @@ public class LocalHandler {
 
                                                 System.out.println(currentEvent.getId() + "Local Error - rejected already filled position entry order?");
                                                 position.setEntryOrder(order.clone());
+
+                                                break loop;
 
                                             } else if (position.getStopOrder().getId() == order.getId()) {
 
@@ -591,9 +759,14 @@ public class LocalHandler {
                                                         order.clone()));
 
                                                 position.setClosedBeforeStopLoss(true);
+
+                                                break loop;
+
                                             } else if (position.getCloseOrder() != null && position.getCloseOrder().getId() == order.getId()) {
                                                 //For programmatic take profits, not usable for now
                                                 position.setCloseOrder(order.clone());
+
+                                                break loop;
                                             }
                                         }
                                     }
@@ -601,32 +774,169 @@ public class LocalHandler {
                             }
                             case INSUFFICIENT_FUNDS, INSUFFICIENT_MARGIN -> {
                                 //Insufficient funds? Discard the position.
-                                if(!order.getPurpose().equals(OrderPurpose.ENTRY)){
+                                if (!order.getPurpose().equals(OrderPurpose.ENTRY)) {
                                     //System.out.println(currentEvent.getId() + "Local Error - insufficient funds | margin action rejection but it's not an entry order - pls fix");
                                 }
 
-                                for(Position position : activePositions){
-                                    if(position.getEntryOrder().getId() == order.getId()){
-                                        if(position.isStopLossRequestSent()){
-                                            scheduler.addEvent(new Event(
-                                                    currentEvent.getDelayedTimestamp(),
-                                                    EventDestination.EXCHANGE,
-                                                    OrderAction.CANCEL_ORDER,
-                                                    position.getStopOrder().clone()
-                                            ));
+                                boolean isInActivePositions = false;
+                                boolean isInInactivePositions = false;
+
+                                ArrayList<Position> tempPositions = new ArrayList<>();
+
+                                loop: for (Position position : activePositions) {
+                                    if (position.getEntryOrder().getId() == order.getId()) {
+                                        isInActivePositions = true;
+
+                                        if (position.isStopLossRequestSent()) {
+                                            if (!position.getStopOrder().getStatus().equals(OrderStatus.FILLED)) {
+
+                                                // What if it fills in the meantime? Illegal order state? Do we have to handle that separately (will it remove the position automatically?)
+                                                // Yes illegal order state must be handler appropriately and it seems to be.
+
+                                                scheduler.addEvent(new Event(
+                                                        currentEvent.getDelayedTimestamp(),
+                                                        EventDestination.EXCHANGE,
+                                                        OrderAction.CANCEL_ORDER,
+                                                        position.getStopOrder().clone()
+                                                ));
+
+                                                // When order cancelled response comes it must discard the position (already done since rejectionReason != null)? True.
+
+                                            } else {
+                                                //It's filled which is an issue because it didn't borrow funds.
+                                                System.out.println("Local Error - ENTRY order rejected due to insufficient funds | margin but stoploss is filled.");
+                                            }
+
+                                            position.setEntryOrder(order.clone());
+                                        } else {
+                                            // Just discard the position.
+                                            position.setGroup(PositionGroup.DISCARDED);
+                                            tempPositions.add(position);
                                         }
-                                    } else if(position.getCloseOrder() != null && position.getCloseOrder().getId() == order.getId()){
-                                        if(!position.getStopOrder().getStatus().equals(OrderStatus.FILLED)){
-                                            delayedRepayOrderRejectionReasonMethod(order, position);
+
+                                        break;
+
+                                    } else if (position.getStopOrder().getId() == order.getId()) {
+                                        isInActivePositions = true;
+                                        System.out.println("Local Error - STOP order rejected due to insufficient funds | margin");
+                                        position.setStopOrder(order.clone());
+
+                                        break;
+                                    } else if (position.getCloseOrder() != null && position.getCloseOrder().getId() == order.getId()) {
+                                        isInActivePositions = true;
+
+                                        position.setCloseOrder(order.clone());
+
+                                        if (!position.getStopOrder().getStatus().equals(OrderStatus.FILLED)) {
+
+                                            if(!waitForRepayToRepeatActionsList.isEmpty()){
+                                                delayedRepayOrderRejectionReasonMethod(order, position);
+                                            }
+
+
+                                            if (!closeFilledAfterStopFilledCorrectionActionsList.isEmpty()) { //Another position executed a close after stop, blocking this one from executing.
+                                                //TODOOO
+
+                                                addToDelayedActionMap(closeFilledAfterStopFilledCorrectionActionsList, null, order, OrderAction.CREATE_ORDER);
+                                            } else if(!order.isCloseReattempted()) {
+                                                order.setCloseReattempted(true);
+                                                order.setStatus(OrderStatus.NEW);
+                                                scheduler.addEvent(new Event(
+                                                        currentEvent.getDelayedTimestamp(),
+                                                        EventDestination.EXCHANGE,
+                                                        OrderAction.CREATE_ORDER,
+                                                        order.clone()
+                                                ));
+                                            } else {
+                                                System.out.println("Local Error - can't close order twice.");
+                                            }
+                                        }
+
+                                        break;
+                                    }
+                                }
+
+                                if (!isInActivePositions) {
+                                    for (Position position : inactivePositions) {
+                                        if (position.getCloseOrder() != null && position.getCloseOrder().getId() == order.getId()) {
+                                            isInInactivePositions = true;
+                                            if (position.getStopOrder().getStatus().equals(OrderStatus.FILLED)) {
+                                                position.setCloseOrder(null);
+                                            } else {
+                                                System.out.println("Rejected close order from a position which stoploss is NOT filled found in inactive positions - bug.");
+                                            }
+
+                                            break;
+                                        } else if (position.getStopOrder().getId() == order.getId()) {
+                                            isInInactivePositions = true;
+                                            System.out.println("Rejected stop order from inactive position???");
+
+                                            position.setStopOrder(order.clone());
+
+                                            break;
+                                        } else if (position.getEntryOrder().getId() == order.getId()) {
+                                            isInInactivePositions = true;
+                                            System.out.println("Rejected entry order from inactive position???");
+
+                                            position.setEntryOrder(order.clone());
+
+                                            break;
                                         }
                                     }
                                 }
+
+                                if (!isInActivePositions && !isInInactivePositions) {
+                                    System.out.println("Local Error - order rejected due to insufficient funds | margin, but not in any active OR INACTIVE positions.");
+                                }
+
+                                if (!tempPositions.isEmpty()) {
+                                    for (Position p : tempPositions) {
+                                        inactivePositions.addFirst(p);
+                                    }
+                                    activePositions.removeAll(tempPositions);
+                                    tempPositions.clear();
+                                }
                             }
-                            case EXCESS_BORROW ->
-                                    System.out.println(currentEvent.getId() + "Local Error - excess borrow action rejection - should have been tested during order creation.");
+                            case EXCESS_BORROW -> {
+                                //System.out.println(currentEvent.getId() + "Local Error - excess borrow action rejection - should have been tested during order creation.");
+
+                                ArrayList<Position> tempPositions = new ArrayList<>();
+
+                                for (Position position : activePositions) {
+                                    if (position.getEntryOrder().getId() == order.getId()) {
+                                        if (position.isStopLossRequestSent()) {
+                                            if (position.getStopOrder().getStatus().equals(OrderStatus.FILLED)) {
+                                                System.out.println("Local Error - excess borrow order rejected but it's stoploss is triggered.");
+                                            } else {
+                                                scheduler.addEvent(new Event(
+                                                        currentEvent.getDelayedTimestamp(),
+                                                        EventDestination.EXCHANGE,
+                                                        OrderAction.CANCEL_ORDER,
+                                                        position.getStopOrder().clone()
+                                                ));
+                                            }
+                                        } else {
+                                            // Discard the position
+                                            position.setGroup(PositionGroup.DISCARDED);
+                                            tempPositions.add(position);
+                                        }
+
+                                        break;
+                                    }
+                                }
+
+                                if (!tempPositions.isEmpty()) {
+                                    for (Position p : tempPositions) {
+                                        inactivePositions.addFirst(p);
+                                    }
+                                    activePositions.removeAll(tempPositions);
+                                    tempPositions.clear();
+                                }
+                            }
                             case MAX_NUM_ALGO_ORDERS ->
                                     System.out.println(currentEvent.getId() + "Local Error - maximum number of algo orders action rejection - should have been tested during order creation.");
-                            case INVALID_ORDER_STATE -> System.out.println(currentEvent.getId() + "Local Error - invalid order state action rejection");
+                            case INVALID_ORDER_STATE ->
+                                    System.out.println(currentEvent.getId() + "Local Error - invalid order state action rejection");
                         }
                     } // "Done"
                     case ACTION_REJECTED -> { // Cancel order or repay funds - invalid order state (non-existent order), or general repay rejection reasons
@@ -635,10 +945,30 @@ public class LocalHandler {
 
                                 // Insufficient funds to repay a loan means we took the borrowed funds and executed a trade with them.
                                 // Yes I can create a map of last order actions, or I can hope this is the only case I'll need it for.
-                                if(illegalExecutionCorrectionInProgress){
-                                    illegalExecutionCorrectionActionStorageList.add(new SingletonMap<>(order, OrderAction.REPAY_FUNDS));
-                                } else {
-                                    System.out.println("Local Error - action rejected due to insufficient funds but there is no illegal execution.");
+
+                                for (Position position : activePositions) {
+                                    if (position.getEntryOrder().getId() == order.getId()) {
+                                        if (position.isRepayRequestSent() && !position.isRepaid()) {
+                                            if (!illegalExecutionCorrectionActionsList.isEmpty()) {
+                                                addToDelayedActionMap(illegalExecutionCorrectionActionsList, null, order, OrderAction.REPAY_FUNDS);
+
+                                            } else if (!order.isRepayReattempted()) {
+
+                                                order.setRepayReattempted(true);
+
+                                                scheduler.addEvent(new Event(
+                                                        currentEvent.getDelayedTimestamp(),
+                                                        EventDestination.EXCHANGE,
+                                                        OrderAction.REPAY_FUNDS,
+                                                        order.clone()
+                                                ));
+                                            } else {
+                                                System.out.println("Local Error - action rejected due to insufficient funds but there is no illegal execution and repay is reattempted.");
+                                            }
+
+                                            break;
+                                        }
+                                    }
                                 }
                             }
 
@@ -649,30 +979,86 @@ public class LocalHandler {
                                 //FIXME: BUT WE'RE GETTING A LOT OF IT WHAT THE FUCK (not anymore but don't know if this works.)
                                 //Todo: Don't know if this is necessary.
 
+                                ArrayList<Position> tempPositions = new ArrayList<>();
+
+                                boolean isInActivePositions = false;
+                                boolean isInInactivePositions = false;
+
                                 for (Position position : activePositions) {
                                     if (position.getStopOrder().getId() == order.getId()) {
+                                        isInActivePositions = true;
 
-                                        Order closeOrder = order.clone();
+                                        Order stopOrder = order.clone();
 
-                                        closeOrder.setDirection(order.getDirection().equals(OrderSide.BUY) ? OrderSide.SELL : OrderSide.BUY);
-                                        closeOrder.setType(OrderType.MARKET);
+                                        if (!position.getStopOrder().getStatus().equals(OrderStatus.REJECTED)) {
+                                            stopOrder.setDirection(order.getDirection().equals(OrderSide.BUY) ? OrderSide.SELL : OrderSide.BUY);
+                                            stopOrder.setType(OrderType.MARKET);
 
-                                        scheduler.addEvent(new Event(
-                                                currentEvent.getDelayedTimestamp(),
-                                                EventDestination.EXCHANGE,
-                                                OrderAction.CREATE_ORDER,
-                                                closeOrder.clone()
-                                        ));
+                                            scheduler.addEvent(new Event(
+                                                    currentEvent.getDelayedTimestamp(),
+                                                    EventDestination.EXCHANGE,
+                                                    OrderAction.CREATE_ORDER,
+                                                    stopOrder.clone()
+                                            ));
 
-                                        position.setStopOrder(closeOrder);
+                                            position.setStopOrder(stopOrder.clone());
+                                        } else if (position.getCloseOrder() != null && position.getCloseOrder().getStatus().equals(OrderStatus.FILLED)) {
+                                            position.setGroup(PositionGroup.CANCELLED);
+                                            tempPositions.add(position);
+                                        }
+
+                                        break;
                                     }
                                 }
+
+                                if (!isInActivePositions) {
+                                    for (int i = inactivePositions.size() - 1; i >= 0; i--) {
+                                        Position position = inactivePositions.get(i);
+
+                                        if (position.getStopOrder().getId() == order.getId()) {
+                                            isInInactivePositions = true;
+
+                                            Order stopOrder = order.clone();
+
+                                            if (!position.getStopOrder().getStatus().equals(OrderStatus.REJECTED)) {
+                                                stopOrder.setDirection(order.getDirection().equals(OrderSide.BUY) ? OrderSide.SELL : OrderSide.BUY);
+                                                stopOrder.setType(OrderType.MARKET);
+
+                                                scheduler.addEvent(new Event(
+                                                        currentEvent.getDelayedTimestamp(),
+                                                        EventDestination.EXCHANGE,
+                                                        OrderAction.CREATE_ORDER,
+                                                        stopOrder.clone()
+                                                ));
+
+                                                position.setStopOrder(stopOrder.clone());
+                                            } else if (position.getCloseOrder() != null && position.getCloseOrder().getStatus().equals(OrderStatus.FILLED)) {
+                                                position.setGroup(PositionGroup.CANCELLED);
+                                                tempPositions.add(position);
+                                            }
+
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if (!isInActivePositions && !isInInactivePositions) {
+                                    System.out.println("???????????????????????????");
+                                }
+
+                                if (!tempPositions.isEmpty()) {
+                                    for (Position p : tempPositions) {
+                                        inactivePositions.addFirst(p);
+                                    }
+                                    activePositions.removeAll(tempPositions);
+                                }
+
                             }
                         }
                     } // DONE
                     case FUNDS_REPAID -> {
                         ArrayList<Position> tempPositions = new ArrayList<>();
-                        for (Position position : activePositions) {
+                        loop: for (Position position : activePositions) {
                             switch (position.getGroup()) {
                                 case NEW, FILLED -> {
                                     if (position.getEntryOrder().getId() == order.getId()) {
@@ -688,7 +1074,8 @@ public class LocalHandler {
 
                                         if (position.getGroup().equals(PositionGroup.FILLED)) {
                                             position.setGroup(PositionGroup.CLOSED);
-                                            if(position.getId() == marginCallPositionId){
+                                            checkFuckedness(position);
+                                            if (position.getId() == marginCallPositionId) {
                                                 marginCallPositionCloseRequestSent = false;
                                             }
                                         } else {
@@ -697,22 +1084,29 @@ public class LocalHandler {
 
                                         position.setRepaid(true);
 
-                                        executeDelayedActionsFromList(waitForRepayToRepeatActionList);
+                                        executeDelayedActionsFromMap(waitForRepayToRepeatActionsList, order.getId());
 
                                         tempPositions.add(position);
+
+                                        break loop;
                                     }
                                 }
                             }
                         }
 
-                        if(order.getId() == BTCInterestRepayOrderId){ // If it's done for repaying purposes
+                        if (order.getId() == BTCInterestRepayOrderId) { // If it's done for repaying purposes
                             repayBTCRequestSent = false;
-                        } else if (order.getId() == USDTInterestRepayOrderId){
+                            BTCInterestRepayOrderId = -1;
+                        } else if (order.getId() == USDTInterestRepayOrderId) {
                             repayUSDTRequestSent = false;
+                            USDTInterestRepayOrderId = -1;
                         }
 
-                        inactivePositions.addAll(tempPositions);
+                        for (Position p : tempPositions) {
+                            inactivePositions.addFirst(p);
+                        }
                         activePositions.removeAll(tempPositions);
+
                     } // DONE
                     case ORDER_CANCELLED -> { //DONE?
 
@@ -721,19 +1115,22 @@ public class LocalHandler {
                         }
 
                         ArrayList<Position> tempPositions = new ArrayList<>();
-                        for (Position position : activePositions) {
+
+                        boolean isInActivePositions = false;
+                        boolean isInInactivePositions = false;
+
+                        loop: for (Position position : activePositions) {
                             switch (position.getGroup()) {
                                 case PENDING, NEW -> {
                                     if (position.getEntryOrder().getId() == order.getId()) {
+                                        isInActivePositions = true;
 
                                         //Repay funds if stop order is cancelled - IF it's not automatic repay at cancel.
                                         //FIXME: Currently only supporting auto repay on cancel. What happens if we don't borrow here? We have that check in binance therefore position will only be cancelled
                                         if (position.getStopOrder().getStatus().equals(OrderStatus.CANCELED)) {
                                             position.setGroup(PositionGroup.CANCELLED);
                                             tempPositions.add(position);
-
-                                            illegalExecutionRoutine(order, position); // In case of canceling
-                                        } else {
+                                        } else if (position.getStopOrder().getType().equals(OrderType.LIMIT)) {
                                             //Send request for stoploss order cancellation? Or will that be done manually for now let's do it automatic.
                                             scheduler.addEvent(new Event(
                                                     currentEvent.getDelayedTimestamp(),
@@ -742,49 +1139,82 @@ public class LocalHandler {
                                                     position.getStopOrder().clone()));
                                         }
 
+                                        illegalExecutionRoutine(order, position);
+
                                         position.setEntryOrder(order.clone());
 
+                                        break loop;
+
                                     } else if (position.getStopOrder().getId() == order.getId()) {
+                                        isInActivePositions = true;
 
                                         //Repay funds if entry order is cancelled - IF it's not automatic repay at cancel
                                         if (position.getEntryOrder().getStatus().equals(OrderStatus.CANCELED)) {
                                             position.setGroup(PositionGroup.CANCELLED);
                                             tempPositions.add(position);
 
-                                            illegalExecutionRoutine(order, position); // In case of canceling
+                                            //illegalExecutionRoutine(order, position); // In case of canceling
 
-                                        } else if (position.getEntryOrder().getStatus().equals(OrderStatus.NEW) && position.getEntryOrder().getRejectionReason() != null) { //If the entry order got rejected?
+                                        } else if (position.getEntryOrder().getStatus().equals(OrderStatus.REJECTED)) { //If the entry order got rejected?
                                             //Funds weren't borrowed, discard the position
                                             position.setGroup(PositionGroup.DISCARDED);
                                             tempPositions.add(position);
                                         }
 
                                         position.setStopOrder(order.clone());
+
+                                        break loop;
                                     }
                                 }
                                 case FILLED -> {
                                     if (position.getEntryOrder().getId() == order.getId()) {
+                                        isInActivePositions = true;
                                         System.out.println(currentEvent.getId() + "Local Error - cancelling filled position's entry order");
                                         position.setEntryOrder(order.clone());
+
+                                        break loop;
                                     } else if (position.getStopOrder().getId() == order.getId()) {
+                                        isInActivePositions = true;
                                         //Most likely a breakeven / move stoploss request
                                         position.setStopOrder(order.clone());
                                         position.setActiveStopLoss(false); //Temporarily
+
+                                        break loop;
                                     }
                                 }
                                 case CLOSED -> { //Cancelling stoploss order after closing the order
                                     if (position.getStopOrder().getId() == order.getId()) {
+                                        isInActivePositions = true;
                                         position.setStopOrder(order.clone());
                                         tempPositions.add(position);
+
+                                        break loop;
                                     }
                                 }
                             }
                         }
+
+                        if (!isInActivePositions) {
+                            for (Position position : inactivePositions) {
+                                if (position.getStopOrder().getId() == order.getId()) {
+                                    isInInactivePositions = true;
+                                    position.setStopOrder(order.clone());
+                                }
+                            }
+                        }
+
+                        if (!isInActivePositions && !isInInactivePositions) {
+                            System.out.println("Order cancelled but it's not in active nor inactive positions");
+                        }
+
+                        for (Position p : tempPositions) {
+                            inactivePositions.addFirst(p);
+                        }
                         activePositions.removeAll(tempPositions);
-                        inactivePositions.addAll(tempPositions);
+
                     } // DONE?
                     case ORDER_CREATED -> { // DONE
-                        for (Position position : activePositions) {
+                        loop: for (Position position : activePositions) {
                             switch (position.getGroup()) {
                                 case PENDING -> {
                                     if (position.getEntryOrder().getId() == order.getId()) {
@@ -797,30 +1227,43 @@ public class LocalHandler {
 
                                             illegalExecutionRoutine(order, position);
                                         }
+
+                                        break loop;
+
                                     } else if (position.getStopOrder().getId() == order.getId()) {
                                         position.setStopOrder(order.clone());
                                         System.out.println(currentEvent.getId() + "Local Error - created a stop order for a pending position before it became new");
+
+                                        break loop;
                                     }
                                 }
                                 case NEW -> {
                                     if (position.getEntryOrder().getId() == order.getId()) {
                                         position.setEntryOrder(order.clone());
                                         System.out.println(currentEvent.getId() + "Local Error - created a new entry order for a position of status new?");
+
+                                        break loop;
                                     } else if (position.getStopOrder().getId() == order.getId()) {
                                         position.setStopOrder(order.clone());
                                         position.setActiveStopLoss(true);
+
+                                        break loop;
                                     }
                                 }
                                 case FILLED -> {
                                     if (position.getStopOrder().getId() == order.getId()) {
                                         position.setStopOrder(order.clone());
                                         position.setActiveStopLoss(true);
+
+                                        break loop;
                                     } else if (position.getCloseOrder() != null && position.getCloseOrder().getId() == order.getId()) {
                                         // If we made market + stop request and stop wasn't placed before market order fill but didn't get placed because it would trigger immediately,
                                         // We get a would trigger immediately action rejection for a new position. We send a market close request because the order will be filled in the next cycle
                                         // Here we handle the response from the cancel order request when it's created.
                                         position.setCloseOrder(order.clone());
                                         // Handle order filling and repaying in user data stream
+
+                                        break loop;
                                     }
                                 }
                             }
@@ -835,27 +1278,81 @@ public class LocalHandler {
         }
     }
 
+    private void checkFuckedness(Position position) {
+        if (position.getCloseOrder() != null && position.getEntryOrder().getFillPrice() != null && position.getCloseOrder().getFillPrice() != null) {
+            boolean fucked = false;
+
+            if (position.getDirection().equals(OrderSide.BUY)) {
+                if (position.isFilled()) {
+                    if (position.getStopOrder().getOpenPrice().compareTo(position.getEntryOrder().getFillPrice()) >= 0) {
+                        if (position.getProfit().doubleValue() > 0) {
+                            fucked = true;
+                        }
+                    }
+                }
+            } else {
+                if (position.isFilled()) {
+                    if (position.getStopOrder().getOpenPrice().compareTo(position.getEntryOrder().getFillPrice()) <= 0) {
+                        if (position.getProfit().doubleValue() > 0) {
+                            fucked = true;
+                        }
+                    }
+                }
+            }
+
+            if (fucked) {
+                System.out.println("Position " + position.getId() + " is fucked. Resulted in $" + position.getProfit() + ", but should have been -$" + (position.getProfit().doubleValue() / position.getRR()));
+            }
+        }
+    }
+
     private void delayedRepayOrderRejectionReasonMethod(Order order, Position position) {
         boolean remainingUnpaidPositions = false;
 
-        for(Position pos : activePositions){
-            if(!pos.equals(position)){
-                if(!position.isRepaid()){
+        for (Position pos : activePositions) {
+            if (!pos.equals(position)) {
+                if (!position.isRepaid()) {
                     remainingUnpaidPositions = true;
+                    break;
                 }
             }
         }
 
-        if(!remainingUnpaidPositions){
-            System.out.println("Local Error - Position CLOSE order rejected due to insufficient funds but no unpaid positions remain");
+        if (!remainingUnpaidPositions) {
+            if (position.getEntryOrder().getStatus().equals(OrderStatus.FILLED)) {
+                closePosition(position);
+            } else {
+                cancelPosition(position);
+            }
         } else {
-            waitForRepayToRepeatActionList.add(new SingletonMap<>(order, OrderAction.CREATE_ORDER));
+            addToDelayedActionMap(waitForRepayToRepeatActionsList, null, order, OrderAction.CREATE_ORDER);
         }
     }
 
-    private void executeDelayedActionsFromList(ArrayList<Map<Order, OrderAction>> list) {
-        if(!list.isEmpty()){
-            for(Map<Order, OrderAction> orderAction : list){
+    private void addToDelayedActionMap(TreeMap<Long, ArrayList<Map<Order, OrderAction>>> map, Long orderId, Order order, OrderAction action) {
+        if (orderId != null && map.get(orderId) == null) {
+            if (map.lastEntry() != null && map.lastEntry().getValue().isEmpty()) {
+                map.remove(map.lastKey());
+            }
+            map.put(orderId, new ArrayList<>());
+            return;
+        }
+
+        if (map.isEmpty()) {
+            System.out.println("Error - adding action events to a map before identifying the first key");
+            return;
+        }
+
+        ArrayList<Map<Order, OrderAction>> subMap = map.lastEntry().getValue();
+        subMap.add(new SingletonMap<>(order.clone(), action));
+        map.put(map.lastKey(), new ArrayList<>(subMap));
+    }
+
+    private void executeDelayedActionsFromMap(TreeMap<Long, ArrayList<Map<Order, OrderAction>>> map, long orderId) {
+
+        if (map.containsKey(orderId)) {
+            ArrayList<Map<Order, OrderAction>> list = map.get(orderId);
+            for (Map<Order, OrderAction> orderAction : list) {
 
                 Map.Entry<Order, OrderAction> entry = orderAction.entrySet().iterator().next();
 
@@ -868,34 +1365,34 @@ public class LocalHandler {
 
                 System.out.println("Executed delayed action: " + entry.getValue());
             }
-            list.clear();
         }
-    }
 
-    public void insufficientFundOrderCancel(Order order, Position position){
-
+        map.remove(orderId);
     }
 
     /**
      * FIXME: If the first order is a long it
+     *
      * @param order
      * @param position
      */
-    private void illegalExecutionRoutine(Order order, Position position){
-        boolean secondIllegalLackOfExecutionCorrectionInProgress;
+    private void illegalExecutionRoutine(Order order, Position position) {
 
-        if(!illegalExecutionCorrectionInProgress){
-            illegalExecutionCorrectionInProgress = checkIllegalExecution(order, position);
-        } else if(illegalExecutionOrderId == order.getId()) {
-
-            if(checkIllegalExecution(order, position)){
+        if (illegalExecutionCorrectionActionsList.get(order.getId()) == null) {
+            checkIllegalExecution(order, position);
+        } else {
+            if (order.getMarginBuyBorrowAmount().doubleValue() <= 0e-7 && order.isAutomaticBorrow()) {
                 System.out.println("Local Error - illegalLackOfBorrowCorrectionInProgress true while another entry order is filled. 2 potential events collide. Probably the rebuy one.");
             } else {
-                // Position is closed, we can reattempt the request we made unsuccessfully before.
-                illegalExecutionCorrectionInProgress = false;
-
-                executeDelayedActionsFromList(illegalExecutionCorrectionActionStorageList);
+                executeDelayedActionsFromMap(illegalExecutionCorrectionActionsList, order.getId());
             }
+//            if (checkIllegalExecution(order, position)) {
+//                System.out.println("Local Error - illegalLackOfBorrowCorrectionInProgress true while another entry order is filled. 2 potential events collide. Probably the rebuy one.");
+//            } else {
+//                // Position is closed, we can reattempt the request we made unsuccessfully before.
+//
+//                executeDelayedActionsFromMap(illegalExecutionCorrectionActionsList, order.getId());
+//            }
         }
     }
 
@@ -911,13 +1408,14 @@ public class LocalHandler {
      * TODO: If we lack the funds both return funds and keep the new position, we'll discard the position
      * <br>
      * TODO: There might be a better way of handling this but this seems reasonable to keep all things in order.
+     *
      * @param order the order we're testing for
      * @return true if order executed illegally (executed without borrowing), false otherwise.
      */
-    private boolean checkIllegalExecution(Order order, Position position){
+    private boolean checkIllegalExecution(Order order, Position position) {
 
         // If the first order is a long it's okay if it executes without borrowing
-        if(order.getId() == 0){
+        if (order.getId() == 0 || activePositions.size() == 1) {
             return false;
         }
 
@@ -929,16 +1427,32 @@ public class LocalHandler {
         // If we notice the flag on an action response, execute this on next user assets stream
         // This will cancel the...
 
-        if(order.isAutomaticBorrow() && order.getMarginBuyBorrowAmount().compareTo(BigDecimal.ZERO) == 0){
+        if (order.getPositionId() == 8224 || order.getPositionId() == 8225 || order.getPositionId() == 8229) {
+            boolean point = true;
+        }
+
+        if (order.isAutomaticBorrow() && order.getMarginBuyBorrowAmount().doubleValue() <= 0e-7) {
 
             // Just close the position for now
-            if((order.getType().equals(OrderType.MARKET) || order.getStatus().equals(OrderStatus.FILLED)) && closePosition(position)){
-                System.out.println("Local Error - Closing the position returned true meaning we can't close it that's just fucked.");
-            } else if (order.getType().equals(OrderType.LIMIT) && cancelPosition(position)){
-                System.out.println("Local Error - Closing the position returned true meaning we can't close it that's just fucked.");
+            if ((order.getType().equals(OrderType.MARKET) || order.getStatus().equals(OrderStatus.FILLED))) {
+                if (closePosition(position)) {
+                    if (!position.isClosedBeforeStopLoss()) {
+                        System.out.println("Local Error - Closing the position returned true meaning we can't close it that's just fucked.");
+                    } else {
+                        System.out.println("huh...");
+                    }
+                } else {
+                    addToDelayedActionMap(illegalExecutionCorrectionActionsList, position.getCloseOrder().getId(), null, null);
+                }
+            } else if (order.getType().equals(OrderType.LIMIT)) {
+                if (cancelPosition(position)) {
+                    System.out.println("Local Error - Cancelling the position returned true meaning we can't close it that's just fucked.");
+                } else {
+                    addToDelayedActionMap(illegalExecutionCorrectionActionsList, position.getEntryOrder().getId(), null, null);
+                }
             }
 
-            illegalExecutionOrderId = order.getId();
+            return true;
 
 //            BigDecimal doubleOrderSize = order.getSize().multiply(BigDecimal.TWO);
 //            if ((!order.getDirection().equals(OrderSide.BUY) || doubleOrderSize.multiply(transaction.price()).compareTo(userAssets.getFreeUSDT()) > 0)
@@ -973,8 +1487,6 @@ public class LocalHandler {
 //            ));
 
             // After receiving the disassociated order fill response, we must repeat the previously failed action (probably repaying)
-
-            return true;
         }
         return false;
     }
@@ -1019,7 +1531,7 @@ public class LocalHandler {
             for (Position position : activePositions) {
                 Order order = position.getEntryOrder();
 
-                if (order.getMarginBuyBorrowAmount().compareTo(BigDecimal.ZERO) != 0) {
+                if (order.getMarginBuyBorrowAmount().doubleValue() > 0e-7) {
 
                     order.increaseUnpaidInterest();
 //                    if (order.getDirection().equals(OrderSide.SELL)) { // Every time BTC interest increases in a short order we must update the stoploss to buy more bitcoin when triggered
@@ -1065,11 +1577,11 @@ public class LocalHandler {
         return this.userAssets;
     }
 
-    public ArrayList<Position> getInactivePositions(){
+    public LinkedList<Position> getInactivePositions() {
         return this.inactivePositions;
     }
 
-    public ArrayList<Position> getActivePositions(){
+    public ArrayList<Position> getActivePositions() {
         return this.activePositions;
     }
 }

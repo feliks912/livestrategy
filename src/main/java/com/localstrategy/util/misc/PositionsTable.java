@@ -6,18 +6,17 @@ import com.localstrategy.util.types.Position;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedList;
 
 public class PositionsTable extends JFrame {
 
     private JTable positionTable;
     private DefaultTableModel tableModel;
 
-    ArrayList<Position> inactivePositions;
+    LinkedList<Position> inactivePositions;
 
-    public PositionsTable(ArrayList<Position> inactivePositions, boolean visible) {
+    public PositionsTable(LinkedList<Position> inactivePositions, boolean visible) {
 
         this.inactivePositions = inactivePositions;
 
@@ -42,10 +41,31 @@ public class PositionsTable extends JFrame {
             return;
         }
 
-        Collections.sort(inactivePositions, Comparator.comparingLong(Position::getId).reversed());
+        inactivePositions.sort(Comparator.comparingLong(Position::getId).reversed());
 
         for (Position position : inactivePositions) {
             if(position.getFillPrice() != null){
+
+                boolean isFucked = false;
+
+                if(position.getDirection().equals(OrderSide.BUY)){
+                    if(position.isFilled()){
+                        if(position.getStopOrder().getOpenPrice().compareTo(position.getEntryOrder().getFillPrice()) >= 0){
+                            if(position.getProfit().doubleValue() > 0){
+                                isFucked = true;
+                            }
+                        }
+                    }
+                } else {
+                    if(position.isFilled()){
+                        if(position.getStopOrder().getOpenPrice().compareTo(position.getEntryOrder().getFillPrice()) <= 0){
+                            if(position.getProfit().doubleValue() > 0){
+                                isFucked = true;
+                            }
+                        }
+                    }
+                }
+
                 Object[] rowData = {
                         position.getId(),
                         position.getOrderType(),
@@ -55,9 +75,9 @@ public class PositionsTable extends JFrame {
                         String.format("%.5f", position.getSize()),
                         position.getClosingPrice(),
                         position.getDirection().equals(OrderSide.BUY) ? "long" : "short",
-                        position.calculateRR(),
+                        position.getRR(),
                         String.format("%.2f", position.getProfit()),
-                        position.isFilled()
+                        isFucked
                 };
                 tableModel.addRow(rowData);
             }
