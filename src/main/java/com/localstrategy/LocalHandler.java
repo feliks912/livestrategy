@@ -17,7 +17,7 @@ import java.util.TreeMap;
 public class LocalHandler {
 
     private static final int CANDLE_VOLUME = 500_000;
-    private static final double RISK_PCT = 0.1;
+    private static final double RISK_PCT = 0.15;
 
     //In relation to the difference between our entry and stop-loss price difference, how much in percentage of slippage are we ready to accept (total, not the average fill price)
     private static final int SLIPPAGE_PCT = 15;
@@ -94,6 +94,7 @@ public class LocalHandler {
         orderRequest.setUserAssets(userAssets);
 
         //TODO: Print parameters on strategy start
+        System.out.println("Local handler settings: candle volume " + CANDLE_VOLUME + ", risk " + RISK_PCT + "%, slippage pct: " + SLIPPAGE_PCT + "%");
 
         strategy = new Strategy2(this, candles, activePositions, inactivePositions);
     }
@@ -106,8 +107,8 @@ public class LocalHandler {
         strategy.candleUpdate(lastCandle);
     }
 
-    public Position executeMarketOrder(double stopPrice) {
-        Position newMarketPosition = orderRequest.newMarketPosition(transaction, BigDecimal.valueOf(stopPrice));
+    public Position executeMarketOrder(double stopPrice, boolean adjustStop) {
+        Position newMarketPosition = orderRequest.newMarketPosition(transaction, BigDecimal.valueOf(stopPrice), adjustStop);
 
         if (newMarketPosition != null) {
             scheduler.addEvent(new Event(
@@ -121,8 +122,8 @@ public class LocalHandler {
         return newMarketPosition;
     }
 
-    public Position executeLimitOrder(double entryPrice, double stopPrice) {
-        Position newLimitPosition = orderRequest.newLimitPosition(BigDecimal.valueOf(entryPrice), BigDecimal.valueOf(stopPrice), transaction);
+    public Position executeLimitOrder(double entryPrice, double stopPrice, boolean adjustStop) {
+        Position newLimitPosition = orderRequest.newLimitPosition(BigDecimal.valueOf(entryPrice), BigDecimal.valueOf(stopPrice), transaction, adjustStop);
 
         if (newLimitPosition != null) {
             scheduler.addEvent(new Event(
@@ -412,11 +413,14 @@ public class LocalHandler {
                         } // DONE
 
                         case FILLED -> { // DONE
+
+                            executeDelayedActionsFromMap(closeFilledAfterStopFilledCorrectionActionsList, order.getId());
+
                             ArrayList<Position> tempPositions = new ArrayList<>();
                             boolean isInActivePositions = false;
                             loop: for (Position position : activePositions) {
                                 switch (position.getGroup()) {
-                                    case PENDING, NEW, FILLED -> {
+                                    case PENDING, NEW, FILLED, CLOSED -> {
                                         if (position.getEntryOrder().getId() == order.getId()) {
 
                                             isInActivePositions = true;
@@ -518,21 +522,19 @@ public class LocalHandler {
                                                         order.clone()
                                                 ));
 
-                                                //This is a new key which must be added to the respective map for delayed orders to be stored in.
+                                                //This is a new key which must be added to the respective map for delayed action executions
                                                 addToDelayedActionMap(closeFilledAfterStopFilledCorrectionActionsList, order.getId(), null, null);
-                                            }
+                                            } else if (position.getMarginBuyBorrowAmount().doubleValue() > 0e-7) { //If position has borrowed
 
-                                            if (position.getMarginBuyBorrowAmount().doubleValue() > 0e-7) { //If position has borrowed
+                                                    position.getEntryOrder().setTotalUnpaidInterest(BigDecimal.ZERO);
 
-                                                position.getEntryOrder().setTotalUnpaidInterest(BigDecimal.ZERO);
+                                                    scheduler.addEvent(new Event(
+                                                            currentEvent.getDelayedTimestamp(),
+                                                            EventDestination.EXCHANGE,
+                                                            OrderAction.REPAY_FUNDS,
+                                                            position.getEntryOrder().clone()));
 
-                                                scheduler.addEvent(new Event(
-                                                        currentEvent.getDelayedTimestamp(),
-                                                        EventDestination.EXCHANGE,
-                                                        OrderAction.REPAY_FUNDS,
-                                                        position.getEntryOrder().clone()));
-
-                                                position.setRepayRequestSent(true);
+                                                    position.setRepayRequestSent(true);
 
                                             } else {
 
@@ -551,7 +553,7 @@ public class LocalHandler {
                                                 tempPositions.add(position); //Add to inactive positions
                                             }
 
-                                            if (position.getStopOrder().getStatus().equals(OrderStatus.NEW)) { //If stoploss is still active cancel it
+                                            if(position.getStopOrder().getStatus().equals(OrderStatus.NEW)) { //If stoploss is still active cancel it
                                                 scheduler.addEvent(new Event(
                                                         currentEvent.getDelayedTimestamp(),
                                                         EventDestination.EXCHANGE,
@@ -673,8 +675,6 @@ public class LocalHandler {
                                     }
                                 }
                             }
-
-                            executeDelayedActionsFromMap(closeFilledAfterStopFilledCorrectionActionsList, order.getId());
 
                             for (Position p : tempPositions) {
                                 inactivePositions.addFirst(p);
@@ -814,6 +814,10 @@ public class LocalHandler {
                                             // Just discard the position.
                                             position.setGroup(PositionGroup.DISCARDED);
                                             tempPositions.add(position);
+                                        }
+
+                                        if(position.getStopOrder().getStatus().equals(OrderStatus.FILLED) || position.getCloseOrder() != null){
+                                            addToDelayedActionMap(closeFilledAfterStopFilledCorrectionActionsList, null, order, OrderAction.REPAY_FUNDS);
                                         }
 
                                         break;
@@ -1591,4 +1595,6 @@ public class LocalHandler {
     public ArrayList<Position> getActivePositions() {
         return this.activePositions;
     }
+
+
 }

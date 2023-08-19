@@ -14,7 +14,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 public class Strategy2 {
-    private final static boolean DISPLAY_TRADING_GUI = false;
+    private final static boolean DISPLAY_TRADING_GUI = true;
 
 
 
@@ -28,6 +28,9 @@ public class Strategy2 {
 
     int DISTANCE = 300;
 
+    private int ZZDepth = 4;
+    private int ZZBackstep = 2;
+
     public Strategy2(LocalHandler localHandler, ArrayList<Candle> candles, ArrayList<Position> activePositions, LinkedList<Position> inactivePositions){
         this.handler = localHandler;
         this.candles = candles;
@@ -39,13 +42,10 @@ public class Strategy2 {
         }
 
         // Your code
-        System.out.println("Distance: " + DISTANCE);
+        System.out.println("Strategy distance: " + DISTANCE + ", ZZDepth " + ZZDepth + ", ZZBackstep " + ZZBackstep);
     }
 
     Candle lastCandle;
-
-    private double ZZHigh = -1;
-    private double ZZLow = -1;
 
     private double previousZZHigh = -1;
 
@@ -81,13 +81,37 @@ public class Strategy2 {
     private long lastHighIndex;
     private long lastLowIndex;
 
+    private final ZigZag zz = new ZigZag(ZZDepth, 0, ZZBackstep, 0);
+    private final ZigZag zz_SL = new ZigZag(15, 0, 10, 0);
+
     public void priceUpdate(SingleTransaction transaction){
         this.transaction = transaction;
         //TODO: Fix when forming candle would become the new high / low, executing two orders. Also, some long orders don't long?
 
+//        if(!activePositions.isEmpty()){
+//            Position position = activePositions.get(0);
+//            if(position.getGroup().equals(PositionGroup.FILLED)) {
+//                if(position.calculateRR(transaction.price()) > 60){
+//                    handler.closePosition(position);
+//                } else if(position.getCloseOrder() == null) {
+//                    if(zz_SL.getLastLow() != -1 && zz_SL.getLastHigh() != -1) {
+//                        if (position.getDirection().equals(OrderSide.BUY) && transaction.price() >= zz_SL.getLastHigh()) {
+//                            if (position.getStopOrder().getOpenPrice().doubleValue() < zz_SL.getLastLow()) {
+//                                handler.updateStopLoss(zz_SL.getLastLow(), position);
+//                            }
+//                        } else if (position.getDirection().equals(OrderSide.SELL) && transaction.price() <= zz_SL.getLastLow()) {
+//                            if (position.getStopOrder().getOpenPrice().doubleValue() > zz_SL.getLastHigh()) {
+//                                handler.updateStopLoss(zz_SL.getLastHigh(), position);
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//        }
+
         if(longOnEmptyActivePositions && activePositions.isEmpty()){
 
-            Position newMarketPosition = handler.executeMarketOrder(longRangeLowStop);
+            Position newMarketPosition = handler.executeMarketOrder(longRangeLowStop, true);
 
             if(newMarketPosition != null){
                 handler.activateStopLoss(newMarketPosition);
@@ -101,7 +125,7 @@ public class Strategy2 {
             longOnEmptyActivePositions = false;
         } else if (shortOnEmptyActivePositions && activePositions.isEmpty()){
 
-            Position newMarketPosition = handler.executeMarketOrder(shortRangeHighStop);
+            Position newMarketPosition = handler.executeMarketOrder(shortRangeHighStop, true);
 
             if(newMarketPosition != null){
                 handler.activateStopLoss(newMarketPosition);
@@ -117,7 +141,7 @@ public class Strategy2 {
 
         // --- LONG ---
         if(packingForLong){
-            if(transaction.price() >= ZZHigh){
+            if(transaction.price() >= zz.getLastHigh()){
                 for(Position position : activePositions){
                     if(position.getDirection().equals(OrderSide.SELL)){
                         if(position.getGroup().equals(PositionGroup.FILLED)){
@@ -135,7 +159,7 @@ public class Strategy2 {
 
         // --- SHORT ---
         if (packingForShort){
-            if(transaction.price() <= ZZLow){
+            if(transaction.price() <= zz.getLastLow()){
                 for(Position position : activePositions){
                     if(position.getDirection().equals(OrderSide.BUY)){
                         if(position.getGroup().equals(PositionGroup.FILLED)){
@@ -164,7 +188,7 @@ public class Strategy2 {
 
         this.lastCandle = candle;
 
-        if(candles.size() < 2 * ZZDepth + ZZBackstep + 1){
+        if(candles.size() < 2 * Math.max(zz.getDepth(), zz_SL.getDepth()) + Math.max(zz.getBackstep(), zz_SL.getBackstep()) + 1){
             return;
         }
 
@@ -185,9 +209,10 @@ public class Strategy2 {
 
 
 
-        updateZigZagValue(candles);
+        updateZigZagValue(zz, candles);
+        updateZigZagValue(zz_SL, candles);
 
-        if(ZZHigh == -1 || ZZLow == -1){
+        if(zz.getLastHigh() == -1 || zz.getLastLow() == -1 || zz_SL.getLastHigh() == -1 || zz_SL.getLastLow() == -1){
             return;
         }
 
@@ -199,7 +224,7 @@ public class Strategy2 {
             }
             packingForLong = true;
 
-            longRangeHighEntry = Math.min(ZZHigh, candle.high());
+            longRangeHighEntry = Math.min(zz.getLastHigh(), candle.high());
             longRangeLowStop = Math.min(longRangeLowStop, candle.low());
         } else {
             longBreak = true;
@@ -213,7 +238,7 @@ public class Strategy2 {
             }
             packingForShort = true;
 
-            shortRangeLowEntry = Math.max(ZZLow, candle.low());
+            shortRangeLowEntry = Math.max(zz.getLastLow(), candle.low());
             shortRangeHighStop = Math.max(shortRangeHighStop, candle.high());
         } else {
             shortBreak = true;
@@ -225,15 +250,13 @@ public class Strategy2 {
 
     }
 
-    private int ZZDepth = 2;
-    private int ZZBackstep = 0;
+    public void updateZigZagValue(ZigZag indicator, ArrayList<Candle> candles){
 
-    private ZigZag zz = new ZigZag(ZZDepth, 0, ZZBackstep, 0);
-
-    public void updateZigZagValue(ArrayList<Candle> candles){
+        int depth = indicator.getDepth();
+        int backstep = indicator.getBackstep();
 
         List<Candle> candleSublist = candles.subList(
-                candles.size()-1 - 2 * ZZDepth - ZZBackstep,
+                candles.size()-1 - 2 * depth - backstep,
                 candles.size());
 
         double[] highsArray = candleSublist.stream()
@@ -244,20 +267,20 @@ public class Strategy2 {
                 .mapToDouble(Candle::low)
                 .toArray();
 
-        zz.calculate(highsArray.length, highsArray, lowsArray);
+        indicator.calculate(highsArray.length, highsArray, lowsArray);
 
-        double zigZagValue = zz.getZigzagBuffer()[ZZDepth];
+        double zigZagValue = indicator.getZigzagBuffer()[depth];
 
         if(zigZagValue != 0){
 
-            Candle zigZagCandle = candles.get(candles.size()-1 - ZZBackstep - ZZDepth); // OK
+            Candle zigZagCandle = candles.get(candles.size()-1 - backstep - depth); // OK
 
             if(zigZagValue == zigZagCandle.high()){
                 lastHighIndex = zigZagCandle.index();
-                ZZHigh = zigZagValue;
+                indicator.setLastHigh(zigZagValue);
             } else if(zigZagValue == zigZagCandle.low()) {
                 lastLowIndex = zigZagCandle.index();
-                ZZLow = zigZagValue;
+                indicator.setLastLow(zigZagValue);
             }
         }
     }

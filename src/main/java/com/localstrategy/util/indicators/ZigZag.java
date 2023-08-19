@@ -11,6 +11,12 @@ public class ZigZag {
 
   private static final Logger LOGGER = Logger.getLogger(ZigZag.class.getName());
 
+  private double lastHigh = -1;
+  private double lastLow = -1;
+
+  private double previousHigh = -1;
+  private double previousLow = -1;
+
   // auxiliary enumeration
   private static final int PIKE = 1; // searching for next high
   private static final int SILL = -1; // searching for next low
@@ -418,5 +424,45 @@ public class ZigZag {
 
   public void setPoint(double point) {
     this.point = point;
+  }
+
+  public int getDepth(){
+    return this.depth;
+  }
+
+  public int getBackstep(){
+    return this.backstep;
+  }
+
+  public double getLastHigh() {
+    return lastHigh;
+  }
+
+  public void setLastHigh(double lastHigh) {
+    this.lastHigh = lastHigh;
+  }
+
+  public double getLastLow() {
+    return lastLow;
+  }
+
+  public void setLastLow(double lastLow) {
+    this.lastLow = lastLow;
+  }
+
+  public double getPreviousHigh() {
+    return previousHigh;
+  }
+
+  public void setPreviousHigh(double previousHigh) {
+    this.previousHigh = previousHigh;
+  }
+
+  public double getPreviousLow() {
+    return previousLow;
+  }
+
+  public void setPreviousLow(double previousLow) {
+    this.previousLow = previousLow;
   }
 }

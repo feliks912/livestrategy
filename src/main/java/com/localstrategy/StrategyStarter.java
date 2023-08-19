@@ -26,6 +26,8 @@ public class StrategyStarter {
 
     public StrategyStarter(String inputDataFolderPath, String inputLatencyFilePath, String fromDate, String toDate, double initialUSDTPortfolio) {
 
+        System.out.println("Starting " + inputDataFolderPath.split(" ")[1] + " from " + fromDate + " to " + toDate);
+
         this.exchangeHandler = new BinanceHandler(initialUSDTPortfolio, scheduler);
         this.localHandler = new LocalHandler(initialUSDTPortfolio, scheduler);
 
@@ -73,11 +75,11 @@ public class StrategyStarter {
 //                }
 //            }
 //
-//            if (!event.getType().equals(EventType.TRANSACTION)) {
-//                boolean point = true;
-//            } else if(event.getType().equals(EventType.TRANSACTION) && event.getDestination().equals(EventDestination.EXCHANGE)){
-//                boolean point = true;
-//            }
+            if (!event.getType().equals(EventType.TRANSACTION)) {
+                boolean point = true;
+            } else if(event.getType().equals(EventType.TRANSACTION) && event.getDestination().equals(EventDestination.EXCHANGE)){
+                boolean point = true;
+            }
 
             if (event.getDestination().equals(EventDestination.LOCAL)) {
                 localHandler.onEvent(event);

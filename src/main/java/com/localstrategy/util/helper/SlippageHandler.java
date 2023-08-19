@@ -22,13 +22,22 @@ public class SlippageHandler {
         return fillPrice.setScale(2, RoundingMode.HALF_UP);
     }
 
+    public static BigDecimal getUnadjustedFillPrice(BigDecimal price, BigDecimal orderSize, OrderSide orderSide){
+        BigDecimal direction = (orderSide.equals(OrderSide.BUY) ? BigDecimal.ONE : BigDecimal.ONE.negate());
+        BigDecimal fillPrice = price.multiply(BigDecimal.ONE.add(ORDERBOOK_PCT.divide(BigDecimal.valueOf(100))
+                .divide(ORDERBOOK_QTY, RoundingMode.HALF_UP).divide(BigDecimal.valueOf(Math.sqrt(2)))
+                .multiply(orderSize).multiply(direction)));
+
+        return fillPrice.setScale(2, RoundingMode.HALF_UP);
+    }
+
     public static BigDecimal getMaximumOrderSize(BigDecimal price, BigDecimal priceDifference,
                                                  BigDecimal percentage, OrderSide orderSide) {
 
         BigDecimal direction = (orderSide.equals(OrderSide.BUY) ? BigDecimal.ONE : BigDecimal.ONE.negate());
         BigDecimal fillingPrice = price.add(direction.multiply(percentage.divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP)
                 .multiply(priceDifference)));
-        BigDecimal priceRatio = fillingPrice.subtract(price).abs().divide(price, 10, RoundingMode.HALF_UP);
+        BigDecimal priceRatio = fillingPrice.subtract(price).abs().divide(price, 8, RoundingMode.HALF_UP);
 
         BigDecimal maximumOrderSize = priceRatio.multiply(ORDERBOOK_QTY).multiply(BigDecimal.valueOf(Math.sqrt(2)))
                 .divide(ORDERBOOK_PCT.divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP), 10, RoundingMode.HALF_UP);

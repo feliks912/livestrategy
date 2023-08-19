@@ -26,6 +26,8 @@ public class OrderRequest {
     private BigDecimal amountToBorrow;
     private BigDecimal requiredMargin;
 
+    private BigDecimal stopLossPrice;
+
     //TODO: Add stop limit orders
     public OrderRequest(
         ArrayList<Position> activePositions,
@@ -41,11 +43,12 @@ public class OrderRequest {
             this.slippagePct = BigDecimal.valueOf(slippagePct);
     }
 
-    public Position newMarketPosition(SingleTransaction transaction, BigDecimal stopLossPrice){
-        if(calculatePositionParameters(BigDecimal.valueOf(transaction.price()), stopLossPrice, transaction)){
+    public Position newMarketPosition(SingleTransaction transaction, BigDecimal stopLossPrice, boolean compensateStopLoss){
+        this.stopLossPrice = stopLossPrice;
+        if(calculatePositionParameters(BigDecimal.valueOf(transaction.price()), stopLossPrice, transaction, compensateStopLoss)){
             Position position = new Position(
                 BigDecimal.valueOf(transaction.price()),
-                stopLossPrice, 
+                this.stopLossPrice,
                 positionSize, 
                 OrderType.MARKET,
                 requiredMargin, 
@@ -59,11 +62,12 @@ public class OrderRequest {
         return null;
     }
 
-    public Position newLimitPosition(BigDecimal entryPrice, BigDecimal stopLossPrice, SingleTransaction transaction){
-        if(calculatePositionParameters(entryPrice, stopLossPrice, transaction)){
+    public Position newLimitPosition(BigDecimal entryPrice, BigDecimal stopLossPrice, SingleTransaction transaction, boolean compensateStopLoss){
+        this.stopLossPrice = stopLossPrice;
+        if(calculatePositionParameters(entryPrice, stopLossPrice, transaction, compensateStopLoss)){
             Position position = new Position(
                 entryPrice, 
-                stopLossPrice, 
+                this.stopLossPrice,
                 positionSize, 
                 OrderType.LIMIT, 
                 requiredMargin, 
@@ -81,7 +85,7 @@ public class OrderRequest {
     //FIXME: This still calculates amount to borrow even if the position size goes over. It borrows and then takes everything else from our portfolio. BinanceHandler doesn't support that with automatic borrowings
     //TODO: Add return statuses
     //TODO: Add condition when slippage crosses the stop-loss
-    private boolean calculatePositionParameters(BigDecimal entryPrice, BigDecimal stopLossPrice, SingleTransaction transaction){
+    private boolean calculatePositionParameters(BigDecimal entryPrice, BigDecimal stopLossPrice, SingleTransaction transaction, boolean compensateStopLoss){
 
         BigDecimal absPriceDiff = entryPrice.subtract(stopLossPrice).abs();
 
@@ -108,6 +112,23 @@ public class OrderRequest {
                     .max(BigDecimal.valueOf(10).divide(entryPrice, 8, RoundingMode.HALF_UP))
                     .max(BigDecimal.valueOf(0.00001))
                     .min(BigDecimal.valueOf(152));
+
+            //Compensate for stoploss slippage
+            if(compensateStopLoss){
+                BigDecimal fillPrice = SlippageHandler.getSlippageFillPrice(
+                        stopLossPrice,
+                        positionSize,
+                        entryPrice.compareTo(stopLossPrice) > 0 ? OrderSide.SELL : OrderSide.BUY
+                );
+
+                if(entryPrice.compareTo(stopLossPrice) > 0){
+                    stopLossPrice = stopLossPrice.add(stopLossPrice.subtract(fillPrice).abs());
+                } else {
+                    stopLossPrice = stopLossPrice.subtract(fillPrice.subtract(stopLossPrice).abs());
+                }
+            }
+
+            this.stopLossPrice = stopLossPrice;
 
             BigDecimal borrowedUSDT = userAssets.getTotalBorrowedUSDT();
             BigDecimal borrowedBTC = userAssets.getTotalBorrowedBTC();

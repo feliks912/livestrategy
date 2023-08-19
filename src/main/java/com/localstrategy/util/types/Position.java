@@ -167,9 +167,9 @@ public class Position implements Cloneable {
         if (stopLossOrder.getStatus().equals(OrderStatus.FILLED)) {
             this.profit = (stopLossOrder.getFillPrice().subtract(entryOrder.getFillPrice())).multiply(size)
                     .multiply(direction.equals(OrderSide.BUY) ? BigDecimal.ONE : BigDecimal.ONE.negate());
-            if(profit.doubleValue() >= 0){
-                System.out.println("Stoplossed position resulted in positive profit of " + profit);
-            }
+//            if(profit.doubleValue() >= 0){
+//                System.out.println("Stoplossed position resulted in positive profit of " + profit);
+//            }
             this.closingPrice = stopLossOrder.getFillPrice().doubleValue();
         } else if (closeOrder != null && closeOrder.getStatus().equals(OrderStatus.FILLED)) {
             this.profit = (closeOrder.getFillPrice().subtract(entryOrder.getFillPrice())).multiply(size)
@@ -180,7 +180,7 @@ public class Position implements Cloneable {
 
         this.closeTimestamp = closeTimestamp;
 
-        calculateRR();
+        calculateRR(0);
 
         return profit.doubleValue();
     }
@@ -219,24 +219,30 @@ public class Position implements Cloneable {
         this.repaidRequestSent = repaidRequestSent;
     }
 
-    public double calculateRR() {
+    public double calculateRR(double currentPrice) {
+
         Order respectiveOrder;
 
-        if(stopLossOrder.getStatus().equals(OrderStatus.FILLED)){
-            respectiveOrder = stopLossOrder;
-        } else if(closeOrder != null){
-            respectiveOrder = closeOrder;
+        if(currentPrice == 0){
+            if(stopLossOrder.getStatus().equals(OrderStatus.FILLED)){
+                respectiveOrder = stopLossOrder;
+            } else if(closeOrder != null){
+                respectiveOrder = closeOrder;
+            } else {
+                this.RR = 0.0;
+                return 0.0;
+            }
+
+            if(fillPrice.subtract(initialStopLossPrice).compareTo(BigDecimal.ZERO) == 0){
+                this.RR = 0.0;
+                return 0.0;
+            }
+
+            this.RR = respectiveOrder.getFillPrice().subtract(fillPrice).divide(fillPrice.subtract(initialStopLossPrice), PRECISION_PRICE, RoundingMode.HALF_UP).doubleValue();
         } else {
-            this.RR = 0.0;
-            return 0.0;
+            double fillPriceDouble = fillPrice.doubleValue();
+            this.RR = (currentPrice - fillPriceDouble) / (fillPriceDouble - initialStopLossPrice.doubleValue());
         }
-
-        if(fillPrice.subtract(initialStopLossPrice).compareTo(BigDecimal.ZERO) == 0){
-            this.RR = 0.0;
-            return 0.0;
-        }
-
-        this.RR = respectiveOrder.getFillPrice().subtract(fillPrice).divide(fillPrice.subtract(initialStopLossPrice), PRECISION_PRICE, RoundingMode.HALF_UP).doubleValue();
 
         return RR;
     }

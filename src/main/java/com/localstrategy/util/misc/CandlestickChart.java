@@ -29,7 +29,7 @@ import java.util.Calendar;
 import java.util.List;
 
 public class CandlestickChart extends JFrame {
-    private static final int MAX_CANDLES = 75; // Maximum number of candles on the chart
+    private static final int MAX_CANDLES = 200; // Maximum number of candles on the chart
     private CustomOHLCDataset dataset;
     private int currentIndex;
     private Calendar calendar = Calendar.getInstance();
@@ -201,7 +201,7 @@ public class CandlestickChart extends JFrame {
             isButtonPressed = false;
         } else {
             try{
-                Thread.sleep(30);
+                Thread.sleep(15);
             } catch(Exception e){
                 System.out.println(e);
             }
@@ -309,41 +309,43 @@ public class CandlestickChart extends JFrame {
 
         // Add new annotations for each position
         for (Position position : positions) {
-            double priceEntry = position.getEntryOrder().getOpenPrice().doubleValue();
-            double stopLossPrice = position.getStopOrder().getOpenPrice().doubleValue();
-            int entryIndex = 0; // position.getEntryPriceIndex();
-            int stopLossIndex = 0; // position.getInitialStopLossIndex();
+            if(position.getEntryOrder().getFillPrice() != null){
+                double priceEntry = position.getEntryOrder().getFillPrice().doubleValue();
+                double stopLossPrice = position.getStopOrder().getOpenPrice().doubleValue();
+                int entryIndex = 0; // position.getEntryPriceIndex();
+                int stopLossIndex = 0; // position.getInitialStopLossIndex();
 
-            if(currentIndex - entryIndex < MAX_CANDLES - 6){ // margin 3 on both sides
-                // Create and add ray for entry price
-                XYLineAnnotation entryRay = new XYLineAnnotation(
-                    dataset.getXValue(0, maxEndpointIndex - (currentIndex - entryIndex) + 1), priceEntry, dataset.getXValue(0, maxEndpointIndex), priceEntry,
-                    new BasicStroke(2f), position.isFilled() ? Color.GREEN : Color.ORANGE
-                );
-                plot.addAnnotation(entryRay);
-                annotations.add(entryRay);
-            } else {
-                ValueMarker entryMarker = new ValueMarker(priceEntry);
-                entryMarker.setPaint(position.isFilled() ? Color.GREEN : Color.ORANGE);
-                entryMarker.setStroke(new BasicStroke(2f));
-                plot.addRangeMarker(entryMarker);
-                valueMarkers.add(entryMarker);
-            }
+                if(currentIndex - entryIndex < MAX_CANDLES - 6){ // margin 3 on both sides
+                    // Create and add ray for entry price
+                    XYLineAnnotation entryRay = new XYLineAnnotation(
+                            dataset.getXValue(0, maxEndpointIndex - (currentIndex - entryIndex) + 1), priceEntry, dataset.getXValue(0, maxEndpointIndex), priceEntry,
+                            new BasicStroke(2f), position.isFilled() ? Color.GREEN : Color.ORANGE
+                    );
+                    plot.addAnnotation(entryRay);
+                    annotations.add(entryRay);
+                } else {
+                    ValueMarker entryMarker = new ValueMarker(priceEntry);
+                    entryMarker.setPaint(position.isFilled() ? Color.GREEN : Color.ORANGE);
+                    entryMarker.setStroke(new BasicStroke(2f));
+                    plot.addRangeMarker(entryMarker);
+                    valueMarkers.add(entryMarker);
+                }
 
-            if(currentIndex - stopLossIndex < MAX_CANDLES - 6){
-                // Create and add ray for stoploss price
-                XYLineAnnotation stopLossRay = new XYLineAnnotation(
-                    dataset.getXValue(0, maxEndpointIndex - (currentIndex - stopLossIndex) + 1), stopLossPrice, dataset.getXValue(0, maxEndpointIndex), stopLossPrice,
-                    new BasicStroke(2f), Color.RED
-                );
-                plot.addAnnotation(stopLossRay);
-                annotations.add(stopLossRay);
-            } else {
-                ValueMarker stoplossMarker = new ValueMarker(stopLossPrice);
-                stoplossMarker.setPaint(Color.RED);
-                stoplossMarker.setStroke(new BasicStroke(2f));
-                plot.addRangeMarker(stoplossMarker);
-                valueMarkers.add(stoplossMarker);
+                if(currentIndex - stopLossIndex < MAX_CANDLES - 6){
+                    // Create and add ray for stoploss price
+                    XYLineAnnotation stopLossRay = new XYLineAnnotation(
+                            dataset.getXValue(0, maxEndpointIndex - (currentIndex - stopLossIndex) + 1), stopLossPrice, dataset.getXValue(0, maxEndpointIndex), stopLossPrice,
+                            new BasicStroke(2f), Color.RED
+                    );
+                    plot.addAnnotation(stopLossRay);
+                    annotations.add(stopLossRay);
+                } else {
+                    ValueMarker stoplossMarker = new ValueMarker(stopLossPrice);
+                    stoplossMarker.setPaint(Color.RED);
+                    stoplossMarker.setStroke(new BasicStroke(2f));
+                    plot.addRangeMarker(stoplossMarker);
+                    valueMarkers.add(stoplossMarker);
+                }
             }
         }
     }
