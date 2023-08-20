@@ -14,18 +14,18 @@ public class App {
 
     public static void main(String[] args) {
 
-
         String inputDataFolderPath = "C:\\--- BTCUSDT";
 
         StrategyStarter starter = new StrategyStarter(
                 inputDataFolderPath,
                 "src/main/java/Resources/only_latencies_fixed.csv",
-                "2022-08-02","2023-03-02",
+                //"2022-01-20","2022-03-04",
+                "2023-03-21", null,
                 //null,null,
                 10000
         );
 
-        starter.execute(null);
+        starter.execute();
 
         ArrayList<UserAssets> assets = starter.getBinanceHandler().getUserAssetsList();
 

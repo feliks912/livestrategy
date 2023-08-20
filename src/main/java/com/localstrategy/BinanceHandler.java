@@ -33,6 +33,8 @@ public class BinanceHandler {
 
     public final static int ALGO_ORDER_LIMIT = 5;
 
+    public final static boolean LOG_KEY_EVENTS = false;
+
     private final ArrayList<Order> newOrders = new ArrayList<>();
     private final ArrayList<Order> filledOrders = new ArrayList<>();
     private final ArrayList<Order> cancelledOrders = new ArrayList<>();
@@ -179,7 +181,7 @@ public class BinanceHandler {
                     }
                 }
 
-                historicalList.addFirst(new CustomMapWrapper(order, userAssets, "Created order " + order.getId() + ", position " + order.getPositionId()));
+                logToHistory(order, userAssets, "Created order " + order.getId() + ", position " + order.getPositionId());
 
                 order.setStatus(OrderStatus.NEW);
                 newOrders.add(order);
@@ -209,12 +211,12 @@ public class BinanceHandler {
                         order.setStatus(OrderStatus.REJECTED);
                         order.setRejectionReason(rejectionReason);
                         createActionResponse(ActionResponse.ACTION_REJECTED, order);
-                        historicalList.addFirst(new CustomMapWrapper(order, userAssets, "Rejected repay on cancel order " + order.getId() + ", position " + order.getPositionId()));
+                        logToHistory(order, userAssets, "Rejected repay on cancel order " + order.getId() + ", position " + order.getPositionId());
                         break;
                     }
                 }
 
-                historicalList.addFirst(new CustomMapWrapper(order, userAssets, "Cancelled order " + order.getId() + ", position " + order.getPositionId()));
+                logToHistory(order, userAssets, "Cancelled order " + order.getId() + ", position " + order.getPositionId());
 
                 order.setStatus(OrderStatus.CANCELED);
                 cancelledOrders.add(order);
@@ -229,7 +231,7 @@ public class BinanceHandler {
                     order.setStatus(OrderStatus.REJECTED);
                     order.setRejectionReason(rejectionReason);
                     createActionResponse(ActionResponse.ACTION_REJECTED, order);
-                    historicalList.addFirst(new CustomMapWrapper(order, userAssets, "Rejected repay order " + order.getId() + ", position " + order.getPositionId()));
+                    logToHistory(order, userAssets, "Rejected repay order " + order.getId() + ", position " + order.getPositionId());
                     break;
                 }
                 createActionResponse(ActionResponse.FUNDS_REPAID, order);
@@ -279,9 +281,9 @@ public class BinanceHandler {
                                 order.setRejectionReason(rejectionReason);
                                 createActionResponse(ActionResponse.ORDER_REJECTED, order);
                                 rejectedOrders.add(order); //For removal at the end of the method
-                                historicalList.addFirst(new CustomMapWrapper(order, userAssets, "Rejected "
+                                logToHistory(order, userAssets, "Rejected "
                                         + (order.getDirection().equals(OrderSide.BUY) ? "USDT" : "BTC")
-                                        + " borrow order " + order.getId() + ", position " + order.getPositionId()));
+                                        + " borrow order " + order.getId() + ", position " + order.getPositionId());
                                 continue;
                             }
                         }
@@ -296,7 +298,7 @@ public class BinanceHandler {
                             } else { // Rejected order
                                 rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, order); //This one for example, reports over a user stream.
                             }
-                            historicalList.addFirst(new CustomMapWrapper(order, userAssets, "Rejected long order " + order.getId() + ", position " + order.getPositionId()));
+                            logToHistory(order, userAssets, "Rejected long order " + order.getId() + ", position " + order.getPositionId());
                             continue;
                         }
 
@@ -312,7 +314,7 @@ public class BinanceHandler {
                                         .add(order.getSize())
                         );
 
-                        historicalList.addFirst(new CustomMapWrapper(order, userAssets, "Longed order " + order.getId() + ", position " + order.getPositionId()));
+                        logToHistory(order, userAssets, "Longed order " + order.getId() + ", position " + order.getPositionId());
 
                     } else { //Short
                         if (userAssets.getFreeBTC().compareTo(order.getSize()) < 0) {
@@ -324,7 +326,7 @@ public class BinanceHandler {
                             } else {
                                 rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, order); //FIXME: This one for example, would report over a user stream.
                             }
-                            historicalList.addFirst(new CustomMapWrapper(order, userAssets, "Rejected short order " + order.getId() + ", position " + order.getPositionId()));
+                            logToHistory(order, userAssets, "Rejected short order " + order.getId() + ", position " + order.getPositionId());
                             continue;
                         }
                         //Sell BTC
@@ -338,7 +340,7 @@ public class BinanceHandler {
                                         .add(order.getSize().multiply(fillPrice))
                         );
 
-                        historicalList.addFirst(new CustomMapWrapper(order, userAssets, "Shorted order " + order.getId() + ", position " + order.getPositionId()));
+                        logToHistory(order, userAssets, "Shorted order " + order.getId() + ", position " + order.getPositionId());
                     }
 
                     order.setFillPrice(fillPrice);
@@ -448,7 +450,7 @@ public class BinanceHandler {
                             .add(order.getTotalUnpaidInterest())
             );
 
-            historicalList.addFirst(new CustomMapWrapper(order, userAssets, "Borrowed USDT order " + order.getId() + ", position " + order.getPositionId()));
+            logToHistory(order, userAssets, "Borrowed USDT order " + order.getId() + ", position " + order.getPositionId());
 
         } else { //Short - borrow BTC
 
@@ -499,7 +501,7 @@ public class BinanceHandler {
                             .add(order.getTotalUnpaidInterest())
             );
 
-            historicalList.addFirst(new CustomMapWrapper(order, userAssets, "Borrowed BTC order " + order.getId() + ", position " + order.getPositionId()));
+            logToHistory(order, userAssets, "Borrowed BTC order " + order.getId() + ", position " + order.getPositionId());
         }
 
 //        if(StrategyStarter.currentDay == 52){
@@ -576,7 +578,7 @@ public class BinanceHandler {
                             .subtract(order.getTotalUnpaidInterest())
             );
 
-            historicalList.addFirst(new CustomMapWrapper(order, userAssets, "Repaid USDT order " + order.getId() + ", position " + order.getPositionId()));
+            logToHistory(order, userAssets, "Repaid USDT order " + order.getId() + ", position " + order.getPositionId());
 
 
         } else {
@@ -627,7 +629,7 @@ public class BinanceHandler {
                             .subtract(order.getTotalUnpaidInterest())
             );
 
-            historicalList.addFirst(new CustomMapWrapper(order, userAssets, "Repaid BTC order " + order.getId() + ", position " + order.getPositionId()));
+            logToHistory(order, userAssets, "Repaid BTC order " + order.getId() + ", position " + order.getPositionId());
 
         }
 
@@ -709,5 +711,11 @@ public class BinanceHandler {
 
     public ArrayList<UserAssets> getUserAssetsList(){
         return this.userAssetsList;
+    }
+
+    private void logToHistory(Order order, UserAssets assets, String message){
+        if(LOG_KEY_EVENTS){
+            historicalList.addFirst(new CustomMapWrapper(order, assets, message));
+        }
     }
 }

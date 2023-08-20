@@ -14,7 +14,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 public class Strategy2 {
-    private final static boolean DISPLAY_TRADING_GUI = true;
+    private final static boolean DISPLAY_TRADING_GUI = false;
 
 
 
@@ -26,10 +26,10 @@ public class Strategy2 {
 
     private TradingGUI tradingGUI;
 
-    int DISTANCE = 300;
+    int DISTANCE = 150;
 
-    private int ZZDepth = 4;
-    private int ZZBackstep = 2;
+    private int ZZDepth = 3;
+    private int ZZBackstep = 0;
 
     public Strategy2(LocalHandler localHandler, ArrayList<Candle> candles, ArrayList<Position> activePositions, LinkedList<Position> inactivePositions){
         this.handler = localHandler;

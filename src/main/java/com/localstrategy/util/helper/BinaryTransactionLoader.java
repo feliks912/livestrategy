@@ -22,6 +22,8 @@ public class BinaryTransactionLoader {
 
     private String currentFileName;
 
+    private int totalFileCount;
+
     public BinaryTransactionLoader(String folderPath, String inputFromDate, String inputToDate) {
         this.filesQueue = new PriorityQueue<>();
 
@@ -61,6 +63,7 @@ public class BinaryTransactionLoader {
                 ex.printStackTrace();
             }
         }
+        this.totalFileCount = filesQueue.size();
     }
 
     public ArrayList<SingleTransaction> loadNextDay(){
@@ -84,7 +87,7 @@ public class BinaryTransactionLoader {
     }
 
     private ArrayList<SingleTransaction> readBinaryData(Path binaryFilePath) throws IOException {
-        ArrayList<SingleTransaction> transactionDataList = new ArrayList<>((int) (binaryFilePath.toFile().length() / 12));
+        ArrayList<SingleTransaction> transactionDataList = new ArrayList<>();
 
         byte[] allBytes = Files.readAllBytes(binaryFilePath);
         ByteBuffer buffer = ByteBuffer.wrap(allBytes);
@@ -117,9 +120,11 @@ public class BinaryTransactionLoader {
         return transactionDataList;
     }
 
-    public int getTotalFileCount() {
+    public int getRemainingFileCount() {
         return filesQueue.size();
     }
+
+    public int getTotalFileCount(){ return this.totalFileCount; }
 
     public String getCurrentFileName(){
         return this.currentFileName;
