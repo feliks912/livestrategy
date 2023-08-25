@@ -7,6 +7,7 @@ import com.localstrategy.util.misc.TradingGUI;
 import com.localstrategy.util.types.Candle;
 import com.localstrategy.util.types.Position;
 import com.localstrategy.util.types.SingleTransaction;
+import org.apache.commons.collections4.map.SingletonMap;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -14,7 +15,9 @@ import java.util.LinkedList;
 import java.util.List;
 
 public class Strategy2 {
-    private final static boolean DISPLAY_TRADING_GUI = false;
+    private final static boolean DISPLAY_TRADING_GUI = true;
+
+    private final static int CANDLE_STEP_TIME_MS = 30;
 
 
 
@@ -24,12 +27,14 @@ public class Strategy2 {
     private SingleTransaction transaction;
     private ArrayList<Candle> candles;
 
+    private final ArrayList<SingletonMap<Double, Double>> unusedStructure = new ArrayList<>();
+
     private TradingGUI tradingGUI;
 
-    int DISTANCE = 150;
+    int DISTANCE = 300;
 
-    private int ZZDepth = 3;
-    private int ZZBackstep = 0;
+    private int ZZDepth = 2;
+    private int ZZBackstep = 2;
 
     public Strategy2(LocalHandler localHandler, ArrayList<Candle> candles, ArrayList<Position> activePositions, LinkedList<Position> inactivePositions){
         this.handler = localHandler;
@@ -38,7 +43,7 @@ public class Strategy2 {
         this.inactivePositions = Collections.unmodifiableList(inactivePositions);
 
         if(DISPLAY_TRADING_GUI){
-            this.tradingGUI = new TradingGUI(activePositions, inactivePositions, DISTANCE);
+            this.tradingGUI = new TradingGUI(activePositions, inactivePositions, DISTANCE, CANDLE_STEP_TIME_MS);
         }
 
         // Your code
@@ -81,12 +86,62 @@ public class Strategy2 {
     private long lastHighIndex;
     private long lastLowIndex;
 
+    private boolean newLow = false;
+    private boolean newHigh = false;
+
+    private boolean shortAttempt = false;
+
+    private boolean longAttempt = false;
+
     private final ZigZag zz = new ZigZag(ZZDepth, 0, ZZBackstep, 0);
     private final ZigZag zz_SL = new ZigZag(15, 0, 10, 0);
 
     public void priceUpdate(SingleTransaction transaction){
         this.transaction = transaction;
         //TODO: Fix when forming candle would become the new high / low, executing two orders. Also, some long orders don't long?
+
+//        ArrayList<SingletonMap<Double, Double>> tempList = new ArrayList<>();
+//        for(SingletonMap<Double, Double> map : unusedStructure){
+//            double high = map.getKey();
+//            double low = map.getValue();
+//
+//            if(transaction.price() > high){
+//                boolean activeLong = false;
+//                for(Position position : activePositions){
+//                    if(position.getDirection().equals(OrderSide.BUY)){
+//                        activeLong = true;
+//                    }
+//                }
+//                if(!activeLong){
+//                    for(Position position : activePositions){
+//                        if(position.getDirection().equals(OrderSide.SELL) && position.getGroup().equals(PositionGroup.FILLED)){
+//                            handler.closePosition(position);
+//                        }
+//                    }
+//                    handler.activateStopLoss(handler.executeMarketOrder(low, true));
+//                }
+//                tempList.add(map);
+//            } else if(transaction.price() < low){
+//                boolean activeShort = false;
+//                for(Position position : activePositions){
+//                    if(position.getDirection().equals(OrderSide.SELL)){
+//                        activeShort = true;
+//                    }
+//                }
+//                if(!activeShort){
+//                    for(Position position : activePositions){
+//                        if(position.getDirection().equals(OrderSide.BUY) && position.getGroup().equals(PositionGroup.FILLED)){
+//                            handler.closePosition(position);
+//                        }
+//                    }
+//                    handler.activateStopLoss(handler.executeMarketOrder(high, true));
+//                }
+//                tempList.add(map);
+//            }
+//        }
+//        if(!tempList.isEmpty()){
+//            unusedStructure.removeAll(tempList);
+//        }
 
 //        if(!activePositions.isEmpty()){
 //            Position position = activePositions.get(0);
@@ -109,7 +164,43 @@ public class Strategy2 {
 //            }
 //        }
 
-        if(longOnEmptyActivePositions && activePositions.isEmpty()){
+
+//        if(longAttempt){
+//            ArrayList<SingletonMap<Double, Double>> tempMap = new ArrayList<>();
+//            for(SingletonMap<Double, Double> map : unusedStructure){
+//                double high = map.getKey();
+//                double low = map.getValue();
+//                if(transaction.price() >= high){
+//                    handler.activateStopLoss(handler.executeMarketOrder(low, true));
+//                    newHigh = false;
+//                    longAttempt = false;
+//                    tempMap.add(map);
+//                }
+//            }
+//            if(!tempMap.isEmpty()){
+//                unusedStructure.clear();
+//            }
+//        }
+//        if(shortAttempt){
+//            ArrayList<SingletonMap<Double, Double>> tempMap = new ArrayList<>();
+//            for(SingletonMap<Double, Double> map : unusedStructure){
+//                double high = map.getKey();
+//                double low = map.getValue();
+//                if(transaction.price() <= low){
+//                    handler.activateStopLoss(handler.executeMarketOrder(high, true));
+//                    newHigh = false;
+//                    shortAttempt = false;
+//                    tempMap.add(map);
+//                }
+//            }
+//            if(!tempMap.isEmpty()){
+//                unusedStructure.clear();
+//            }
+//        }
+
+
+
+        if(longOnEmptyActivePositions){
 
             Position newMarketPosition = handler.executeMarketOrder(longRangeLowStop, true);
 
@@ -123,7 +214,7 @@ public class Strategy2 {
             waitForNextCandle = true;
 
             longOnEmptyActivePositions = false;
-        } else if (shortOnEmptyActivePositions && activePositions.isEmpty()){
+        } else if (shortOnEmptyActivePositions){
 
             Position newMarketPosition = handler.executeMarketOrder(shortRangeHighStop, true);
 
@@ -138,6 +229,8 @@ public class Strategy2 {
 
             shortOnEmptyActivePositions = false;
         }
+
+
 
         // --- LONG ---
         if(packingForLong){
@@ -181,6 +274,12 @@ public class Strategy2 {
 
     public void candleUpdate(Candle candle){
 
+//        if(lastCandle != null && lastCandle.tick() <= -DISTANCE && candle.tick() > -DISTANCE){
+//            shortAttempt = true;
+//        } else if(lastCandle != null && lastCandle.tick() >= DISTANCE && candle.tick() < DISTANCE){
+//            longAttempt = true;
+//        }
+
         //TODO: Manually update value markers
         if(DISPLAY_TRADING_GUI){
             tradingGUI.getCandlestickChart().newCandle(handler.getUserAssets().getMomentaryOwnedAssets(), candle, transaction);
@@ -195,24 +294,36 @@ public class Strategy2 {
         // -- BREAKEVENS ---
 //        for(Position position : activePositions){
 //            if(!position.isBreakEvenActive() && position.getGroup().equals(PositionGroup.FILLED)){
-//                if(position.isBreakEvenActive()){
-//                    if(position.getDirection().equals(OrderSide.BUY) && transaction.price() > position.getEntryOrder().getFillPrice().doubleValue()){
-//                        handler.updateStopLoss(position.getEntryOrder().getFillPrice().doubleValue(), position);
-//                        position.setBreakEvenStatus(true);
-//                    } else if(position.getDirection().equals(OrderSide.SELL) && transaction.price() < position.getEntryOrder().getFillPrice().doubleValue()){
-//                        handler.updateStopLoss(position.getEntryOrder().getFillPrice().doubleValue(), position);
-//                        position.setBreakEvenStatus(true);
-//                    }
+//                if(position.getDirection().equals(OrderSide.BUY) && transaction.price() > position.getEntryOrder().getFillPrice().doubleValue()){
+//                    handler.updateStopLoss(position.getEntryOrder().getFillPrice().doubleValue(), position);
+//                    position.setBreakEvenStatus(true);
+//                } else if(position.getDirection().equals(OrderSide.SELL) && transaction.price() < position.getEntryOrder().getFillPrice().doubleValue()){
+//                    handler.updateStopLoss(position.getEntryOrder().getFillPrice().doubleValue(), position);
+//                    position.setBreakEvenStatus(true);
 //                }
 //            }
 //        }
 
 
+//        double previousHigh = zz.getLastHigh();
+//        double previousLow = zz.getLastLow();
 
-        updateZigZagValue(zz, candles);
-        updateZigZagValue(zz_SL, candles);
+        zz.updateZigZagValue(candles);
 
-        if(zz.getLastHigh() == -1 || zz.getLastLow() == -1 || zz_SL.getLastHigh() == -1 || zz_SL.getLastLow() == -1){
+//        if(previousHigh != zz.getLastHigh()){
+//            newHigh = true;
+//            if(longAttempt){
+//                unusedStructure.add(new SingletonMap<>(zz.getLastHigh(), zz.getLastLow()));
+//            }
+//        }
+//        if(previousLow != zz.getLastLow()){
+//            newLow = true;
+//            if(shortAttempt){
+//                unusedStructure.add(new SingletonMap<>(zz.getLastHigh(), zz.getLastLow()));
+//            }
+//        }
+
+        if(zz.getLastHigh() == -1 || zz.getLastLow() == -1){
             return;
         }
 
@@ -248,40 +359,5 @@ public class Strategy2 {
             waitForNextCandle = false;
         }
 
-    }
-
-    public void updateZigZagValue(ZigZag indicator, ArrayList<Candle> candles){
-
-        int depth = indicator.getDepth();
-        int backstep = indicator.getBackstep();
-
-        List<Candle> candleSublist = candles.subList(
-                candles.size()-1 - 2 * depth - backstep,
-                candles.size());
-
-        double[] highsArray = candleSublist.stream()
-                .mapToDouble(Candle::high)
-                .toArray();
-
-        double[] lowsArray = candleSublist.stream()
-                .mapToDouble(Candle::low)
-                .toArray();
-
-        indicator.calculate(highsArray.length, highsArray, lowsArray);
-
-        double zigZagValue = indicator.getZigzagBuffer()[depth];
-
-        if(zigZagValue != 0){
-
-            Candle zigZagCandle = candles.get(candles.size()-1 - backstep - depth); // OK
-
-            if(zigZagValue == zigZagCandle.high()){
-                lastHighIndex = zigZagCandle.index();
-                indicator.setLastHigh(zigZagValue);
-            } else if(zigZagValue == zigZagCandle.low()) {
-                lastLowIndex = zigZagCandle.index();
-                indicator.setLastLow(zigZagValue);
-            }
-        }
     }
 }

@@ -1,5 +1,9 @@
 package com.localstrategy.util.indicators;
 
+import com.localstrategy.util.types.Candle;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Logger;
 
 /**
@@ -383,6 +387,39 @@ public class ZigZag {
     lowMapBuffer = new double[ratesTotal];
 
     // if (ratesTotal < 100) LOGGER.warning("Not enough bars for calculation");
+  }
+
+  public void updateZigZagValue(ArrayList<Candle> candles){
+
+    int depth = this.getDepth();
+    int backstep = this.getBackstep();
+
+    List<Candle> candleSublist = candles.subList(
+            candles.size()-1 - 2 * depth - backstep,
+            candles.size());
+
+    double[] highsArray = candleSublist.stream()
+            .mapToDouble(Candle::high)
+            .toArray();
+
+    double[] lowsArray = candleSublist.stream()
+            .mapToDouble(Candle::low)
+            .toArray();
+
+    this.calculate(highsArray.length, highsArray, lowsArray);
+
+    double zigZagValue = this.getZigzagBuffer()[depth];
+
+    if(zigZagValue != 0){
+
+      Candle zigZagCandle = candles.get(candles.size()-1 - backstep - depth); // OK
+
+      if(zigZagValue == zigZagCandle.high()){
+        this.setLastHigh(zigZagValue);
+      } else if(zigZagValue == zigZagCandle.low()) {
+        this.setLastLow(zigZagValue);
+      }
+    }
   }
 
   public double[] getZigzagBuffer() {

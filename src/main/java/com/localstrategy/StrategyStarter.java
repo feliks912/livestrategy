@@ -56,6 +56,14 @@ public class StrategyStarter {
         while (true) {
             Event event = scheduler.getNextEvent();
 
+            if(event.getType().equals(EventType.ACTION_REQUEST) && event.getOrder().getId() == 103){
+                boolean stop = true;
+            }
+
+            if(!event.getType().equals(EventType.TRANSACTION)){
+                boolean stop = true;
+            }
+
             if (event.getDestination().equals(EventDestination.LOCAL)) {
                 localHandler.onEvent(event);
             } else {

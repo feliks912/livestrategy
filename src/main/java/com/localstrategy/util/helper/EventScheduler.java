@@ -43,10 +43,14 @@ public class EventScheduler {
             }
         }
 
+
         eventQueue.add(event);
     }
 
     public Event getNextEvent(){
-        return eventQueue.poll();
+
+        Event event = eventQueue.poll();
+
+        return event;
     }
 }

@@ -16,11 +16,11 @@ import java.util.TreeMap;
 
 public class LocalHandler {
 
-    private static final int CANDLE_VOLUME = 500_000;
-    private static final double RISK_PCT = 0.5;
+    private static final int CANDLE_VOLUME = 2_000_000;
+    private static final double RISK_PCT = 0.1;
 
     //In relation to the difference between our entry and stop-loss price difference, how much in percentage of slippage are we ready to accept (total, not the average fill price)
-    private static final int SLIPPAGE_PCT = 25;
+    private static final int SLIPPAGE_PCT = 15;
 
     private final EventScheduler scheduler;
     private final CandleConstructor candleConstructor = new CandleConstructor(CANDLE_VOLUME);
@@ -824,7 +824,44 @@ public class LocalHandler {
 
                                     } else if (position.getStopOrder().getId() == order.getId()) {
                                         isInActivePositions = true;
-                                        System.out.println("Local Error - STOP order rejected due to insufficient funds | margin");
+
+
+                                        //Let's see if just spamming the market stop order works
+                                        order.setStatus(OrderStatus.NEW);
+                                        order.setType(OrderType.MARKET);
+                                        order.setRejectionReason(null);
+
+                                        scheduler.addEvent(new Event(
+                                                currentEvent.getDelayedTimestamp(),
+                                                EventDestination.EXCHANGE,
+                                                OrderAction.CREATE_ORDER,
+                                                order.clone()
+                                        ));
+
+//                                        boolean temp = false;
+//                                        for(Position pos : activePositions){
+//                                            if(position != pos && pos.getStopOrder().getStatus().equals(OrderStatus.REJECTED)){
+//                                                //It's possible another stop order has fucked something up therefore
+//                                                //Let's try turning this to market.
+//                                                order.setStatus(OrderStatus.NEW);
+//                                                order.setType(OrderType.MARKET);
+//                                                order.setRejectionReason(null);
+//
+//                                                scheduler.addEvent(new Event(
+//                                                        currentEvent.getDelayedTimestamp(),
+//                                                        EventDestination.EXCHANGE,
+//                                                        OrderAction.CREATE_ORDER,
+//                                                        order.clone()
+//                                                ));
+//
+//                                                temp = true;
+//                                                break;
+//                                            }
+//                                        }
+//                                        if(!temp){
+//                                            System.out.println("Local Error - STOP order rejected due to insufficient funds | margin and there seems to be no solutions...");
+//                                        }
+
                                         position.setStopOrder(order.clone());
 
                                         break;
@@ -844,7 +881,8 @@ public class LocalHandler {
                                                 //TODOOO
 
                                                 addToDelayedActionMap(closeFilledAfterStopFilledCorrectionActionsList, null, order, OrderAction.CREATE_ORDER);
-                                            } else if(!order.isCloseReattempted()) {
+                                            } else if(order.getCloseReattemptCounter() < 2) {
+                                                order.setCloseReattemptCounter(order.getCloseReattemptCounter() + 1);
                                                 order.setCloseReattempted(true);
                                                 order.setStatus(OrderStatus.NEW);
                                                 scheduler.addEvent(new Event(

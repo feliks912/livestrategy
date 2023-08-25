@@ -17,13 +17,13 @@ public class TradingGUI extends JFrame {
     private double currentPortfolio = 0;
 
 
-    public TradingGUI(ArrayList<Position> activePositions, LinkedList<Position> inactivePositions, int distance) {
+    public TradingGUI(ArrayList<Position> activePositions, LinkedList<Position> inactivePositions, int distance, int candleStepTime) {
         // Set the layout manager for the frame
         setLayout(new BorderLayout());
 
         // Create a candlestick chart
         positionsTable = new PositionsTable(inactivePositions, false);
-        candlestickChart = new CandlestickChart(distance, positionsTable, activePositions, false);
+        candlestickChart = new CandlestickChart(distance, positionsTable, activePositions, false, candleStepTime);
         
 
         // Get initial portfolio values

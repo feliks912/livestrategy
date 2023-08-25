@@ -42,6 +42,8 @@ public class Order implements Cloneable {
 
     private OrderPurpose purpose;
 
+    private int closeReattemptCounter = 0;
+
     public Order(
             BigDecimal openPrice,
             OrderSide direction,
@@ -74,8 +76,12 @@ public class Order implements Cloneable {
                 : TierManager.HOURLY_BTC_INTEREST_RATE_PCT.divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP);
     }
 
-    public boolean isCloseReattempted() {
-        return isCloseReattempted;
+    public int getCloseReattemptCounter() {
+        return closeReattemptCounter;
+    }
+
+    public void setCloseReattemptCounter(int closeReattemptCounter) {
+        this.closeReattemptCounter = closeReattemptCounter;
     }
 
     public void setCloseReattempted(boolean closeReattempted) {

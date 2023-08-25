@@ -29,7 +29,7 @@ import java.util.Calendar;
 import java.util.List;
 
 public class CandlestickChart extends JFrame {
-    private static final int MAX_CANDLES = 200; // Maximum number of candles on the chart
+    private static final int MAX_CANDLES = 400; // Maximum number of candles on the chart
     private CustomOHLCDataset dataset;
     private int currentIndex;
     private Calendar calendar = Calendar.getInstance();
@@ -50,13 +50,16 @@ public class CandlestickChart extends JFrame {
     private String startDate;
     private String endDate;
 
+    private int candleStepTime;
+
     ArrayList<Position> activePositions;
 
-    public CandlestickChart(int distance, PositionsTable positionsTable, ArrayList<Position> activePositions, boolean visible) {
+    public CandlestickChart(int distance, PositionsTable positionsTable, ArrayList<Position> activePositions, boolean visible, int candleStepTime) {
         super("Candlestick Chart Demo");
         this.positionsTable = positionsTable;
 
         this.distanceSet = distance;
+        this.candleStepTime = candleStepTime;
         this.activePositions = activePositions;
 
         calendar.set(1970, Calendar.JANUARY, 1, 0, 0, 0);
@@ -201,7 +204,7 @@ public class CandlestickChart extends JFrame {
             isButtonPressed = false;
         } else {
             try{
-                Thread.sleep(15);
+                Thread.sleep(candleStepTime);
             } catch(Exception e){
                 System.out.println(e);
             }
