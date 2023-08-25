@@ -125,9 +125,9 @@ public class App {
         StrategyStarter starter = new StrategyStarter(
                 inputDataFolderPath,
                 "src/main/java/Resources/only_latencies_fixed.csv",
-                "2023-01-31","2023-03-09",
+                //"2023-01-31","2023-03-09",
                 //"2023-03-21", null,
-                //null,null,
+                null,null,
                 10000
         );
 

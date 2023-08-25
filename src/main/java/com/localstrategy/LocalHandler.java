@@ -16,11 +16,11 @@ import java.util.TreeMap;
 
 public class LocalHandler {
 
-    private static final int CANDLE_VOLUME = 2_000_000;
-    private static final double RISK_PCT = 0.1;
+    private static final int CANDLE_VOLUME = 1_000_000;
+    private static final double RISK_PCT = 0.15;
 
     //In relation to the difference between our entry and stop-loss price difference, how much in percentage of slippage are we ready to accept (total, not the average fill price)
-    private static final int SLIPPAGE_PCT = 15;
+    private static final int SLIPPAGE_PCT = 5;
 
     private final EventScheduler scheduler;
     private final CandleConstructor candleConstructor = new CandleConstructor(CANDLE_VOLUME);
@@ -182,7 +182,7 @@ public class LocalHandler {
     }
 
     public boolean cancelPosition(Position position) {
-        if (position == null || !position.getGroup().equals(PositionGroup.NEW) || !position.getGroup().equals(PositionGroup.FILLED)) {
+        if (position == null || !position.getGroup().equals(PositionGroup.NEW)) {
             return true;
         }
 
@@ -1425,7 +1425,7 @@ public class LocalHandler {
         if (illegalExecutionCorrectionActionsList.get(order.getId()) == null) {
             checkIllegalExecution(order, position);
         } else {
-            if (order.getMarginBuyBorrowAmount().doubleValue() <= 0e-7 && order.isAutomaticBorrow()) {
+            if (order.getMarginBuyBorrowAmount().doubleValue() <= 0e-7 && order.isAutomaticBorrow() && !order.getStatus().equals(OrderStatus.CANCELED)) {
                 System.out.println("Local Error - illegalLackOfBorrowCorrectionInProgress true while another entry order is filled. 2 potential events collide. Probably the rebuy one.");
             } else {
                 executeDelayedActionsFromMap(illegalExecutionCorrectionActionsList, order.getId());

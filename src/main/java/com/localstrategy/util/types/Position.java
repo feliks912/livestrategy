@@ -223,6 +223,8 @@ public class Position implements Cloneable {
 
         Order respectiveOrder;
 
+        this.RR = 0;
+
         if(currentPrice == 0){
             if(stopLossOrder.getStatus().equals(OrderStatus.FILLED)){
                 respectiveOrder = stopLossOrder;
@@ -239,7 +241,7 @@ public class Position implements Cloneable {
             }
 
             this.RR = respectiveOrder.getFillPrice().subtract(fillPrice).divide(fillPrice.subtract(initialStopLossPrice), PRECISION_PRICE, RoundingMode.HALF_UP).doubleValue();
-        } else {
+        } else if(fillPrice != null){
             double fillPriceDouble = fillPrice.doubleValue();
             this.RR = (currentPrice - fillPriceDouble) / (fillPriceDouble - initialStopLossPrice.doubleValue());
         }
