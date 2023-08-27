@@ -2,6 +2,7 @@ package com.localstrategy;
 
 import com.localstrategy.util.enums.EventDestination;
 import com.localstrategy.util.enums.EventType;
+import com.localstrategy.util.helper.BinaryOrderbookReader;
 import com.localstrategy.util.helper.BinaryTransactionLoader;
 import com.localstrategy.util.helper.EventScheduler;
 import com.localstrategy.util.types.Event;
@@ -9,6 +10,7 @@ import com.localstrategy.util.types.Position;
 import com.localstrategy.util.types.SingleTransaction;
 import com.localstrategy.util.types.UserAssets;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 
@@ -24,7 +26,11 @@ public class StrategyStarter {
 
     private double previousDayUSDT;
 
+    private long startingTimestamp = 0;
+
     private int initialFileCounter;
+
+    private BinaryOrderbookReader bookReader;
 
     public StrategyStarter(String inputDataFolderPath, String inputLatencyFilePath, String fromDate, String toDate, double initialUSDTPortfolio) {
 
@@ -32,6 +38,13 @@ public class StrategyStarter {
 
         this.exchangeHandler = new BinanceHandler(initialUSDTPortfolio, scheduler);
         this.localHandler = new LocalHandler(initialUSDTPortfolio, scheduler);
+
+        try {
+            bookReader = new BinaryOrderbookReader("C:\\Users\\Admin\\Desktop\\livestrategy\\src\\main\\java\\Resources\\orderbook.bin");
+            // Use the bookReader object
+        } catch (IOException e) {
+            // Handle the exception
+        }
 
         this.transactionLoader = new BinaryTransactionLoader(inputDataFolderPath, fromDate, toDate);
 
@@ -53,6 +66,14 @@ public class StrategyStarter {
         SingleTransaction exchangeTransaction = transactionList.get(transactionCounter++);
         scheduler.addEvent(new Event(exchangeTransaction.timestamp(), EventDestination.EXCHANGE, exchangeTransaction));
 
+        startingTimestamp = exchangeTransaction.timestamp();
+
+        try{
+            bookReader.loadUntil(exchangeTransaction.timestamp() - startingTimestamp);
+        } catch(IOException e){
+            System.out.println(e);
+        }
+
         while (true) {
             Event event = scheduler.getNextEvent();
 
@@ -68,12 +89,20 @@ public class StrategyStarter {
                 localHandler.onEvent(event);
             } else {
                 if (event.getType().equals(EventType.TRANSACTION)) {
+
+                    try{
+                        bookReader.loadUntil(event.getTimestamp() - startingTimestamp);
+                    } catch(IOException e){
+                        System.out.println(e);
+                    }
+
                     LatencyProcessor.calculateLatency(event);
 
                     scheduler.addEvent(new Event(event.getTransaction().timestamp(), EventDestination.LOCAL, event.getTransaction()));
 
                     exchangeTransaction = transactionList.get(transactionCounter++);
                     scheduler.addEvent(new Event(exchangeTransaction.timestamp(), EventDestination.EXCHANGE, exchangeTransaction));
+
 
                     if (transactionCounter >= transactionList.size()) {
 

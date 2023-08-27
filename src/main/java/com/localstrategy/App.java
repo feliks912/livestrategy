@@ -17,104 +17,105 @@ public class App {
 
     public static void main(String[] args) {
 
-//        ArrayList<Candle> candles = new ArrayList<>(CandleFileManager.readCandles("C:\\BTCCandles\\500kAll.bin", 0, Integer.MAX_VALUE));
+//        String[] fileNames = {"250k", "500k", "1M", "2M", "4M"};
 //
-//        ArrayList<Candle> newCandles = new ArrayList<>();
+//        for(String name : fileNames){
 //
-//        int highCount = 0;
-//        int lowCount = 0;
+//            new Thread(() ->{
+//                ArrayList<Candle> candles = new ArrayList<>(CandleFileManager.readCandles("C:\\BTCCandles\\" + name + "All.bin", 0, Integer.MAX_VALUE));
 //
-//        for(Candle candle : candles) {
-//            newCandles.add(candle);
+//                System.out.println("Filename: " + name + "All.bin");
 //
-//            double low = zz.getLastLow();
-//            double high = zz.getLastHigh();
+//                boolean packingHigh = false;
+//                boolean packingLow = false;
 //
-//            if(newCandles.size() > 2 * zz.getDepth() + zz.getBackstep()){
-//                zz.updateZigZagValue(newCandles);
-//            }
+//                int firstLargerIndex = 0;
+//                int lastLargerIndex = 0;
 //
-//            if(zz.getLastLow() != low){
-//                lowCount++;
-//            }
+//                int firstLowerIndex = 0;
+//                int lastLowerIndex = 0;
 //
-//            if(zz.getLastHigh() != high){
-//                highCount++;
-//            }
-//        }
-//
-//        System.out.println("Lows: " + lowCount + ", Highs: " + highCount);
-
-
-//        boolean packingHigh = false;
-//        boolean packingLow = false;
-//
-//        int firstLargerIndex = 0;
-//        int lastLargerIndex = 0;
-//
-//        int firstLowerIndex = 0;
-//        int lastLowerIndex = 0;
-//
-//        enum LastGroup{
-//            NONE,
-//            HIGH,
-//            LOW
-//        }
-//
-//        final int DISTANCE = 300;
-//
-//        LastGroup lastGroup = LastGroup.NONE;
-//
-//        int totalGroupCounter = 0;
-//
-//        ArrayList<SingletonMap<SingletonMap<Integer, Integer>, String>> groups = new ArrayList<>();
-//        ArrayList<SingletonMap<SingletonMap<Integer, Integer>, String>> all_groups = new ArrayList<>();
-//
-//        for(Candle candle : candles){
-//            if(candle.tick() > DISTANCE){
-//                if(lastGroup.equals(LastGroup.LOW)){
-//                    lastGroup = LastGroup.NONE;
-//                    groups.add(new SingletonMap<>(new SingletonMap<>(firstLowerIndex, lastLowerIndex), "LOW: "));
-//                    //Add to group
+//                enum LastGroup{
+//                    NONE,
+//                    HIGH,
+//                    LOW
 //                }
-//                if(!packingHigh){
-//                    packingHigh = true;
-//                    firstLargerIndex = candle.index();
+//
+//                LastGroup lastGroup = LastGroup.NONE;
+//
+//                int ZZDepth;
+//                int ZZBackstep;
+//
+//                double highStop = 0;
+//                double lowStop = Double.MAX_VALUE;
+//
+//                boolean shortBreak = false;
+//                boolean longBreak = false;
+//
+//                for(int DISTANCE = 10; DISTANCE <= 1000; DISTANCE += 10){
+//                    int failureCounter = 0;
+//                    int successCounter = 0;
+//
+//                    for(Candle candle : candles){
+//                        if(candle.tick() > DISTANCE){
+//                            if(!packingHigh){
+//                                highStop = 0;
+//
+//                                if(lastGroup == LastGroup.HIGH){
+//
+//                                    failureCounter++;
+//
+//                                    lastGroup = LastGroup.NONE;
+//                                } else if(lastGroup == LastGroup.LOW){
+//                                    successCounter++;
+//                                    lastGroup = LastGroup.NONE;
+//                                }
+//                            }
+//
+//                            packingHigh = true;
+//
+//                            highStop = Math.max(highStop, candle.high());
+//
+//                        } else if(packingHigh){
+//                            packingHigh = false;
+//                            lastGroup = LastGroup.HIGH;
+//
+//                        }
+//                        if(candle.tick() < -DISTANCE){
+//                            if(!packingLow){
+//                                lowStop = Double.MAX_VALUE;
+//
+//                                if(lastGroup == LastGroup.LOW){
+//
+//                                    failureCounter++;
+//
+//
+//                                    lastGroup = LastGroup.NONE;
+//                                } else if(lastGroup == LastGroup.HIGH){
+//
+//                                    successCounter++;
+//
+//                                    lastGroup = LastGroup.NONE;
+//                                }
+//                            }
+//
+//
+//
+//                            packingLow = true;
+//
+//                            lowStop = Math.min(lowStop, candle.low());
+//
+//                        } else if(packingLow){
+//                            packingLow = false;
+//                            lastGroup = LastGroup.LOW;
+//                        }
+//                    }
+//
+//                    System.out.println("For DISTANCE " + DISTANCE + ", total: " + (failureCounter + successCounter) + ", losses: " + failureCounter + ", wins: " + successCounter + ", ratio: " + ((successCounter * 1.) / (failureCounter * 1.)));
 //                }
-//            } else if(packingHigh){
-//                lastLargerIndex = candle.index() - 1;
-//                packingHigh = false;
-//                totalGroupCounter++;
-//                all_groups.add(new SingletonMap<>(new SingletonMap<>(firstLowerIndex, lastLowerIndex), "LOW: "));
-//
-//                lastGroup = LastGroup.HIGH;
-//            }
-//
-//            if(candle.tick() < -DISTANCE){
-//                if(lastGroup.equals(LastGroup.HIGH)){
-//                    lastGroup = LastGroup.NONE;
-//                    groups.add(new SingletonMap<>(new SingletonMap<>(firstLargerIndex, lastLargerIndex), "HIGH: "));
-//                }
-//                if(!packingLow){
-//                    packingLow = true;
-//                    firstLowerIndex = candle.index();
-//                }
-//            } else if(packingLow){
-//                lastLowerIndex = candle.index() - 1;
-//                packingLow = false;
-//                totalGroupCounter++;
-//                all_groups.add(new SingletonMap<>(new SingletonMap<>(firstLargerIndex, lastLargerIndex), "HIGH: "));
-//
-//                lastGroup = LastGroup.LOW;
-//            }
-//        }
-//        System.out.println("Distance: " + DISTANCE + ", total groups: " + totalGroupCounter + ", lastGroups: " + groups.size());
-//
-//        for(SingletonMap<SingletonMap<Integer, Integer>, String> map : all_groups){
-//            int startIndex = map.getKey().getKey();
-//            int endIndex = map.getKey().getValue();
-//            String group = map.getValue();
-//            System.out.println(endIndex-startIndex+1);
+//                System.out.println();
+//                System.out.println();
+//            }).start();
 //        }
 
 
@@ -125,10 +126,10 @@ public class App {
         StrategyStarter starter = new StrategyStarter(
                 inputDataFolderPath,
                 "src/main/java/Resources/only_latencies_fixed.csv",
-                //"2023-01-31","2023-03-09",
-                //"2023-03-21", null,
+                //"2023-02-17","2023-02-17",
+                //"2023-03-25", null,
                 null,null,
-                10000
+                100000
         );
 
         starter.execute();

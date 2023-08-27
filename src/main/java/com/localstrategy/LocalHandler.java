@@ -17,10 +17,10 @@ import java.util.TreeMap;
 public class LocalHandler {
 
     private static final int CANDLE_VOLUME = 1_000_000;
-    private static final double RISK_PCT = 0.15;
+    private static final double RISK_PCT = 0.1;
 
     //In relation to the difference between our entry and stop-loss price difference, how much in percentage of slippage are we ready to accept (total, not the average fill price)
-    private static final int SLIPPAGE_PCT = 5;
+    private static final int SLIPPAGE_PCT = 10;
 
     private final EventScheduler scheduler;
     private final CandleConstructor candleConstructor = new CandleConstructor(CANDLE_VOLUME);
@@ -881,7 +881,7 @@ public class LocalHandler {
                                                 //TODOOO
 
                                                 addToDelayedActionMap(closeFilledAfterStopFilledCorrectionActionsList, null, order, OrderAction.CREATE_ORDER);
-                                            } else if(order.getCloseReattemptCounter() < 2) {
+                                            } else if(order.getCloseReattemptCounter() < 4) {
                                                 order.setCloseReattemptCounter(order.getCloseReattemptCounter() + 1);
                                                 order.setCloseReattempted(true);
                                                 order.setStatus(OrderStatus.NEW);
@@ -892,7 +892,7 @@ public class LocalHandler {
                                                         order.clone()
                                                 ));
                                             } else {
-                                                System.out.println("Local Error - can't close order twice.");
+                                                System.out.println("Local Error - can't close order four times..");
                                             }
                                         }
 

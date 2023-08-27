@@ -158,7 +158,13 @@ public class BinanceHandler {
                     boolean isLong = order.getDirection().equals(OrderSide.BUY);
 
                     //Hacky as hell here - binance usually borrows extra funds I already see we're going to have issues with automatic borrowings.
-                    BigDecimal fillPrice = SlippageHandler.getSlippageFillPrice(
+//                    BigDecimal fillPrice = SlippageHandler.getSlippageFillPrice(
+//                            order.getOpenPrice(),
+//                            order.getSize(),
+//                            order.getDirection()
+//                    );
+
+                    BigDecimal fillPrice = SlippageHandler.getSlippageFillFromBook(
                             order.getOpenPrice(),
                             order.getSize(),
                             order.getDirection()
@@ -259,8 +265,14 @@ public class BinanceHandler {
                         boolean point = true;
                     }
 
-                    BigDecimal fillPrice = SlippageHandler.getSlippageFillPrice(
-                            isMarketOrder ? BigDecimal.valueOf(transaction.price()) : order.getOpenPrice(),
+//                    BigDecimal fillPrice = SlippageHandler.getSlippageFillPrice(
+//                            isMarketOrder ? BigDecimal.valueOf(transaction.price()) : order.getOpenPrice(),
+//                            order.getSize(),
+//                            order.getDirection()
+//                    );
+
+                    BigDecimal fillPrice = SlippageHandler.getSlippageFillFromBook(
+                            order.getOpenPrice(),
                             order.getSize(),
                             order.getDirection()
                     );

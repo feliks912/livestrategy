@@ -1,6 +1,7 @@
 package com.localstrategy;
 
 import com.localstrategy.util.enums.OrderSide;
+import com.localstrategy.util.enums.PositionGroup;
 import com.localstrategy.util.indicators.ZigZag;
 import com.localstrategy.util.misc.TradingGUI;
 import com.localstrategy.util.types.Candle;
@@ -30,7 +31,7 @@ public class Strategy2 {
 
     private TradingGUI tradingGUI;
 
-    int DISTANCE = 250;
+    int DISTANCE = 300;
 
     private int ZZDepth = 2;
     private int ZZBackstep = 0;
@@ -92,56 +93,12 @@ public class Strategy2 {
 
     private boolean longAttempt = false;
 
-    private ArrayList<SingletonMap<Double, Double>> newPairs = new ArrayList<>();
-    private ArrayList<SingletonMap<Double, Double>> buyPairs = new ArrayList<>();
-    private ArrayList<SingletonMap<Double, Double>> sellPairs = new ArrayList<>();
-
     private final ZigZag zz = new ZigZag(ZZDepth, 0, ZZBackstep, 0);
     private final ZigZag zz_SL = new ZigZag(15, 0, 10, 0);
 
     public void priceUpdate(SingleTransaction transaction){
         this.transaction = transaction;
         //TODO: Fix when forming candle would become the new high / low, executing two orders. Also, some long orders don't long?
-
-        for(SingletonMap<Double, Double> p : newPairs){
-            if(transaction.price() > p.getKey()){
-                buyPairs.add(new SingletonMap<>(p.getKey(), p.getValue()));
-            } else if(transaction.price() < p.getValue()){
-                sellPairs.add(new SingletonMap<>(p.getKey(), p.getValue()));
-            }
-        }
-
-        newPairs.removeAll(buyPairs);
-        newPairs.removeAll(sellPairs);
-
-        ArrayList<SingletonMap<Double, Double>> tempPairs = new ArrayList<>();
-
-        for(SingletonMap<Double, Double> p : buyPairs){
-            if(transaction.price() < p.getKey()){
-                for(Position position : activePositions){
-                    if(position.getDirection().equals(OrderSide.SELL)){
-                        handler.closePosition(position);
-                    }
-                }
-                handler.activateStopLoss(handler.executeMarketOrder(p.getValue(), true));
-                tempPairs.add(p);
-            }
-        }
-
-        for(SingletonMap<Double, Double> p : sellPairs){
-            if(transaction.price() > p.getValue()){
-                for(Position position : activePositions){
-                    if(position.getDirection().equals(OrderSide.BUY)){
-                        handler.closePosition(position);
-                    }
-                }
-                handler.activateStopLoss(handler.executeMarketOrder(p.getKey(), true));
-                tempPairs.add(p);
-            }
-        }
-
-        buyPairs.removeAll(tempPairs);
-        sellPairs.removeAll(tempPairs);
 
 //        ArrayList<SingletonMap<Double, Double>> tempList = new ArrayList<>();
 //        for(SingletonMap<Double, Double> map : unusedStructure){
@@ -243,73 +200,73 @@ public class Strategy2 {
 
 
 
-//        if(longOnEmptyActivePositions){
-//
-//            Position newMarketPosition = handler.executeMarketOrder(longRangeLowStop, true);
-//
-//            if(newMarketPosition != null){
-//                handler.activateStopLoss(newMarketPosition);
-//            }
-//
-//            packingForLong = false;
-//            longRangeLowStop = Double.MAX_VALUE;
-//            longRangeHighEntry = 0;
-//            waitForNextCandle = true;
-//
-//            longOnEmptyActivePositions = false;
-//        } else if (shortOnEmptyActivePositions){
-//
-//            Position newMarketPosition = handler.executeMarketOrder(shortRangeHighStop, true);
-//
-//            if(newMarketPosition != null){
-//                handler.activateStopLoss(newMarketPosition);
-//            }
-//
-//            packingForShort = false;
-//            shortRangeHighStop = 0;
-//            shortRangeLowEntry = Double.MAX_VALUE;
-//            waitForNextCandle = true;
-//
-//            shortOnEmptyActivePositions = false;
-//        }
-//
-//
-//
-//        // --- LONG ---
-//        if(packingForLong){
-//            if(transaction.price() >= zz.getLastHigh()){
-//                for(Position position : activePositions){
-//                    if(position.getDirection().equals(OrderSide.SELL)){
-//                        if(position.getGroup().equals(PositionGroup.FILLED)){
-//                            handler.closePosition(position);
-//                        }
-//                    }
-//                }
-//
-//                longOnEmptyActivePositions = true;
-//
-//            } else if(transaction.price() <= longRangeLowStop){
-//                longRangeLowStop = transaction.price();
-//            }
-//        }
-//
-//        // --- SHORT ---
-//        if (packingForShort){
-//            if(transaction.price() <= zz.getLastLow()){
-//                for(Position position : activePositions){
-//                    if(position.getDirection().equals(OrderSide.BUY)){
-//                        if(position.getGroup().equals(PositionGroup.FILLED)){
-//                            handler.closePosition(position);
-//                        }
-//                    }
-//                }
-//
-//                shortOnEmptyActivePositions = true;
-//
-//            } else if(transaction.price() >= shortRangeHighStop) {
-//                shortRangeHighStop = transaction.price();
-//            }
-//        }
+        if(longOnEmptyActivePositions){
+
+            Position newMarketPosition = handler.executeMarketOrder(longRangeLowStop, true);
+
+            if(newMarketPosition != null){
+                handler.activateStopLoss(newMarketPosition);
+            }
+
+            packingForLong = false;
+            longRangeLowStop = Double.MAX_VALUE;
+            longRangeHighEntry = 0;
+            waitForNextCandle = true;
+
+            longOnEmptyActivePositions = false;
+        } else if (shortOnEmptyActivePositions){
+
+            Position newMarketPosition = handler.executeMarketOrder(shortRangeHighStop, true);
+
+            if(newMarketPosition != null){
+                handler.activateStopLoss(newMarketPosition);
+            }
+
+            packingForShort = false;
+            shortRangeHighStop = 0;
+            shortRangeLowEntry = Double.MAX_VALUE;
+            waitForNextCandle = true;
+
+            shortOnEmptyActivePositions = false;
+        }
+
+
+
+        // --- LONG ---
+        if(packingForLong){
+            if(transaction.price() >= zz.getLastHigh()){
+                for(Position position : activePositions){
+                    if(position.getDirection().equals(OrderSide.SELL)){
+                        if(position.getGroup().equals(PositionGroup.FILLED)){
+                            handler.closePosition(position);
+                        }
+                    }
+                }
+
+                longOnEmptyActivePositions = true;
+
+            } else if(transaction.price() <= longRangeLowStop){
+                longRangeLowStop = transaction.price();
+            }
+        }
+
+        // --- SHORT ---
+        if (packingForShort){
+            if(transaction.price() <= zz.getLastLow()){
+                for(Position position : activePositions){
+                    if(position.getDirection().equals(OrderSide.BUY)){
+                        if(position.getGroup().equals(PositionGroup.FILLED)){
+                            handler.closePosition(position);
+                        }
+                    }
+                }
+
+                shortOnEmptyActivePositions = true;
+
+            } else if(transaction.price() >= shortRangeHighStop) {
+                shortRangeHighStop = transaction.price();
+            }
+        }
     }
 
     boolean longBreak = false;
@@ -334,11 +291,6 @@ public class Strategy2 {
             return;
         }
 
-        for(Position position : activePositions){
-            if(position.calculateRR(transaction.price()) > 10){
-                handler.closePosition(position);
-            }
-        }
         // -- BREAKEVENS ---
 //        for(Position position : activePositions){
 //            if(!position.isBreakEvenActive() && position.getGroup().equals(PositionGroup.FILLED)){
@@ -356,21 +308,7 @@ public class Strategy2 {
 //        double previousHigh = zz.getLastHigh();
 //        double previousLow = zz.getLastLow();
 
-        double high = zz.getLastHigh();
-        double low = zz.getLastLow();
-
         zz.updateZigZagValue(candles);
-
-        if(zz.getLastHigh() == -1 || zz.getLastLow() == -1){
-            return;
-        }
-
-        if(zz.getLastHigh() != high){
-            newPairs.add(new SingletonMap<>(zz.getLastHigh(), zz.getLastLow()));
-        }
-        if(zz.getLastLow() != low){
-            newPairs.add(new SingletonMap<>(zz.getLastHigh(), zz.getLastLow()));
-        }
 
 //        if(previousHigh != zz.getLastHigh()){
 //            newHigh = true;
@@ -385,40 +323,41 @@ public class Strategy2 {
 //            }
 //        }
 
-
-
+        if(zz.getLastHigh() == -1 || zz.getLastLow() == -1){
+            return;
+        }
 
         // --- LONG ---
-//        if(!waitForNextCandle && candle.tick() <= -DISTANCE){ // New lows for long
-//            if(longBreak){
-//                longRangeLowStop = Double.MAX_VALUE;
-//                longBreak = false;
-//            }
-//            packingForLong = true;
-//
-//            longRangeHighEntry = Math.min(zz.getLastHigh(), candle.high());
-//            longRangeLowStop = Math.min(longRangeLowStop, candle.low());
-//        } else {
-//            longBreak = true;
-//        }
-//
-//        // --- SHORT  ---
-//        if(!waitForNextCandle && candle.tick() >= DISTANCE){ // New highs for short
-//            if(shortBreak){
-//                shortRangeHighStop = 0;
-//                shortBreak = false;
-//            }
-//            packingForShort = true;
-//
-//            shortRangeLowEntry = Math.max(zz.getLastLow(), candle.low());
-//            shortRangeHighStop = Math.max(shortRangeHighStop, candle.high());
-//        } else {
-//            shortBreak = true;
-//        }
-//
-//        if(waitForNextCandle){
-//            waitForNextCandle = false;
-//        }
+        if(!waitForNextCandle && candle.tick() <= -DISTANCE){ // New lows for long
+            if(longBreak){
+                longRangeLowStop = Double.MAX_VALUE;
+                longBreak = false;
+            }
+            packingForLong = true;
+
+            longRangeHighEntry = Math.min(zz.getLastHigh(), candle.high());
+            longRangeLowStop = Math.min(longRangeLowStop, candle.low());
+        } else {
+            longBreak = true;
+        }
+
+        // --- SHORT  ---
+        if(!waitForNextCandle && candle.tick() >= DISTANCE){ // New highs for short
+            if(shortBreak){
+                shortRangeHighStop = 0;
+                shortBreak = false;
+            }
+            packingForShort = true;
+
+            shortRangeLowEntry = Math.max(zz.getLastLow(), candle.low());
+            shortRangeHighStop = Math.max(shortRangeHighStop, candle.high());
+        } else {
+            shortBreak = true;
+        }
+
+        if(waitForNextCandle){
+            waitForNextCandle = false;
+        }
 
     }
 }

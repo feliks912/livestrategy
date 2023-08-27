@@ -16,6 +16,9 @@ public class OrderRequest {
 
     public int totalProgrammaticOrderLimit;
 
+    private static double maxPositionSize = 0;
+    private static double maxPositionSizeFiltered = 0;
+
     private final ArrayList<Position> activePositions;
     private UserAssets userAssets;
     private final double risk;
@@ -104,14 +107,27 @@ public class OrderRequest {
                     .divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP)
                     .divide(absPriceDiff, 6, RoundingMode.HALF_UP);
 
-            BigDecimal slippageLimitedPositionSize = SlippageHandler.getMaximumOrderSize(entryPrice, absPriceDiff, slippagePct, (entryPrice.compareTo(stopLossPrice) > 0 ? OrderSide.BUY : OrderSide.SELL))
-                    .min(SlippageHandler.getMaximumOrderSize(stopLossPrice, absPriceDiff, slippagePct, (entryPrice.compareTo(stopLossPrice) > 0 ? OrderSide.SELL : OrderSide.BUY)));
+            if(positionSize.doubleValue() > maxPositionSize) {
+                maxPositionSize = positionSize.doubleValue();
+                System.out.println("New max position value: " + maxPositionSize);
+            }
+
+            BigDecimal slippageLimitedPositionSize = SlippageHandler.getMaximumOrderSizeFromBook(entryPrice, absPriceDiff, slippagePct, (entryPrice.compareTo(stopLossPrice) > 0 ? OrderSide.BUY : OrderSide.SELL))
+                    .min(SlippageHandler.getMaximumOrderSizeFromBook(stopLossPrice, absPriceDiff, slippagePct, (entryPrice.compareTo(stopLossPrice) > 0 ? OrderSide.SELL : OrderSide.BUY)));
+
+//            BigDecimal slippageLimitedPositionSize = SlippageHandler.getMaximumOrderSize(entryPrice, absPriceDiff, slippagePct, (entryPrice.compareTo(stopLossPrice) > 0 ? OrderSide.BUY : OrderSide.SELL))
+//                    .min(SlippageHandler.getMaximumOrderSize(stopLossPrice, absPriceDiff, slippagePct, (entryPrice.compareTo(stopLossPrice) > 0 ? OrderSide.SELL : OrderSide.BUY)));
 
             positionSize = slippageLimitedPositionSize
                     .min(positionSize)
                     .max(BigDecimal.valueOf(10).divide(entryPrice, 8, RoundingMode.HALF_UP))
                     .max(BigDecimal.valueOf(0.00001))
                     .min(BigDecimal.valueOf(152));
+
+            if(positionSize.doubleValue() > maxPositionSizeFiltered){
+                maxPositionSizeFiltered = positionSize.doubleValue();
+                System.out.println("New max filtered position size: " + maxPositionSizeFiltered);
+            }
 
             //Compensate for stoploss slippage
             if(compensateStopLoss){
@@ -143,7 +159,7 @@ public class OrderRequest {
                 amountToBorrow = amountToBorrow.multiply(entryPrice);
 
                 if(borrowedUSDT.add(amountToBorrow).compareTo(TierManager.MAX_BORROW_USDT) > 0){
-                    System.out.println("No bueno borrow USDT.");
+                    //System.out.println("No bueno borrow USDT.");
                     return false;
                 }
 
@@ -162,7 +178,7 @@ public class OrderRequest {
             }
             else {
                 if(borrowedBTC.add(amountToBorrow).compareTo(TierManager.MAX_BORROW_BTC) > 0){
-                    System.out.println("No bueno borrow BTC.");
+                    //System.out.println("No bueno borrow BTC.");
                     return false;
                 }
 
