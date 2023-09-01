@@ -116,7 +116,7 @@ public class OrderRequest {
 
             if(positionSize.doubleValue() > maxPositionSize) {
                 maxPositionSize = positionSize.doubleValue();
-                System.out.println("New max position value: " + maxPositionSize);
+                //System.out.println("New max position value: " + maxPositionSize);
             }
 
             BigDecimal slippageLimitedPositionSize = SlippageHandler.getMaximumOrderSizeFromBook(entryPrice, absPriceDiff, slippagePct, (entryPrice.compareTo(stopLossPrice) > 0 ? OrderSide.BUY : OrderSide.SELL))
@@ -133,7 +133,7 @@ public class OrderRequest {
 
             if(positionSize.doubleValue() > maxPositionSizeFiltered){
                 maxPositionSizeFiltered = positionSize.doubleValue();
-                System.out.println("New max filtered position size: " + maxPositionSizeFiltered);
+                //System.out.println("New max filtered position size: " + maxPositionSizeFiltered);
             }
 
             //Compensate for stoploss slippage
@@ -244,7 +244,7 @@ public class OrderRequest {
                     programmaticCounter < totalProgrammaticOrderLimit){
                 return true;
             } else {
-                System.out.println("Not - margin or prog counter");
+                //System.out.println("Not - margin or prog counter");
             }
         }
 

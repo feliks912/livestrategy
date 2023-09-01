@@ -17,7 +17,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 public class Strategy2 {
-    private final static boolean DISPLAY_TRADING_GUI = true;
+    private final static boolean DISPLAY_TRADING_GUI = Params.showGraph;
 
     private final static int CANDLE_STEP_TIME_MS = 30;
 
@@ -31,7 +31,7 @@ public class Strategy2 {
 
     private final ArrayList<SingletonMap<Double, Double>> unusedStructure = new ArrayList<>();
 
-    private final CandleConstructor localCandleConstructor = new CandleConstructor(150_000);
+    private final CandleConstructor localCandleConstructor = new CandleConstructor(200_000);
 
     private final BinaryTransactionLoader localLoader = new BinaryTransactionLoader("C:\\--- BTCUSDT", "2023-03-25", null);
 
@@ -41,12 +41,12 @@ public class Strategy2 {
 
     private TradingGUI tradingGUI;
 
-    int DISTANCE = 2000000;
+    int DISTANCE = Params.distance;
 
     public static int positionCount = 0;
 
-    private int ZZDepth = 4;
-    private int ZZBackstep = 2;
+    private int ZZDepth = Params.depth;
+    private int ZZBackstep = Params.backstep;
 
     public Strategy2(LocalHandler localHandler, ArrayList<Candle> candles, ArrayList<Position> activePositions, LinkedList<Position> inactivePositions){
         this.handler = localHandler;
@@ -113,6 +113,13 @@ public class Strategy2 {
     private Candle localCandle;
 
     public void priceUpdate(SingleTransaction transaction){
+
+        if(packingForShort && transaction.price() > shortRangeHighStop){
+            shortRangeHighStop = transaction.price();
+        }
+        if(packingForLong && transaction.price() < longRangeLowStop){
+            longRangeLowStop = transaction.price();
+        }
 
         //local transaction is always a bit ahead of the binance transaction
         if(transaction.timestamp() > localTransactionList.get(localTransactionList.size() - 1).timestamp()){
@@ -342,7 +349,7 @@ public class Strategy2 {
 
         this.lastCandle = candle;
 
-        if(candles.size() < 2 * Math.max(zz.getDepth(), zz_SL.getDepth()) + Math.max(zz.getBackstep(), zz_SL.getBackstep()) + 1){
+        if(candles.size() < 2 * zz.getDepth() + zz.getBackstep() + 1){
             return;
         }
 

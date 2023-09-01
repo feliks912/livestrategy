@@ -16,11 +16,11 @@ import java.util.TreeMap;
 
 public class LocalHandler {
 
-    private static final int CANDLE_VOLUME = 100_000;
-    private static final double RISK_PCT = 0.1;
+    private static final int CANDLE_VOLUME = Params.volume;
+    private static final double RISK_PCT = Params.risk;
 
     //In relation to the difference between our entry and stop-loss price difference, how much in percentage of slippage are we ready to accept (total, not the average fill price)
-    private static final int SLIPPAGE_PCT = 10;
+    private static final int SLIPPAGE_PCT = Params.perc;
 
     private final EventScheduler scheduler;
     private final CandleConstructor candleConstructor = new CandleConstructor(CANDLE_VOLUME);

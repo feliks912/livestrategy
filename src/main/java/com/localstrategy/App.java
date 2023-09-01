@@ -65,10 +65,10 @@ public class App {
 //            }
 //        }
 
-        String inputDataFolderPath = "C:\\--- ETHTUSD";
+        String inputDataFolderPath = "C:\\--- BTCTUSD";
 
         StrategyStarter starter = new StrategyStarter(
-                inputDataFolderPath,
+                Params.dataPath,
                 "src/main/java/Resources/only_latencies_fixed.csv",
                 //"2023-02-17","2023-02-17",
                 //"2023-05-05", "2023-06-22",
