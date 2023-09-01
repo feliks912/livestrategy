@@ -6,6 +6,7 @@ import com.localstrategy.util.indicators.ZigZag;
 import com.localstrategy.util.types.UserAssets;
 import org.apache.commons.collections4.map.SingletonMap;
 
+import java.io.IOException;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Map;
@@ -15,120 +16,64 @@ public class App {
 
     public static ZigZag zz = new ZigZag(5, 0, 0, 0);
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
 
-//        String[] fileNames = {"250k", "500k", "1M", "2M", "4M"};
+//        DataOutputStream dataOutputStream;
 //
-//        for(String name : fileNames){
+//        dataOutputStream = new DataOutputStream(new FileOutputStream("C:\\BTCCandles\\1MAll_MLData.bin", true));
 //
-//            new Thread(() ->{
-//                ArrayList<Candle> candles = new ArrayList<>(CandleFileManager.readCandles("C:\\BTCCandles\\" + name + "All.bin", 0, Integer.MAX_VALUE));
+//        ArrayList<Candle> candles = new ArrayList<>(CandleFileManager.readCandles("C:\\BTCCandles\\" + "1M" + "All.bin", 0, Integer.MAX_VALUE));
 //
-//                System.out.println("Filename: " + name + "All.bin");
+//        int ZZDepth = 4;
+//        int ZZBackstep = 4;
 //
-//                boolean packingHigh = false;
-//                boolean packingLow = false;
+//        ZigZag zz = new ZigZag(ZZDepth, 0, ZZBackstep, 0);
 //
-//                int firstLargerIndex = 0;
-//                int lastLargerIndex = 0;
+//        int size = candles.size();
 //
-//                int firstLowerIndex = 0;
-//                int lastLowerIndex = 0;
+//        for(int i = 2 * ZZDepth + ZZBackstep; i < size; i++){
 //
-//                enum LastGroup{
-//                    NONE,
-//                    HIGH,
-//                    LOW
-//                }
+//            ArrayList<Candle> can = new ArrayList<>(candles.subList(i - 2 * ZZDepth - ZZBackstep, i + 1));
 //
-//                LastGroup lastGroup = LastGroup.NONE;
+//            double high = zz.getLastHigh();
+//            double low = zz.getLastLow();
 //
-//                int ZZDepth;
-//                int ZZBackstep;
+//            zz.updateZigZagValue(can);
 //
-//                double highStop = 0;
-//                double lowStop = Double.MAX_VALUE;
+//            int diff = 0;
 //
-//                boolean shortBreak = false;
-//                boolean longBreak = false;
+//            if(high != zz.getLastHigh()){
+//                diff = 1;
+//            }
+//            if (low != zz.getLastLow()) {
+//                diff = -1;
+//            }
 //
-//                for(int DISTANCE = 10; DISTANCE <= 1000; DISTANCE += 10){
-//                    int failureCounter = 0;
-//                    int successCounter = 0;
+//            Candle candle = candles.get(i - ZZDepth - ZZBackstep);
 //
-//                    for(Candle candle : candles){
-//                        if(candle.tick() > DISTANCE){
-//                            if(!packingHigh){
-//                                highStop = 0;
+//            double returns = (candle.open() - candle.close()) / candle.close();
 //
-//                                if(lastGroup == LastGroup.HIGH){
-//
-//                                    failureCounter++;
-//
-//                                    lastGroup = LastGroup.NONE;
-//                                } else if(lastGroup == LastGroup.LOW){
-//                                    successCounter++;
-//                                    lastGroup = LastGroup.NONE;
-//                                }
-//                            }
-//
-//                            packingHigh = true;
-//
-//                            highStop = Math.max(highStop, candle.high());
-//
-//                        } else if(packingHigh){
-//                            packingHigh = false;
-//                            lastGroup = LastGroup.HIGH;
-//
-//                        }
-//                        if(candle.tick() < -DISTANCE){
-//                            if(!packingLow){
-//                                lowStop = Double.MAX_VALUE;
-//
-//                                if(lastGroup == LastGroup.LOW){
-//
-//                                    failureCounter++;
-//
-//
-//                                    lastGroup = LastGroup.NONE;
-//                                } else if(lastGroup == LastGroup.HIGH){
-//
-//                                    successCounter++;
-//
-//                                    lastGroup = LastGroup.NONE;
-//                                }
-//                            }
-//
-//
-//
-//                            packingLow = true;
-//
-//                            lowStop = Math.min(lowStop, candle.low());
-//
-//                        } else if(packingLow){
-//                            packingLow = false;
-//                            lastGroup = LastGroup.LOW;
-//                        }
-//                    }
-//
-//                    System.out.println("For DISTANCE " + DISTANCE + ", total: " + (failureCounter + successCounter) + ", losses: " + failureCounter + ", wins: " + successCounter + ", ratio: " + ((successCounter * 1.) / (failureCounter * 1.)));
-//                }
-//                System.out.println();
-//                System.out.println();
-//            }).start();
+//            try{
+//                dataOutputStream.writeDouble(candle.high() - candle.low());
+//                dataOutputStream.writeDouble(returns);
+//                dataOutputStream.writeInt(diff);
+//                dataOutputStream.writeInt(candle.tick());
+//                dataOutputStream.writeInt(candle.volume());
+//                dataOutputStream.writeLong(candle.timestamp());
+//            } catch (IOException e){
+//                throw e;
+//            }
 //        }
 
-
-
-
-        String inputDataFolderPath = "C:\\--- BTCUSDT";
+        String inputDataFolderPath = "C:\\--- ETHTUSD";
 
         StrategyStarter starter = new StrategyStarter(
                 inputDataFolderPath,
                 "src/main/java/Resources/only_latencies_fixed.csv",
                 //"2023-02-17","2023-02-17",
-                //"2023-03-25", null,
-                null,null,
+                //"2023-05-05", "2023-06-22",
+                "2023-03-25", null,
+                //null,null,
                 100000
         );
 
@@ -150,6 +95,4 @@ public class App {
 
         System.out.printf("Max drawdown: %.2f%%" , (1 - DrawdownCalculator.calculateMaxDrawdown(assets.stream().map(UserAssets::getMomentaryOwnedAssets).collect(Collectors.toCollection(ArrayList::new)))) * 100);
     }
-
-
 }

@@ -16,7 +16,7 @@ import java.util.TreeMap;
 
 public class LocalHandler {
 
-    private static final int CANDLE_VOLUME = 1_000_000;
+    private static final int CANDLE_VOLUME = 100_000;
     private static final double RISK_PCT = 0.1;
 
     //In relation to the difference between our entry and stop-loss price difference, how much in percentage of slippage are we ready to accept (total, not the average fill price)
@@ -104,7 +104,7 @@ public class LocalHandler {
     }
 
     private void newCandle(Candle lastCandle) {
-        strategy.candleUpdate(lastCandle);
+        //strategy.candleUpdate(lastCandle);
     }
 
     public Position executeMarketOrder(double stopPrice, boolean adjustStop) {
@@ -1633,6 +1633,4 @@ public class LocalHandler {
     public ArrayList<Position> getActivePositions() {
         return this.activePositions;
     }
-
-
 }

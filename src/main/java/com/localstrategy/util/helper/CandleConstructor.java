@@ -22,7 +22,7 @@ public class CandleConstructor {
     private double closeOnNextOpen;
     private int closeOnNextTransactionCount;
 
-    private static final int MAXIMUM_CANDLES_SIZE = 2000;
+    private static final int MAXIMUM_CANDLES_SIZE = 5000;
 
     public CandleConstructor(int volumePerCandle) {
         this.volumePerCandle = volumePerCandle;

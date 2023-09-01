@@ -2,6 +2,8 @@ package com.localstrategy;
 
 import com.localstrategy.util.enums.OrderSide;
 import com.localstrategy.util.enums.PositionGroup;
+import com.localstrategy.util.helper.BinaryTransactionLoader;
+import com.localstrategy.util.helper.CandleConstructor;
 import com.localstrategy.util.indicators.ZigZag;
 import com.localstrategy.util.misc.TradingGUI;
 import com.localstrategy.util.types.Candle;
@@ -15,7 +17,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 public class Strategy2 {
-    private final static boolean DISPLAY_TRADING_GUI = false;
+    private final static boolean DISPLAY_TRADING_GUI = true;
 
     private final static int CANDLE_STEP_TIME_MS = 30;
 
@@ -29,12 +31,22 @@ public class Strategy2 {
 
     private final ArrayList<SingletonMap<Double, Double>> unusedStructure = new ArrayList<>();
 
+    private final CandleConstructor localCandleConstructor = new CandleConstructor(150_000);
+
+    private final BinaryTransactionLoader localLoader = new BinaryTransactionLoader("C:\\--- BTCUSDT", "2023-03-25", null);
+
+    private final ArrayList<SingleTransaction> localTransactionList = new ArrayList<>(localLoader.loadNextDay());
+
+    private SingleTransaction localTransaction = localTransactionList.get(0);
+
     private TradingGUI tradingGUI;
 
-    int DISTANCE = 300;
+    int DISTANCE = 2000000;
 
-    private int ZZDepth = 2;
-    private int ZZBackstep = 0;
+    public static int positionCount = 0;
+
+    private int ZZDepth = 4;
+    private int ZZBackstep = 2;
 
     public Strategy2(LocalHandler localHandler, ArrayList<Candle> candles, ArrayList<Position> activePositions, LinkedList<Position> inactivePositions){
         this.handler = localHandler;
@@ -96,8 +108,38 @@ public class Strategy2 {
     private final ZigZag zz = new ZigZag(ZZDepth, 0, ZZBackstep, 0);
     private final ZigZag zz_SL = new ZigZag(15, 0, 10, 0);
 
+    private int candleCounter = 0;
+
+    private Candle localCandle;
+
     public void priceUpdate(SingleTransaction transaction){
-        this.transaction = transaction;
+
+        //local transaction is always a bit ahead of the binance transaction
+        if(transaction.timestamp() > localTransactionList.get(localTransactionList.size() - 1).timestamp()){
+            if(localLoader.getRemainingFileCount() == 0){
+                //Halt the program
+                System.out.println("We're done.");
+                StrategyStarter.exitBit = true;
+                return;
+            }
+            localTransactionList.clear();
+            localTransactionList.addAll(localLoader.loadNextDay());
+            candleCounter = 0;
+        }
+
+        while(transaction.timestamp() > localTransaction.timestamp()){
+            localTransaction = localTransactionList.get(candleCounter++);
+            Candle candle = localCandleConstructor.processTradeEvent(localTransaction);
+            if(candle != null){
+                localCandle = candle;
+                candleUpdate(candle);
+            }
+        }
+
+        SingleTransaction globalTransaction = transaction;
+
+        transaction = localTransaction;
+
         //TODO: Fix when forming candle would become the new high / low, executing two orders. Also, some long orders don't long?
 
 //        ArrayList<SingletonMap<Double, Double>> tempList = new ArrayList<>();
@@ -206,6 +248,7 @@ public class Strategy2 {
 
             if(newMarketPosition != null){
                 handler.activateStopLoss(newMarketPosition);
+                positionCount++;
             }
 
             packingForLong = false;
@@ -220,6 +263,7 @@ public class Strategy2 {
 
             if(newMarketPosition != null){
                 handler.activateStopLoss(newMarketPosition);
+                positionCount++;
             }
 
             packingForShort = false;
@@ -245,8 +289,8 @@ public class Strategy2 {
 
                 longOnEmptyActivePositions = true;
 
-            } else if(transaction.price() <= longRangeLowStop){
-                longRangeLowStop = transaction.price();
+            } else if(globalTransaction.price() <= longRangeLowStop){
+                longRangeLowStop = globalTransaction.price();
             }
         }
 
@@ -263,8 +307,8 @@ public class Strategy2 {
 
                 shortOnEmptyActivePositions = true;
 
-            } else if(transaction.price() >= shortRangeHighStop) {
-                shortRangeHighStop = transaction.price();
+            } else if(globalTransaction.price() >= shortRangeHighStop) {
+                shortRangeHighStop = globalTransaction.price();
             }
         }
     }
@@ -272,7 +316,18 @@ public class Strategy2 {
     boolean longBreak = false;
     boolean shortBreak = false;
 
+    private Candle globalCandle;
+
     public void candleUpdate(Candle candle){
+
+        if(candle == localCandle){
+            if(globalCandle == null){
+                globalCandle = candle;
+            }
+        } else {
+            globalCandle = candle;
+            return;
+        }
 
 //        if(lastCandle != null && lastCandle.tick() <= -DISTANCE && candle.tick() > -DISTANCE){
 //            shortAttempt = true;
@@ -336,7 +391,7 @@ public class Strategy2 {
             packingForLong = true;
 
             longRangeHighEntry = Math.min(zz.getLastHigh(), candle.high());
-            longRangeLowStop = Math.min(longRangeLowStop, candle.low());
+            longRangeLowStop = Math.min(longRangeLowStop, globalCandle.low());
         } else {
             longBreak = true;
         }
@@ -350,7 +405,7 @@ public class Strategy2 {
             packingForShort = true;
 
             shortRangeLowEntry = Math.max(zz.getLastLow(), candle.low());
-            shortRangeHighStop = Math.max(shortRangeHighStop, candle.high());
+            shortRangeHighStop = Math.max(shortRangeHighStop, globalCandle.high());
         } else {
             shortBreak = true;
         }

@@ -32,6 +32,8 @@ public class StrategyStarter {
 
     private BinaryOrderbookReader bookReader;
 
+    public static boolean exitBit = false;
+
     public StrategyStarter(String inputDataFolderPath, String inputLatencyFilePath, String fromDate, String toDate, double initialUSDTPortfolio) {
 
         System.out.println("Starting " + inputDataFolderPath.split(" ")[1] + " from " + fromDate + " to " + toDate);
@@ -75,6 +77,10 @@ public class StrategyStarter {
         }
 
         while (true) {
+            if(exitBit){
+                return;
+            }
+
             Event event = scheduler.getNextEvent();
 
             if(event.getType().equals(EventType.ACTION_REQUEST) && event.getOrder().getId() == 103){
@@ -130,6 +136,8 @@ public class StrategyStarter {
         System.out.println(localHandler.getUserAssets().toString());
     }
 
+
+
     public LocalHandler getLocalHandler(){
         return this.localHandler;
     }
@@ -147,7 +155,7 @@ public class StrategyStarter {
 
         double dayDiffPct = (endOfDayUSDT - previousDayUSDT) / previousDayUSDT * 100;
 
-        System.out.printf("Day %d/%d (%s) done. Balance: $%.2f, profit: $%.2f, pct change: %.2f%%. %d active positions.\n",
+        System.out.printf("Day %d/%d (%s) done. Balance: $%.2f, profit: $%.2f, pct change: %.2f%%. %d active positions. %d positions today\n",
                 currentDay,
                 initialFileCounter,
                 transactionLoader.getCurrentFileName().substring(
@@ -156,7 +164,10 @@ public class StrategyStarter {
                 endOfDayUSDT,
                 (endOfDayUSDT - previousDayUSDT),
                 dayDiffPct,
-                localHandler.getActivePositions().size());
+                localHandler.getActivePositions().size(),
+                Strategy2.positionCount);
+
+        Strategy2.positionCount = 0;
 
         previousDayUSDT = endOfDayUSDT;
     }

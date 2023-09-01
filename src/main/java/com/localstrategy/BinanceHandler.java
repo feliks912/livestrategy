@@ -246,6 +246,8 @@ public class BinanceHandler {
     }
 
     private void checkFills() {
+        ArrayList<Order> tempRejectedOrder = new ArrayList<>();
+
         for (Order order : newOrders) {
             if (order.getStatus().equals(OrderStatus.NEW)) { //FIXME: Status field is mutable by the client. We're not editing it too much but still not good practice
 
@@ -292,6 +294,7 @@ public class BinanceHandler {
                                 order.setStatus(OrderStatus.REJECTED);
                                 order.setRejectionReason(rejectionReason);
                                 createActionResponse(ActionResponse.ORDER_REJECTED, order);
+                                tempRejectedOrder.add(order);
                                 rejectedOrders.add(order); //For removal at the end of the method
                                 logToHistory(order, userAssets, "Rejected "
                                         + (order.getDirection().equals(OrderSide.BUY) ? "USDT" : "BTC")
@@ -300,12 +303,18 @@ public class BinanceHandler {
                             }
                         }
                     }
+
+                    boolean payFee = order.getPurpose().equals(OrderPurpose.STOP) || order.getPurpose().equals(OrderPurpose.CLOSE);
+
+                    payFee = false;
+
                     if (isLong) {
                         if (userAssets.getFreeUSDT().compareTo(order.getAppropriateUnitPositionValue()) < 0) {
                             if (isMarketOrder) { // Action response
                                 order.setStatus(OrderStatus.REJECTED);
                                 order.setRejectionReason(RejectionReason.INSUFFICIENT_FUNDS);
                                 createActionResponse(ActionResponse.ORDER_REJECTED, order);
+                                tempRejectedOrder.add(order);
                                 rejectedOrders.add(order);
                             } else { // Rejected order
                                 rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, order); //This one for example, reports over a user stream.
@@ -318,7 +327,8 @@ public class BinanceHandler {
 
                         userAssets.setFreeUSDT(
                                 userAssets.getFreeUSDT()
-                                        .subtract(order.getSize().multiply(fillPrice))
+                                        .subtract(order.getSize().multiply(fillPrice)
+                                                .multiply(payFee ? BigDecimal.valueOf(1.00016) : BigDecimal.ONE))
                         );
 
                         userAssets.setFreeBTC(
@@ -334,6 +344,7 @@ public class BinanceHandler {
                                 order.setStatus(OrderStatus.REJECTED);
                                 order.setRejectionReason(RejectionReason.INSUFFICIENT_FUNDS);
                                 createActionResponse(ActionResponse.ORDER_REJECTED, order);
+                                tempRejectedOrder.add(order);
                                 rejectedOrders.add(order);
                             } else {
                                 rejectOrder(RejectionReason.INSUFFICIENT_FUNDS, order); //FIXME: This one for example, would report over a user stream.
@@ -349,8 +360,11 @@ public class BinanceHandler {
                         );
                         userAssets.setFreeUSDT(
                                 userAssets.getFreeUSDT()
-                                        .add(order.getSize().multiply(fillPrice))
+                                        .add(order.getSize().multiply(fillPrice)
+                                                .multiply(payFee ? BigDecimal.valueOf(0.99984) : BigDecimal.ONE))
                         );
+
+
 
                         logToHistory(order, userAssets, "Shorted order " + order.getId() + ", position " + order.getPositionId());
                     }
@@ -379,7 +393,7 @@ public class BinanceHandler {
             userAssetsUpdated = true;
         }
 
-        for (Order order : rejectedOrders) {
+        for (Order order : tempRejectedOrder) {
             newOrders.removeIf(o -> o.getId() == order.getId());
         }
     }

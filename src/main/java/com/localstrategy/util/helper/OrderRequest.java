@@ -102,10 +102,17 @@ public class OrderRequest {
             // USDT is locked when borrowing USDT or BTC
             // FreeUSDT is got when we sell borrowed BTC or when we borrow USDT
 
-
             positionSize = totalFreeUsdt.multiply(BigDecimal.valueOf(risk))
                     .divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP)
                     .divide(absPriceDiff, 6, RoundingMode.HALF_UP);
+
+//            positionSize = totalFreeUsdt.multiply(BigDecimal.valueOf(risk))
+//                    .divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP)
+//                    .divide(BigDecimal.ONE
+//                            .add(BigDecimal.valueOf(0.00016)
+//                                    .multiply(stopLossPrice.divide(entryPrice, 10, RoundingMode.HALF_UP))
+//                                    .multiply(BigDecimal.valueOf(riskManager.getCurrentLeverage()))), 10, RoundingMode.HALF_UP)
+//                    .divide(absPriceDiff, 6, RoundingMode.HALF_UP);
 
             if(positionSize.doubleValue() > maxPositionSize) {
                 maxPositionSize = positionSize.doubleValue();
