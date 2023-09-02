@@ -31,7 +31,7 @@ public class Strategy2 {
 
     private final ArrayList<SingletonMap<Double, Double>> unusedStructure = new ArrayList<>();
 
-    private final CandleConstructor localCandleConstructor = new CandleConstructor(200_000);
+    private final CandleConstructor localCandleConstructor = new CandleConstructor(Params.volume);
 
     private final BinaryTransactionLoader localLoader = new BinaryTransactionLoader("C:\\--- BTCUSDT", "2023-03-25", null);
 
@@ -143,10 +143,6 @@ public class Strategy2 {
             }
         }
 
-        SingleTransaction globalTransaction = transaction;
-
-        transaction = localTransaction;
-
         //TODO: Fix when forming candle would become the new high / low, executing two orders. Also, some long orders don't long?
 
 //        ArrayList<SingletonMap<Double, Double>> tempList = new ArrayList<>();
@@ -251,7 +247,8 @@ public class Strategy2 {
 
         if(longOnEmptyActivePositions){
 
-            Position newMarketPosition = handler.executeMarketOrder(longRangeLowStop, true);
+            Position newMarketPosition = handler.executeMarketOrder(longRangeLowStop
+                    + (longRangeLowStop - transaction.price()) * 0.2, true);
 
             if(newMarketPosition != null){
                 handler.activateStopLoss(newMarketPosition);
@@ -266,7 +263,8 @@ public class Strategy2 {
             longOnEmptyActivePositions = false;
         } else if (shortOnEmptyActivePositions){
 
-            Position newMarketPosition = handler.executeMarketOrder(shortRangeHighStop, true);
+            Position newMarketPosition = handler.executeMarketOrder(shortRangeHighStop
+                    + (transaction.price() - shortRangeHighStop) * 0.2, true);
 
             if(newMarketPosition != null){
                 handler.activateStopLoss(newMarketPosition);
@@ -285,7 +283,7 @@ public class Strategy2 {
 
         // --- LONG ---
         if(packingForLong){
-            if(transaction.price() >= zz.getLastHigh()){
+            if(localTransaction.price() >= zz.getLastHigh()){
                 for(Position position : activePositions){
                     if(position.getDirection().equals(OrderSide.SELL)){
                         if(position.getGroup().equals(PositionGroup.FILLED)){
@@ -296,14 +294,14 @@ public class Strategy2 {
 
                 longOnEmptyActivePositions = true;
 
-            } else if(globalTransaction.price() <= longRangeLowStop){
-                longRangeLowStop = globalTransaction.price();
+            } else if(localTransaction.price() <= longRangeLowStop){
+                longRangeLowStop = localTransaction.price();
             }
         }
 
         // --- SHORT ---
         if (packingForShort){
-            if(transaction.price() <= zz.getLastLow()){
+            if(localTransaction.price() <= zz.getLastLow()){
                 for(Position position : activePositions){
                     if(position.getDirection().equals(OrderSide.BUY)){
                         if(position.getGroup().equals(PositionGroup.FILLED)){
@@ -314,8 +312,8 @@ public class Strategy2 {
 
                 shortOnEmptyActivePositions = true;
 
-            } else if(globalTransaction.price() >= shortRangeHighStop) {
-                shortRangeHighStop = globalTransaction.price();
+            } else if(localTransaction.price() >= shortRangeHighStop) {
+                shortRangeHighStop = localTransaction.price();
             }
         }
     }
@@ -327,14 +325,18 @@ public class Strategy2 {
 
     public void candleUpdate(Candle candle){
 
-        if(candle == localCandle){
-            if(globalCandle == null){
-                globalCandle = candle;
-            }
-        } else {
-            globalCandle = candle;
+        if(candle != localCandle){
             return;
         }
+
+//        if(candle == localCandle){
+//            if(globalCandle == null){
+//                globalCandle = candle;
+//            }
+//        } else {
+//            globalCandle = candle;
+//            return;
+//        }
 
 //        if(lastCandle != null && lastCandle.tick() <= -DISTANCE && candle.tick() > -DISTANCE){
 //            shortAttempt = true;
@@ -346,8 +348,6 @@ public class Strategy2 {
         if(DISPLAY_TRADING_GUI){
             tradingGUI.getCandlestickChart().newCandle(handler.getUserAssets().getMomentaryOwnedAssets(), candle, transaction);
         }
-
-        this.lastCandle = candle;
 
         if(candles.size() < 2 * zz.getDepth() + zz.getBackstep() + 1){
             return;
@@ -398,7 +398,7 @@ public class Strategy2 {
             packingForLong = true;
 
             longRangeHighEntry = Math.min(zz.getLastHigh(), candle.high());
-            longRangeLowStop = Math.min(longRangeLowStop, globalCandle.low());
+            longRangeLowStop = Math.min(longRangeLowStop, candle.low());
         } else {
             longBreak = true;
         }
@@ -412,7 +412,7 @@ public class Strategy2 {
             packingForShort = true;
 
             shortRangeLowEntry = Math.max(zz.getLastLow(), candle.low());
-            shortRangeHighStop = Math.max(shortRangeHighStop, globalCandle.high());
+            shortRangeHighStop = Math.max(shortRangeHighStop, candle.high());
         } else {
             shortBreak = true;
         }

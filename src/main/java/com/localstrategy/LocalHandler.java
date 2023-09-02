@@ -104,7 +104,7 @@ public class LocalHandler {
     }
 
     private void newCandle(Candle lastCandle) {
-        //strategy.candleUpdate(lastCandle);
+        strategy.candleUpdate(lastCandle);
     }
 
     public Position executeMarketOrder(double stopPrice, boolean adjustStop) {
