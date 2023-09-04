@@ -178,6 +178,8 @@ public class Position implements Cloneable {
         }
         closed = true;
 
+        group = PositionGroup.CLOSED;
+
         this.closeTimestamp = closeTimestamp;
 
         calculateRR(0);
@@ -453,7 +455,7 @@ public class Position implements Cloneable {
         return this.activeStopLoss;
     }
 
-    public void setActiveStopLoss(boolean activeStopLoss) {
+    public void setStopLossActive(boolean activeStopLoss) {
         this.activeStopLoss = activeStopLoss;
     }
 

@@ -210,7 +210,7 @@ public class OrderRequest {
                 marginLevel = Math.min(999, totalAssetValue / totalBorrowAndInterestValue);
             }
 
-            if (marginLevel <= 1.1) {
+            if (marginLevel <= 1.15) {
                 return false; // Just discard the position if our margin level would be less than 1.1 after execution
             }
 

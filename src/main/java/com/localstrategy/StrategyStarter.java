@@ -2,6 +2,7 @@ package com.localstrategy;
 
 import com.localstrategy.util.enums.EventDestination;
 import com.localstrategy.util.enums.EventType;
+import com.localstrategy.util.enums.OrderAction;
 import com.localstrategy.util.helper.BinaryOrderbookReader;
 import com.localstrategy.util.helper.BinaryTransactionLoader;
 import com.localstrategy.util.helper.EventScheduler;
@@ -83,12 +84,18 @@ public class StrategyStarter {
 
             Event event = scheduler.getNextEvent();
 
-            if(event.getType().equals(EventType.ACTION_REQUEST) && event.getOrder().getId() == 103){
-                boolean stop = true;
-            }
-
             if(!event.getType().equals(EventType.TRANSACTION)){
                 boolean stop = true;
+
+                if(event.getDestination().equals(EventDestination.LOCAL) && (event.getOrder() != null || (event.getUserDataStream() != null && !event.getUserDataStream().updatedOrders().isEmpty()))){
+                    stop = true;
+                }
+            }
+
+            if(event.getType().equals(EventType.ACTION_REQUEST) && event.getActionRequest().equals(OrderAction.CREATE_ORDER)){
+                if(event.getOrder().getPositionId() == 2027){
+                    boolean stop = true;
+                }
             }
 
             if (event.getDestination().equals(EventDestination.LOCAL)) {

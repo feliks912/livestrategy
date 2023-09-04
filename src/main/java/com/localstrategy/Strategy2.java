@@ -114,6 +114,8 @@ public class Strategy2 {
 
     public void priceUpdate(SingleTransaction transaction){
 
+        this.transaction = transaction;
+
         if(packingForShort && transaction.price() > shortRangeHighStop){
             shortRangeHighStop = transaction.price();
         }
@@ -248,7 +250,7 @@ public class Strategy2 {
         if(longOnEmptyActivePositions){
 
             Position newMarketPosition = handler.executeMarketOrder(longRangeLowStop
-                    + (longRangeLowStop - transaction.price()) * 0.2, true);
+                    - (transaction.price() - longRangeLowStop) * 0.2, true);
 
             if(newMarketPosition != null){
                 handler.activateStopLoss(newMarketPosition);
@@ -264,7 +266,7 @@ public class Strategy2 {
         } else if (shortOnEmptyActivePositions){
 
             Position newMarketPosition = handler.executeMarketOrder(shortRangeHighStop
-                    + (transaction.price() - shortRangeHighStop) * 0.2, true);
+                    + (shortRangeHighStop - transaction.price()) * 0.2, true);
 
             if(newMarketPosition != null){
                 handler.activateStopLoss(newMarketPosition);
@@ -302,13 +304,6 @@ public class Strategy2 {
         // --- SHORT ---
         if (packingForShort){
             if(localTransaction.price() <= zz.getLastLow()){
-                for(Position position : activePositions){
-                    if(position.getDirection().equals(OrderSide.BUY)){
-                        if(position.getGroup().equals(PositionGroup.FILLED)){
-                            handler.closePosition(position);
-                        }
-                    }
-                }
 
                 shortOnEmptyActivePositions = true;
 
@@ -326,6 +321,10 @@ public class Strategy2 {
     public void candleUpdate(Candle candle){
 
         if(candle != localCandle){
+            //TODO: Manually update value markers
+            if(DISPLAY_TRADING_GUI){
+                tradingGUI.getCandlestickChart().newCandle(handler.getUserAssets().getMomentaryOwnedAssets(), candle, this.transaction);
+            }
             return;
         }
 
@@ -343,11 +342,6 @@ public class Strategy2 {
 //        } else if(lastCandle != null && lastCandle.tick() >= DISTANCE && candle.tick() < DISTANCE){
 //            longAttempt = true;
 //        }
-
-        //TODO: Manually update value markers
-        if(DISPLAY_TRADING_GUI){
-            tradingGUI.getCandlestickChart().newCandle(handler.getUserAssets().getMomentaryOwnedAssets(), candle, transaction);
-        }
 
         if(candles.size() < 2 * zz.getDepth() + zz.getBackstep() + 1){
             return;
@@ -401,6 +395,16 @@ public class Strategy2 {
             longRangeLowStop = Math.min(longRangeLowStop, candle.low());
         } else {
             longBreak = true;
+
+            if(packingForLong){
+                for(Position position : activePositions){
+                    if(position.getDirection().equals(OrderSide.SELL)){
+                        if(position.getGroup().equals(PositionGroup.FILLED)){
+                            handler.closePosition(position);
+                        }
+                    }
+                }
+            }
         }
 
         // --- SHORT  ---
@@ -415,6 +419,16 @@ public class Strategy2 {
             shortRangeHighStop = Math.max(shortRangeHighStop, candle.high());
         } else {
             shortBreak = true;
+
+            if(packingForShort){
+                for(Position position : activePositions){
+                    if(position.getDirection().equals(OrderSide.BUY)){
+                        if(position.getGroup().equals(PositionGroup.FILLED)){
+                            handler.closePosition(position);
+                        }
+                    }
+                }
+            }
         }
 
         if(waitForNextCandle){
