@@ -93,7 +93,7 @@ public class StrategyStarter {
             }
 
             if(event.getType().equals(EventType.ACTION_REQUEST) && event.getActionRequest().equals(OrderAction.CREATE_ORDER)){
-                if(event.getOrder().getPositionId() == 2027){
+                if(event.getOrder().getPositionId() == 107){
                     boolean stop = true;
                 }
             }

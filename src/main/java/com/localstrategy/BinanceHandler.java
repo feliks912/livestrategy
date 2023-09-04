@@ -710,7 +710,7 @@ public class BinanceHandler {
     }
 
     private void createActionResponse(ActionResponse response, Order order) {
-        scheduler.addEvent(new Event(currentEvent.getDelayedTimestamp(), EventDestination.LOCAL, response, order));
+        scheduler.addEvent(new Event(currentEvent.getDelayedTimestamp(), EventDestination.LOCAL, response, order.clone()));
     }
 
     private void rejectOrder(RejectionReason reason, Order order) {

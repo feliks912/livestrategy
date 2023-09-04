@@ -14,6 +14,8 @@ public class EventScheduler {
 
     private final PriorityQueue<Event> eventQueue = new PriorityQueue<>(MAXIMUM_INSTANTANEOUS_EVENT_COUNT);
 
+    private long previousDelayedTimestamp = 0;
+
     public void addEvent(Event event) {
 
         int currentLatency = LatencyProcessor.getCurrentLatency();
@@ -26,21 +28,43 @@ public class EventScheduler {
                 }
                 event.setEventLatency(currentLatency);
             }
-            case ACTION_RESPONSE, USER_DATA_STREAM -> event.setEventLatency(currentLatency + EXCHANGE_PROCESSING_TIME);
-            case ACTION_REQUEST -> {
-
-                int totalLatency = LOCAL_PROCESSING_TIME;
-
-                //TODO: This break stuff. We're checking if stoploss is created before an entry order, and this makes it not so.
-//                if(event.getActionRequest().equals(OrderAction.CREATE_ORDER)
-//                        && event.getOrder().isAutomaticBorrow()
-//                        && event.getOrder().getPurpose().equals(OrderPurpose.ENTRY)){
-//                    totalLatency += EXCHANGE_PROCESSING_TIME; //Compensating for borrowing
-//                }
-
-                event.setEventLatency(currentLatency + totalLatency);
-
+            default -> {
+                long eventTime = event.getTimestamp();
+                if(previousDelayedTimestamp > eventTime + currentLatency){
+                    System.out.println("Latency error.");
+                    event.setEventLatency((int) (currentLatency + (previousDelayedTimestamp - eventTime - currentLatency)));
+                } else {
+                    event.setEventLatency(currentLatency);
+                }
+                previousDelayedTimestamp = event.getDelayedTimestamp();
             }
+//            case ACTION_RESPONSE, USER_DATA_STREAM -> {
+//                event.setEventLatency(currentLatency + EXCHANGE_PROCESSING_TIME);
+//                if(event.getDelayedTimestamp() > previousDelayedTimestamp){
+//                    System.out.println("Latency error.");
+//                }
+//
+//                previousDelayedTimestamp = event.getDelayedTimestamp();
+//            }
+//            case ACTION_REQUEST -> {
+//
+//                int totalLatency = LOCAL_PROCESSING_TIME;
+//
+//                //TODO: This break stuff. We're checking if stoploss is created before an entry order, and this makes it not so.
+////                if(event.getActionRequest().equals(OrderAction.CREATE_ORDER)
+////                        && event.getOrder().isAutomaticBorrow()
+////                        && event.getOrder().getPurpose().equals(OrderPurpose.ENTRY)){
+////                    totalLatency += EXCHANGE_PROCESSING_TIME; //Compensating for borrowing
+////                }
+//
+//                //event.setEventLatency(currentLatency + totalLatency);
+//
+//                if(event.getDelayedTimestamp() > previousDelayedTimestamp){
+//                    System.out.println("Latency error.");
+//                }
+//                previousDelayedTimestamp = event.getDelayedTimestamp();
+//
+//            }
         }
 
 

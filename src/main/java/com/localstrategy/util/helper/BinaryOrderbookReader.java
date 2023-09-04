@@ -19,13 +19,13 @@ public class BinaryOrderbookReader {
     private long startingTimestamp = 0;
     private long endingTimestamp = 0;
 
-    private static final Map<Double, Double> asks = new TreeMap<>();
-    private static final Map<Double, Double> bids = new TreeMap<>(Comparator.reverseOrder());
+    public static final Map<Double, Double> asks = new TreeMap<>();
+    public static final Map<Double, Double> bids = new TreeMap<>(Comparator.reverseOrder());
     private long relativeTimestamp = 0;
 
     private long bytesRead = 0;
 
-    private static double midprice = 0;
+    private static double midPrice = 0;
 
     public BinaryOrderbookReader(String filePath) throws IOException {
         this.path = Path.of(filePath);
@@ -45,7 +45,7 @@ public class BinaryOrderbookReader {
 
         LinkedHashMap<Double, Double> adjustedBook = new LinkedHashMap<>();
 
-        double diff = price - midprice;
+        double diff = price - midPrice;
 
         if(side.equals(OrderbookSide.ASKS)){
             for(Map.Entry<Double, Double> entry : asks.entrySet()){
@@ -107,7 +107,7 @@ public class BinaryOrderbookReader {
                 }
             }
 
-            midprice = (bids.keySet().iterator().next() + asks.keySet().iterator().next()) / 2;
+            midPrice = (bids.keySet().iterator().next() + asks.keySet().iterator().next()) / 2;
 
             return false;
         } catch (IOException e) {
@@ -119,5 +119,9 @@ public class BinaryOrderbookReader {
 
     public long getEndingTimestamp() {
         return endingTimestamp;
+    }
+
+    public static double getMidprice(){
+        return midPrice;
     }
 }

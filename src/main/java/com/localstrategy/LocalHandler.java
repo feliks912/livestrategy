@@ -172,8 +172,12 @@ public class LocalHandler {
 
         if (position.isClosedBeforeStopLoss()
                 || !position.getGroup().equals(PositionGroup.FILLED)
-                || (position.getCloseOrder() != null && position.getCloseOrder().getRejectionReason() == null)) {
+                || position.getCloseOrder() != null) {
             return true;
+        }
+
+        if(position.getId() == 107){
+            boolean stop = true;
         }
 
         sendAction(OrderAction.CREATE_ORDER, position.createCloseOrder(transaction));
@@ -248,36 +252,42 @@ public class LocalHandler {
                                             sendAction(OrderAction.REPAY_FUNDS, pos.getEntryOrder());
                                         } else if(!pos.getEntryOrder().getStatus().equals(OrderStatus.FILLED)) {
                                             System.out.println("Local Error - stop filled before entry");
-                                        } else {
+                                        } else if(!pos.isClosed()) {
                                             pos.setGroup(PositionGroup.CLOSED);
                                             pos.closePosition(currentEvent.getDelayedTimestamp());
                                             activePositions.remove(pos);
-                                            inactivePositions.add(pos);
+                                            inactivePositions.addFirst(pos);
                                         }
                                     }
                                     case CLOSE -> {
                                         if(pos.getEntryOrder().isAutomaticBorrow() && pos.getEntryOrder().getMarginBuyBorrowAmount().compareTo(BigDecimal.ZERO) != 0){
                                             sendAction(OrderAction.REPAY_FUNDS, pos.getEntryOrder());
-                                        } else {
+                                        } else if(!pos.isClosed()) {
                                             pos.setGroup(PositionGroup.CLOSED);
                                             pos.closePosition(currentEvent.getDelayedTimestamp());
                                             activePositions.remove(pos);
-                                            inactivePositions.add(pos);
+                                            inactivePositions.addFirst(pos);
                                         }
                                     }
                                 }
                             }
                         }
                         case REJECTED -> {
-                            switch(order.getPurpose()){
-                                case CLOSE -> {
-                                    if(pos.getStopOrder().getStatus().equals(OrderStatus.FILLED)){
-                                        pos.setCloseOrder(null);
-                                    } else {
-                                        System.out.println("Local Error - rejected order");
+                            switch(order.getRejectionReason()){
+                                case INSUFFICIENT_FUNDS -> {
+                                    switch(order.getPurpose()){
+                                        case CLOSE -> {
+                                            if(!pos.getStopOrder().getStatus().equals(OrderStatus.FILLED)){
+                                                System.out.println("Local Error - close order rejected due to insufficient funds");
+                                            }
+                                        }
+                                        case STOP -> {
+                                            if(pos.getCloseOrder() == null){
+                                                System.out.println("Local Error - stop order rejected due to insufficient funds");
+                                            }
+                                        }
                                     }
                                 }
-                                default -> System.out.println("Local Error - rejected order");
                             }
                         }
                     }
@@ -311,7 +321,7 @@ public class LocalHandler {
                                     pos.closePosition(currentEvent.getDelayedTimestamp());
                                     pos.setGroup(PositionGroup.CLOSED);
                                     activePositions.remove(pos);
-                                    inactivePositions.add(pos);
+                                    inactivePositions.addFirst(pos);
                                 }
                             }
                             case CLOSE -> {
@@ -325,7 +335,7 @@ public class LocalHandler {
                                         pos.setGroup(PositionGroup.CLOSED);
                                         pos.closePosition(currentEvent.getDelayedTimestamp());
                                         activePositions.remove(pos);
-                                        inactivePositions.add(pos);
+                                        inactivePositions.addFirst(pos);
                                     }
 
                                 } else {
@@ -409,21 +419,17 @@ public class LocalHandler {
                             }
                             case INSUFFICIENT_FUNDS -> {
                                 switch(order.getPurpose()){
-                                    case CLOSE, STOP -> {
-                                        if(!pos.getStopOrder().getStatus().equals(OrderStatus.FILLED)) {
-                                            for(Position position : activePositions){
-                                                if(position.getId() != pos.getId()){
-                                                    if(position.isAutomaticBorrow() && position.getMarginBuyBorrowAmount().compareTo(BigDecimal.ZERO) == 0){
-                                                        //Close that position and reattempt the close
-                                                        closePosition(position);
-                                                        break;
-                                                    }
-                                                }
-                                            }
-                                            repeatActionList.put(order, OrderAction.CREATE_ORDER);
+
+                                    case CLOSE -> {
+                                        if(!pos.getStopOrder().getStatus().equals(OrderStatus.FILLED)){
+                                            System.out.println("Local Error - close order rejected due to insufficient funds");
                                         }
                                     }
-                                    default -> System.out.println("Local Error - order rejected due to insufficient funds");
+                                    case STOP -> {
+                                        if(pos.getCloseOrder() == null){
+                                            System.out.println("Local Error - stop order rejected due to insufficient funds");
+                                        }
+                                    }
                                 }
                             }
                             case INSUFFICIENT_MARGIN -> {
@@ -444,18 +450,21 @@ public class LocalHandler {
                                 && pos.getStopOrder().getStatus().equals(OrderStatus.CANCELED)) {
                             pos.setGroup(PositionGroup.CANCELLED);
                             activePositions.remove(pos);
-                            inactivePositions.add(pos);
+                            inactivePositions.addFirst(pos);
                         } else if(order.getPurpose().equals(OrderPurpose.STOP)){
                             if(pos.getEntryOrder().getStatus().equals(OrderStatus.REJECTED)){
                                 pos.setGroup(PositionGroup.DISCARDED);
                                 activePositions.remove(pos);
-                                inactivePositions.add(pos);
+                                inactivePositions.addFirst(pos);
                             } else {
                                 pos.setStopLossActive(false);
                             }
                         }
                     }
                     case FUNDS_REPAID -> {
+
+                        pos.setRepaid(true);
+
                         if(order.getStatus().equals(OrderStatus.CANCELED)){
                             pos.setGroup(PositionGroup.CANCELLED);
                         } else {
@@ -474,7 +483,7 @@ public class LocalHandler {
                         }
 
                         activePositions.remove(pos);
-                        inactivePositions.add(pos);
+                        inactivePositions.addFirst(pos);
                     }
                 }
             }

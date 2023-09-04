@@ -1,6 +1,5 @@
 package com.localstrategy;
 
-import com.localstrategy.util.enums.OrderSide;
 import com.localstrategy.util.enums.PositionGroup;
 import com.localstrategy.util.helper.BinaryTransactionLoader;
 import com.localstrategy.util.helper.CandleConstructor;
@@ -111,6 +110,13 @@ public class Strategy2 {
     private int candleCounter = 0;
 
     private Candle localCandle;
+
+    private ArrayList<Position> closeConfirmationList = new ArrayList<>();
+
+    private boolean executeLong = true;
+    private boolean executeShort = true;
+
+    private boolean execute = false;
 
     public void priceUpdate(SingleTransaction transaction){
 
@@ -247,7 +253,7 @@ public class Strategy2 {
 
 
 
-        if(longOnEmptyActivePositions){
+        if(activePositions.isEmpty() && longOnEmptyActivePositions){
 
             Position newMarketPosition = handler.executeMarketOrder(longRangeLowStop
                     - (transaction.price() - longRangeLowStop) * 0.2, true);
@@ -263,7 +269,7 @@ public class Strategy2 {
             waitForNextCandle = true;
 
             longOnEmptyActivePositions = false;
-        } else if (shortOnEmptyActivePositions){
+        } else if (activePositions.isEmpty() && shortOnEmptyActivePositions){
 
             Position newMarketPosition = handler.executeMarketOrder(shortRangeHighStop
                     + (shortRangeHighStop - transaction.price()) * 0.2, true);
@@ -286,13 +292,6 @@ public class Strategy2 {
         // --- LONG ---
         if(packingForLong){
             if(localTransaction.price() >= zz.getLastHigh()){
-                for(Position position : activePositions){
-                    if(position.getDirection().equals(OrderSide.SELL)){
-                        if(position.getGroup().equals(PositionGroup.FILLED)){
-                            handler.closePosition(position);
-                        }
-                    }
-                }
 
                 longOnEmptyActivePositions = true;
 
@@ -318,6 +317,9 @@ public class Strategy2 {
 
     private Candle globalCandle;
 
+    boolean realPackingForLong = false;
+    boolean realPackingForShort = false;
+
     public void candleUpdate(Candle candle){
 
         if(candle != localCandle){
@@ -325,6 +327,33 @@ public class Strategy2 {
             if(DISPLAY_TRADING_GUI){
                 tradingGUI.getCandlestickChart().newCandle(handler.getUserAssets().getMomentaryOwnedAssets(), candle, this.transaction);
             }
+
+            if(candle.tick() < -DISTANCE){
+                realPackingForLong = true;
+            } else if(realPackingForLong){
+                realPackingForLong = false;
+
+                for(Position position : activePositions){
+                    if(position.getGroup().equals(PositionGroup.FILLED)){
+                        handler.closePosition(position);
+                        closeConfirmationList.add(position);
+                    }
+                }
+            }
+
+            if(candle.tick() > DISTANCE){
+                realPackingForShort = true;
+            } else if(realPackingForShort){
+                realPackingForShort = false;
+
+                for(Position position : activePositions){
+                    if(position.getGroup().equals(PositionGroup.FILLED)){
+                        handler.closePosition(position);
+                        closeConfirmationList.add(position);
+                    }
+                }
+            }
+
             return;
         }
 
@@ -397,13 +426,13 @@ public class Strategy2 {
             longBreak = true;
 
             if(packingForLong){
-                for(Position position : activePositions){
-                    if(position.getDirection().equals(OrderSide.SELL)){
-                        if(position.getGroup().equals(PositionGroup.FILLED)){
-                            handler.closePosition(position);
-                        }
-                    }
-                }
+//                for(Position position : activePositions){
+//                    if(position.getDirection().equals(OrderSide.SELL)){
+//                        if(position.getGroup().equals(PositionGroup.FILLED)){
+//                            handler.closePosition(position);
+//                        }
+//                    }
+//                }
             }
         }
 
@@ -421,13 +450,13 @@ public class Strategy2 {
             shortBreak = true;
 
             if(packingForShort){
-                for(Position position : activePositions){
-                    if(position.getDirection().equals(OrderSide.BUY)){
-                        if(position.getGroup().equals(PositionGroup.FILLED)){
-                            handler.closePosition(position);
-                        }
-                    }
-                }
+//                for(Position position : activePositions){
+//                    if(position.getDirection().equals(OrderSide.BUY)){
+//                        if(position.getGroup().equals(PositionGroup.FILLED)){
+//                            handler.closePosition(position);
+//                        }
+//                    }
+//                }
             }
         }
 

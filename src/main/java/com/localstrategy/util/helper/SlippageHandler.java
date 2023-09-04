@@ -1,11 +1,9 @@
 package com.localstrategy.util.helper;
 
 import com.localstrategy.util.enums.OrderSide;
-import com.localstrategy.util.enums.OrderbookSide;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class SlippageHandler {
@@ -16,10 +14,12 @@ public class SlippageHandler {
     private static final long BTCUSDT_DAILY_VOLUME = 8_570_000_000L;
 
     public static BigDecimal getSlippageFillFromBook(BigDecimal price, BigDecimal orderSize, OrderSide orderSide){
-        LinkedHashMap<Double, Double> tempMap = new LinkedHashMap<>(
-                BinaryOrderbookReader.shiftOrderbook(price.doubleValue(),
-                orderSide.equals(OrderSide.BUY) ? OrderbookSide.ASKS : OrderbookSide.BIDS)
-        );
+
+        //Shift price and difference and compare to existing map without the need of shifting the entire orderbook
+
+        double priceDiff = price.doubleValue() - BinaryOrderbookReader.getMidprice();
+
+        Map<Double, Double> map = orderSide.equals(OrderSide.BUY) ? BinaryOrderbookReader.asks : BinaryOrderbookReader.bids;
 
         double size = orderSize.doubleValue();
 
@@ -27,7 +27,7 @@ public class SlippageHandler {
 
         double weight = 0;
 
-        for(Map.Entry<Double, Double> e : tempMap.entrySet()){
+        for(Map.Entry<Double, Double> e : map.entrySet()){
             if(cumQ + Math.abs(e.getValue()) < size){
                 weight += Math.abs(e.getValue()) * e.getKey();
                 cumQ += Math.abs(e.getValue());
@@ -39,15 +39,11 @@ public class SlippageHandler {
 
         double fillPrice = weight / size;
 
-        return BigDecimal.valueOf(fillPrice);
+        return BigDecimal.valueOf(fillPrice + priceDiff);
     }
 
     public static BigDecimal getMaximumOrderSizeFromBook(BigDecimal price, BigDecimal priceDifference,
                                                          BigDecimal percentage, OrderSide orderSide){
-        LinkedHashMap<Double, Double> tempMap = new LinkedHashMap<>(
-                BinaryOrderbookReader.shiftOrderbook(price.doubleValue(),
-                        orderSide.equals(OrderSide.BUY) ? OrderbookSide.ASKS : OrderbookSide.BIDS)
-        );
 
         BigDecimal direction = (orderSide.equals(OrderSide.BUY) ? BigDecimal.ONE : BigDecimal.ONE.negate());
         BigDecimal fillingPrice = price.add(direction.multiply(percentage.divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP)
@@ -58,9 +54,13 @@ public class SlippageHandler {
         double cumQ = 0;
         double weight = 0;
 
-        for(Map.Entry<Double, Double> e : tempMap.entrySet()){
+        Map<Double, Double> map = orderSide.equals(OrderSide.BUY) ? BinaryOrderbookReader.asks : BinaryOrderbookReader.bids;
 
-            if(Math.abs((weight + e.getKey() * Math.abs(e.getValue())) / (cumQ + Math.abs(e.getValue())) - price.doubleValue()) > diff){
+        for(Map.Entry<Double, Double> e : map.entrySet()){
+
+            double currentDiff = Math.abs((weight + e.getKey() * Math.abs(e.getValue())) / (cumQ + Math.abs(e.getValue())) - fillingPrice.doubleValue());
+
+            if(currentDiff > diff){
 
                 if(cumQ == 0 && weight == 0){
                     return BigDecimal.valueOf(Math.abs(e.getValue()));
