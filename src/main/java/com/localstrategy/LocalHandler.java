@@ -248,7 +248,6 @@ public class LocalHandler {
                                         pos.setFilled(true);
                                     }
                                     case STOP -> {
-
                                         if(pos.getCloseOrder() != null){
                                             order.setType(OrderType.MARKET);
                                             order.setStatus(OrderStatus.NEW);
@@ -256,11 +255,15 @@ public class LocalHandler {
 
                                             sendAction(OrderAction.CREATE_ORDER, order);
                                         } else {
-                                            if(pos.getEntryOrder().isAutomaticBorrow() && pos.getEntryOrder().getMarginBuyBorrowAmount().compareTo(BigDecimal.ZERO) != 0){
+                                            if(pos.getEntryOrder().isAutomaticBorrow() && pos.getEntryOrder().getMarginBuyBorrowAmount().doubleValue() > 0e-7){
                                                 sendAction(OrderAction.REPAY_FUNDS, pos.getEntryOrder());
+                                                pos.setRepayRequestSent(true);
                                             } else if(!pos.getEntryOrder().getStatus().equals(OrderStatus.FILLED)) {
                                                 System.out.println("Local Error - stop filled before entry");
                                             } else if(!pos.isClosed()) {
+                                                if(pos.getEntryOrder().getMarginBuyBorrowAmount().doubleValue() > 0e-7 && !pos.isRepaid()){
+                                                    System.out.println("Not repaid.");
+                                                }
                                                 pos.setGroup(PositionGroup.CLOSED);
                                                 pos.closePosition(currentEvent.getDelayedTimestamp());
                                                 activePositions.remove(pos);
@@ -273,6 +276,19 @@ public class LocalHandler {
                         }
                         case REJECTED -> {
                             switch(order.getRejectionReason()){
+                                case INVALID_ORDER_STATE -> {
+                                    //order filled during cancel
+                                    if(order.getStatus().equals(OrderStatus.FILLED)){
+                                        order.setType(OrderType.MARKET);
+                                        order.setStatus(OrderStatus.NEW);
+                                        order.setDirection(order.getDirection().equals(OrderSide.BUY) ? OrderSide.SELL : OrderSide.BUY);
+                                        order.setAppropriateUnitPositionValue(order.getSize()); //FIXME: This necessary?
+
+                                        sendAction(OrderAction.CREATE_ORDER, order);
+
+                                        System.out.println("Local Error - order filled during cancel request");
+                                    }
+                                }
                                 case INSUFFICIENT_FUNDS -> {
                                     switch(order.getPurpose()){
                                         case CLOSE -> {
@@ -285,19 +301,6 @@ public class LocalHandler {
                                                 System.out.println("Local Error - stop order rejected due to insufficient funds");
                                             }
                                         }
-                                    }
-                                }
-                                case INVALID_ORDER_STATE -> {
-                                    //order filled during cancel
-                                    if(order.getStatus().equals(OrderStatus.FILLED)){
-                                        order.setType(OrderType.MARKET);
-                                        order.setStatus(OrderStatus.NEW);
-                                        order.setDirection(order.getDirection().equals(OrderSide.BUY) ? OrderSide.SELL : OrderSide.BUY);
-                                        order.setAppropriateUnitPositionValue(order.getSize()); //FIXME: This necessary?
-
-                                        sendAction(OrderAction.CREATE_ORDER, order);
-
-                                        System.out.println("Local Error - order filled during cancel request");
                                     }
                                 }
                             }
@@ -323,34 +326,27 @@ public class LocalHandler {
                                 pos.setFillPrice(order.getFillPrice());
                             }
                             case STOP -> {
-                                if(!pos.isRepaid() && pos.getEntryOrder().isAutomaticBorrow() && pos.getEntryOrder().getMarginBuyBorrowAmount().compareTo(BigDecimal.ZERO) != 0){
+                                if(!pos.isRepaid() && pos.getEntryOrder().getMarginBuyBorrowAmount().doubleValue() > 0e-7){
                                     sendAction(OrderAction.REPAY_FUNDS, pos.getEntryOrder());
+                                    pos.setRepayRequestSent(true);
+                                } else if(pos.getCloseOrder() != null && pos.getCloseOrder().getStatus().equals(OrderStatus.REJECTED)){
+                                    pos.getCloseOrder().setStatus(OrderStatus.NEW);
+                                    sendAction(OrderAction.CREATE_ORDER, pos.getCloseOrder());
                                 } else {
-                                    if(!pos.getEntryOrder().getStatus().equals(OrderStatus.FILLED)){
-                                        sendAction(OrderAction.CANCEL_ORDER, pos.getEntryOrder());
+                                    if(pos.getEntryOrder().getMarginBuyBorrowAmount().doubleValue() > 0e-7 && !pos.isRepaid()){
+                                        System.out.println("Not repaid.");
                                     }
-
                                     pos.closePosition(currentEvent.getDelayedTimestamp());
                                     pos.setGroup(PositionGroup.CLOSED);
                                     activePositions.remove(pos);
-                                    inactivePositions.addFirst(pos);
+                                    inactivePositions.add(pos);
                                 }
                             }
                             case CLOSE -> {
 
                                 if(!pos.getStopOrder().getStatus().equals(OrderStatus.FILLED)) {
                                     sendAction(OrderAction.CANCEL_ORDER, pos.getStopOrder());
-
-                                    if(!pos.isRepaid() && pos.getEntryOrder().isAutomaticBorrow() && pos.getEntryOrder().getMarginBuyBorrowAmount().compareTo(BigDecimal.ZERO) != 0){
-                                        sendAction(OrderAction.REPAY_FUNDS, pos.getEntryOrder());
-                                    } else {
-                                        pos.setGroup(PositionGroup.CLOSED);
-                                        pos.closePosition(currentEvent.getDelayedTimestamp());
-                                        activePositions.remove(pos);
-                                        inactivePositions.addFirst(pos);
-                                    }
-
-                                } else {
+                                } else if(pos.getStopOrder().getType().equals(OrderType.LIMIT)){
                                     //Stop order triggered after closing the position
                                     Order stopOrder = pos.getStopOrder();
                                     stopOrder.setType(OrderType.MARKET);
@@ -358,6 +354,16 @@ public class LocalHandler {
                                     stopOrder.setDirection(stopOrder.getDirection().equals(OrderSide.BUY) ? OrderSide.SELL : OrderSide.BUY);
 
                                     sendAction(OrderAction.CREATE_ORDER, stopOrder);
+                                } else if(!pos.isRepaid() && pos.getMarginBuyBorrowAmount().doubleValue() > 0e-7) {
+                                    sendAction(OrderAction.REPAY_FUNDS, pos.getEntryOrder());
+                                } else {
+                                    if(pos.getEntryOrder().getMarginBuyBorrowAmount().doubleValue() > 0e-7 && !pos.isRepaid()){
+                                        System.out.println("Not repaid.");
+                                    }
+                                    pos.setGroup(PositionGroup.CLOSED);
+                                    pos.closePosition(currentEvent.getDelayedTimestamp());
+                                    activePositions.remove(pos);
+                                    inactivePositions.add(pos);
                                 }
 
                                 if(!pos.getEntryOrder().getStatus().equals(OrderStatus.FILLED)){
@@ -372,7 +378,7 @@ public class LocalHandler {
                             pos.setStopLossActive(true);
                         }
 
-                        if(pos.getEntryOrder().isAutomaticBorrow() && order.getMarginBuyBorrowAmount().doubleValue() == 0){
+                        if(pos.getEntryOrder().isAutomaticBorrow() && order.getMarginBuyBorrowAmount().doubleValue() > 0e-7){
                             //System.out.println("Local Error - illegal borrow");
                         }
                     }
@@ -464,9 +470,7 @@ public class LocalHandler {
                             activePositions.remove(pos);
                             inactivePositions.add(pos);
                         } else {
-                            if(order.getPurpose().equals(OrderPurpose.ENTRY) && !pos.getEntryOrder().isAutoRepayAtCancel()){
-                                sendAction(OrderAction.REPAY_FUNDS, order);
-                            } else if (pos.getEntryOrder().getStatus().equals(OrderStatus.CANCELED)
+                            if (pos.getEntryOrder().getStatus().equals(OrderStatus.CANCELED)
                                     && pos.getStopOrder().getStatus().equals(OrderStatus.CANCELED)) {
                                 pos.setGroup(PositionGroup.CANCELLED);
                                 activePositions.remove(pos);
@@ -476,6 +480,18 @@ public class LocalHandler {
                                     pos.setGroup(PositionGroup.DISCARDED);
                                     activePositions.remove(pos);
                                     inactivePositions.addFirst(pos);
+                                } else if(pos.getCloseOrder() != null && pos.getCloseOrder().getStatus().equals(OrderStatus.FILLED)) {
+                                    if(pos.getEntryOrder().isAutomaticBorrow() && pos.getMarginBuyBorrowAmount().doubleValue() > 0e-7){
+                                        sendAction(OrderAction.REPAY_FUNDS, pos.getEntryOrder());
+                                    } else {
+                                        if(pos.getEntryOrder().getMarginBuyBorrowAmount().doubleValue() > 0e-7 && !pos.isRepaid()){
+                                            System.out.println("Not repaid.");
+                                        }
+                                        pos.setGroup(PositionGroup.CLOSED);
+                                        pos.closePosition(currentEvent.getDelayedTimestamp());
+                                        inactivePositions.add(pos);
+                                        activePositions.remove(pos);
+                                    }
                                 } else {
                                     pos.setStopLossActive(false);
                                 }

@@ -120,6 +120,8 @@ public class Strategy2 {
                 if(newPos != null){
                     handler.activateStopLoss(newPos);
                 }
+                positionCount++;
+
                 pleaseLong = false;
             }
         }
@@ -137,6 +139,8 @@ public class Strategy2 {
                 if(newPos != null){
                     handler.activateStopLoss(newPos);
                 }
+                positionCount++;
+
                 pleaseShort = false;
             }
         }
@@ -167,7 +171,7 @@ public class Strategy2 {
         for(Map.Entry<Double, Double> entry : shortOpportunities.entrySet()){
             if(transaction.price() < entry.getKey()){
                 for(Position pos : activePositions){
-                    if(pos.getDirection().equals(OrderSide.BUY)){
+                    if(pos.getDirection().equals(OrderSide.BUY) && !pos.isRepayRequestSent()){
                         handler.closePosition(pos);
                     }
                 }
