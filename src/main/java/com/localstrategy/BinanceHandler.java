@@ -16,7 +16,7 @@ import java.util.LinkedList;
 
 //TODO: Check if overall borrow / profit logic is alright
 
-//TODO: Separate Order and Position classes - Position class is a local class comprising of position value and a stop-loss order, Order class is a single BinanceHandler-supported order request
+//TODO: Separate Order and SimplePosition classes - SimplePosition class is a local class comprising of position value and a stop-loss order, Order class is a single BinanceHandler-supported order request
 
 
 //FIXME: Refactor
@@ -27,7 +27,7 @@ import java.util.LinkedList;
 //TODO: Add symbol rules (later)
 //TODO: BinanceHandler doesn't actually keep track of filled positions but it does offer a list (later)
 //TODO: Add manual borrow action (later)
-//TODO: Position liquidation (later)
+//TODO: SimplePosition liquidation (later)
 
 public class BinanceHandler {
 

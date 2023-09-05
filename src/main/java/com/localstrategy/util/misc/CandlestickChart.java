@@ -1,7 +1,8 @@
 package com.localstrategy.util.misc;
 
+import com.localstrategy.SimpleExecutor;
+import com.localstrategy.SimplePosition;
 import com.localstrategy.util.types.Candle;
-import com.localstrategy.util.types.Position;
 import com.localstrategy.util.types.SingleTransaction;
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
@@ -52,15 +53,15 @@ public class CandlestickChart extends JFrame {
 
     private int candleStepTime;
 
-    ArrayList<Position> activePositions;
+    ArrayList<SimplePosition> activeSimplePositions;
 
-    public CandlestickChart(int distance, PositionsTable positionsTable, ArrayList<Position> activePositions, boolean visible, int candleStepTime) {
+    public CandlestickChart(int distance, PositionsTable positionsTable, ArrayList<SimplePosition> activeSimplePositions, boolean visible, int candleStepTime) {
         super("Candlestick Chart Demo");
         this.positionsTable = positionsTable;
 
         this.distanceSet = distance;
         this.candleStepTime = candleStepTime;
-        this.activePositions = activePositions;
+        this.activeSimplePositions = activeSimplePositions;
 
         calendar.set(1970, Calendar.JANUARY, 1, 0, 0, 0);
 
@@ -216,19 +217,17 @@ public class CandlestickChart extends JFrame {
         addNewCandle(candle);
 
         // Update the value markers with the new candle's high and low values
-        updateValueMarkers(activePositions);
+        updateValueMarkers(activeSimplePositions);
 
         // Update the info box with the current index information
-        updateInfoBox(infoBox, "Position count: " + activePositions.size(), 0);
+        updateInfoBox(infoBox, "SimplePosition count: " + activeSimplePositions.size(), 0);
 
         //FIXME: Add temporaryProfit
-        double lastPositionProfit = activePositions.isEmpty() ?
-                0 : activePositions.get(activePositions.size() - 1).getFillPrice() == null ?
-                0 : activePositions.get(activePositions.size() - 1).calculateProfit(candle.close());
+        double lastSimplePositionProfit = 0;
 
-         if(lastPositionProfit != 0){
-            updateInfoBox(infoBox2, "last Profit: " + String.format("%.2f", lastPositionProfit), 0.02);
-            previousProfit = lastPositionProfit;
+         if(lastSimplePositionProfit != 0){
+            updateInfoBox(infoBox2, "last Profit: " + String.format("%.2f", lastSimplePositionProfit), 0.02);
+            previousProfit = lastSimplePositionProfit;
         } else {
             updateInfoBox(infoBox2, "last Profit: " + String.format("%.2f", previousProfit), 0.02);
         }
@@ -286,7 +285,7 @@ public class CandlestickChart extends JFrame {
         // Update the info box with the current index information
     }
 
-    private void updateValueMarkers(List<Position> positions) {
+    private void updateValueMarkers(List<SimplePosition> positions) {
         // Get the chart's plot
         JFreeChart chart = ((ChartPanel) getContentPane().getComponent(0)).getChart();
         XYPlot plot = chart.getXYPlot();
@@ -311,10 +310,10 @@ public class CandlestickChart extends JFrame {
         int maxEndpointIndex = Math.min(dataset.getItemCount(0) - 1 + MAX_CANDLES, dataset.getItemCount(0) - 1);
 
         // Add new annotations for each position
-        for (Position position : positions) {
-            if(position.getEntryOrder().getFillPrice() != null){
-                double priceEntry = position.getEntryOrder().getFillPrice().doubleValue();
-                double stopLossPrice = position.getStopOrder().getOpenPrice().doubleValue();
+        for (SimplePosition position : positions) {
+            if(position.state.equals(SimpleExecutor.State.FILLED)){
+                double priceEntry = position.entry;
+                double stopLossPrice = position.stop;
                 int entryIndex = 0; // position.getEntryPriceIndex();
                 int stopLossIndex = 0; // position.getInitialStopLossIndex();
 
@@ -322,13 +321,13 @@ public class CandlestickChart extends JFrame {
                     // Create and add ray for entry price
                     XYLineAnnotation entryRay = new XYLineAnnotation(
                             dataset.getXValue(0, maxEndpointIndex - (currentIndex - entryIndex) + 1), priceEntry, dataset.getXValue(0, maxEndpointIndex), priceEntry,
-                            new BasicStroke(2f), position.isFilled() ? Color.GREEN : Color.ORANGE
+                            new BasicStroke(2f), Color.GREEN
                     );
                     plot.addAnnotation(entryRay);
                     annotations.add(entryRay);
                 } else {
                     ValueMarker entryMarker = new ValueMarker(priceEntry);
-                    entryMarker.setPaint(position.isFilled() ? Color.GREEN : Color.ORANGE);
+                    entryMarker.setPaint(Color.GREEN);
                     entryMarker.setStroke(new BasicStroke(2f));
                     plot.addRangeMarker(entryMarker);
                     valueMarkers.add(entryMarker);

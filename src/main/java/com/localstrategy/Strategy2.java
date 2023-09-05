@@ -51,7 +51,7 @@ public class Strategy2 {
         this.inactivePositions = Collections.unmodifiableList(inactivePositions);
 
         if(DISPLAY_TRADING_GUI){
-            this.tradingGUI = new TradingGUI(activePositions, inactivePositions, DISTANCE, CANDLE_STEP_TIME_MS);
+            this.tradingGUI = new TradingGUI(new ArrayList<SimplePosition>(), inactivePositions, DISTANCE, CANDLE_STEP_TIME_MS);
         }
 
         // Your code

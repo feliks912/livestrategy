@@ -231,13 +231,10 @@ public class LocalHandler {
                 }
 
                 for(Order order : event.getUserDataStream().updatedOrders()){
-
                     Position pos = findPosition(order);
-
                     if(pos == null){
                         return;
                     }
-
                     switch(order.getStatus()){
                         case FILLED -> {
                             if(order.getType().equals(OrderType.LIMIT)){

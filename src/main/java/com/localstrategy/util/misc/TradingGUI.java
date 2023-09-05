@@ -1,5 +1,6 @@
 package com.localstrategy.util.misc;
 
+import com.localstrategy.SimplePosition;
 import com.localstrategy.util.types.Position;
 
 import javax.swing.*;
@@ -17,7 +18,7 @@ public class TradingGUI extends JFrame {
     private double currentPortfolio = 0;
 
 
-    public TradingGUI(ArrayList<Position> activePositions, LinkedList<Position> inactivePositions, int distance, int candleStepTime) {
+    public TradingGUI(ArrayList<SimplePosition> activePositions, LinkedList<Position> inactivePositions, int distance, int candleStepTime) {
         // Set the layout manager for the frame
         setLayout(new BorderLayout());
 
