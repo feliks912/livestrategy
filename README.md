@@ -1,6 +1,6 @@
 # livestrategy
 
-This backtesting engine is designed to utilize historical data from Binance for rigorous testing of market strategies. It incorporates a range of powerful features to help you assess and fine-tune your trading strategies effectively.
+Java backtesting engine - utilizes historical data from Binance for rigorous testing of market strategies.
 
 ## Features:
 
@@ -20,4 +20,4 @@ This backtesting engine is designed to utilize historical data from Binance for 
 
 - **Trailing Stoploss:** Implement trailing stop-loss mechanisms, both price-based and using Binance's percentage-based options.
 
-This project is a valuable tool for traders and researchers looking to test and refine their trading strategies. Feel free to explore and contribute to further enhancements.
+- **Candlestick chart:** Track positions as they're made on a historical candlestick chart.
